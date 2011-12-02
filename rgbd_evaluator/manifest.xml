@@ -1,0 +1,25 @@
+<package>
+  <description>
+  </description>
+  <author>David Gossow</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  
+  <!-- Specify package dependencies (need for library linking, include dirs) -->
+  
+  <depend package="std_msgs" />
+  <depend package="visualization_msgs" />
+  <depend package="sensor_msgs" />
+
+  <depend package="image_transport" />
+  <depend package="tf" />
+  <depend package="dynamic_reconfigure" />
+  
+  <depend package="opencv2" />
+  <depend package="eigen" />
+  
+  <depend package="rgbd_features" />
+    
+</package>
+
+

@@ -1,0 +1,17 @@
+<package>
+  <description brief="ar_fixed_frame">
+
+     ar_fixed_frame
+
+  </description>
+  <author>David Gossow</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ar_fixed_frame</url>
+  <depend package="std_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="tf"/>
+
+</package>
+
+

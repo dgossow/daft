@@ -1,0 +1,8 @@
+<launch>
+ 
+  <node pkg="rgbd_evaluator" type="rgbd_evaluator_node" name="rgbd_evaluator_node" output="screen">
+    <remap from="points" to="/camera/depth_registered/points"/>
+    <remap from="camera_info" to="/camera/rgb/camera_info"/>
+  </node>
+
+</launch>
