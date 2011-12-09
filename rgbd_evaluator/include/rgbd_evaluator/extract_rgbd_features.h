@@ -11,12 +11,15 @@
 #include <image_transport/image_transport.h>
 
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 
 #include <rgbd_features/integral_image.h>
 #include <rgbd_features/key_point.h>
 
 #include <dynamic_reconfigure/server.h>
+
+#include <opencv2/core/core.hpp>
 
 namespace rgbd_evaluator {
 
@@ -28,8 +31,9 @@ public:
 	virtual ~ExtractRgbdFeatures();
 
 	// message callbacks
-	void processPointCloud(const sensor_msgs::PointCloud2::ConstPtr& msg);
-	void processCameraInfo(const sensor_msgs::CameraInfo::ConstPtr& msg);
+	void processCameraInfo( const sensor_msgs::CameraInfo::ConstPtr& msg );
+	void processRGBDImage( const sensor_msgs::Image::ConstPtr rgb_image,
+			const sensor_msgs::Image::ConstPtr depth_image );
 
 	const std::vector<rgbd_features::KeyPoint> & keypoints() const { return keypoints_; }
 
@@ -38,7 +42,7 @@ private:
 	void dynConfigCb(RgbdFeaturesConfig &config, uint32_t level);
 
 	// core feature computation
-	void computeFeatures(const sensor_msgs::PointCloud2::ConstPtr& msg);
+	void computeFeatures( );
 
 	void imageSizeChanged();
 
@@ -68,7 +72,8 @@ private:
 	dynamic_reconfigure::Server<RgbdFeaturesConfig> dyn_conf_srv_;
 	dynamic_reconfigure::Server<RgbdFeaturesConfig>::CallbackType dyn_conf_cb_;
 
-	sensor_msgs::PointCloud2::ConstPtr point_cloud_;
+	cv::Mat rgb_image_;
+	cv::Mat depth_image_;
 
 	rgbd_features::IntegralImage integral_image_;
 	double **scale_map_;

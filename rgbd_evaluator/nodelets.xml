@@ -1,8 +1,7 @@
-<!-- Kinect driver nodelet publisher -->
-<library path="lib/libextract_rgbd_features_nodelet">
-  <class name="rgbd_features/ExtractRgbdFeaturesNodelet" type="rgbd_features::ExtractRgbdFeaturesNodelet" base_class_type="nodelet::Nodelet">
+<library path="lib/librgbd_evaluator_nodelet">
+  <class name="rgbd_evaluator/RgbdEvaluatorNodelet" type="rgbd_evaluator::RgbdEvaluatorNodelet" base_class_type="nodelet::Nodelet">
     <description>
-      This nodelet extracts features from the Kinect data
+      RGBD Evaluator.
     </description>
   </class>
 </library>

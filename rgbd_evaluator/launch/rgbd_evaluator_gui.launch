@@ -1,16 +1,20 @@
 <launch>
 
   <node pkg="image_view" type="image_view" name="image_view_rgbd_features" output="screen">
-    <remap from="image" to="/rgbd_evaluator_node/image_out"/>
+    <remap from="image" to="/rgbd_evaluator/image_out"/>
     <param name="autosize" value="true"/>
   </node>
 
   <node pkg="image_view" type="image_view" name="image_view_rgbd_image" output="screen">
-    <remap from="image" to="/kinect/rgb/image_color"/>
+    <remap from="image" to="/camera/rgb/image_rect_color"/>
     <param name="autosize" value="true"/>
   </node>
 
-  <node pkg="dynamic_reconfigure" type="reconfigure_gui" name="reconfigure_rgbd_evaluator_node" output="screen" args="/rgbd_evaluator_node" respawn="true"/>
+  <node pkg="dynamic_reconfigure" type="reconfigure_gui" name="reconfigure_rgbd_evaluator_node" 
+        output="screen" args="/rgbd_evaluator" respawn="true"/>
+
+  <node pkg="dynamic_reconfigure" type="reconfigure_gui" name="reconfigure_camera" 
+        output="screen" args="/camera/driver" respawn="true"/>
 
 </launch>
 

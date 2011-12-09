@@ -8,6 +8,9 @@ rosbuild_init ()
 add_definitions (-Wall -O3 -Winvalid-pch -pipe -funroll-loops -fPIC)
 rosbuild_check_for_sse ()
 
+# Find OpenCV
+find_package(OpenCV REQUIRED)
+
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
@@ -16,16 +19,13 @@ rosbuild_find_ros_package(dynamic_reconfigure)
 include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
 gencfg()
 
-# Make .so from ExtractFeatures class
-#${SSE_FLAGS}
-#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -O3  -march=native -fopenmp ${SSE_FLAGS}" )
-#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3  -march=native -fopenmp -fPIC ${SSE_FLAGS}" )
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS}" )
+#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS}" )
 
-# Make node
-rosbuild_add_executable (rgbd_evaluator_node 
+# Make nodelet
+rosbuild_add_library (rgbd_evaluator_nodelet 
 src/rgbd_evaluator.cpp
 src/extract_rgbd_features.cpp
-src/rgbd_evaluator_node.cpp
+src/rgbd_evaluator_nodelet.cpp
 )
+target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
 

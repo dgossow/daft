@@ -1,0 +1,2 @@
+{debayering: 1, depth_ir_offset_x: 5.0, depth_ir_offset_y: 4.0, depth_mode: 5, depth_registration: true,
+  depth_time_offset: 0.0, image_mode: 1, image_time_offset: 0.0, z_offset_mm: 0}

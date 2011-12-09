@@ -11,7 +11,11 @@
 
 #include <tf/transform_listener.h>
 
-#include <sensor_msgs/PointCloud2.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+#include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 
 namespace rgbd_evaluator {
@@ -32,15 +36,20 @@ private:
 			std::string frame_id, ros::Time stamp, std::string ns, int id, float r, float g, float b );
 
 	// message callbacks
-	void pointCloudCb(const sensor_msgs::PointCloud2::ConstPtr& msg);
-	void cameraInfoCb(const sensor_msgs::CameraInfo::ConstPtr& msg);
-
-	ros::Subscriber sub_pointcloud2_;
-	ros::Subscriber sub_camerainfo_;
-
-	ros::Publisher pub_markers_;
+	void rgbdImageCb(const sensor_msgs::Image::ConstPtr rgb_img,
+			const sensor_msgs::Image::ConstPtr depth_img, const sensor_msgs::CameraInfo::ConstPtr cam_info );
 
 	ros::NodeHandle comm_nh_;
+
+	message_filters::Subscriber<sensor_msgs::Image> rgb_img_sub_;
+	message_filters::Subscriber<sensor_msgs::Image> depth_img_sub_;
+	message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub_;
+
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
+
+  message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync_;
+
+	ros::Publisher pub_markers_;
 
 	tf::TransformListener tf_listener_;
 

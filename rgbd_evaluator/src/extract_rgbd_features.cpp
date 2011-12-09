@@ -19,6 +19,9 @@
 #include <rgbd_features/harris_filter.h>
 #include <rgbd_features/good_features_to_track_filter.h>
 
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
+
 // ROS
 #include <ros/ros.h>
 
@@ -27,52 +30,10 @@
 
 #include <Eigen/LU>
 
+#include "rgbd_evaluator/timing.h"
+
 using std::vector;
 using namespace rgbd_features;
-
-///////////////////
-static std::map< std::string, std::pair<double, double> > __timing_list;
-
-#define TIME_MS( FUNCTION ) \
-{ \
-  timeval t1,t2; \
-  gettimeofday(&t1, NULL); \
-  FUNCTION \
-  gettimeofday(&t2, NULL); \
-  double elapsed_time = (t2.tv_sec - t1.tv_sec) * 1000.0 + (t2.tv_usec - t1.tv_usec) / 1000.0; \
-/*  ROS_INFO( "%.4lf ms for " #FUNCTION, elapsed_time ); */ \
-  \
-  if ( __timing_list.find( #FUNCTION ) == __timing_list.end() ) { \
-    __timing_list[ #FUNCTION ] = std::pair<double,double>(0,0); \
-  } \
-  __timing_list[ #FUNCTION ].second += elapsed_time; \
-}
-
-void increase_counters()
-{
-  std::map< std::string, std::pair<double, double> >::iterator timing_it = __timing_list.begin();
-  while( timing_it != __timing_list.end() )
-  {
-    timing_it->second.first ++;
-    timing_it++;
-  }
-}
-
-void print_time()
-{
-  double time_total = 0;
-  std::map< std::string, std::pair<double, double> >::iterator timing_it = __timing_list.begin();
-  while( timing_it != __timing_list.end() )
-  {
-    double time_mean = timing_it->second.second/timing_it->second.first;
-    ROS_INFO( "%.4lf ms mean time for %s", time_mean, timing_it->first.c_str() );
-    time_total += time_mean;
-    timing_it++;
-  }
-  ROS_INFO( "%.4lf ms mean time in total.", time_total );
-}
-////////////////////
-
 
 namespace rgbd_evaluator
 {
@@ -110,47 +71,55 @@ void ExtractRgbdFeatures::dynConfigCb(RgbdFeaturesConfig &config, uint32_t level
 {
   config_ = config;
   omp_set_num_threads( config.num_threads );
-  if ( last_point_cloud_.get() )
+  if ( rgb_image_.cols != 0 )
   {
-  	processPointCloud( last_point_cloud_ );
+    computeFeatures();
   }
 }
 
 void ExtractRgbdFeatures::processCameraInfo ( const sensor_msgs::CameraInfo::ConstPtr& msg )
 {
 	//copy camera parameters
-
-  if ( f_ ) return;
-  f_ = msg->P[0];
-  ROS_INFO( "f=%f", f_ );
-}
-
-void ExtractRgbdFeatures::processPointCloud ( const sensor_msgs::PointCloud2::ConstPtr& point_cloud )
-{
-  last_point_cloud_ = point_cloud;
-  computeFeatures( point_cloud );
-
-  float *xyz = ( float* ) & ( point_cloud->data ) [ 0 ];
-  int point_step = point_cloud->point_step / sizeof(float);
-  int row_step = point_cloud->row_step / sizeof(float);
-
-  for ( unsigned i=0; i<keypoints_.size(); i++ )
+  if ( f_ != msg->P[0] )
   {
-    int x = keypoints_[i]._x;
-    int y = keypoints_[i]._y;
-    keypoints_[i]._rx = xyz[ y*row_step + x*point_step ];
-    keypoints_[i]._ry = xyz[ y*row_step + x*point_step + 1 ];
-    keypoints_[i]._rz = xyz[ y*row_step + x*point_step + 2 ];
+  	f_ = msg->P[0];
+  	ROS_INFO( "f=%f", f_ );
   }
 }
 
-void ExtractRgbdFeatures::computeFeatures ( const sensor_msgs::PointCloud2::ConstPtr& msg )
+void ExtractRgbdFeatures::processRGBDImage(
+		sensor_msgs::Image::ConstPtr rgb_image,
+		sensor_msgs::Image::ConstPtr depth_image )
+{
+	cv_bridge::CvImageConstPtr cv_rgb_image = cv_bridge::toCvCopy( rgb_image, sensor_msgs::image_encodings::RGB8 );
+	cv_bridge::CvImageConstPtr cv_depth_image = cv_bridge::toCvCopy( depth_image, sensor_msgs::image_encodings::TYPE_32FC1 );
+
+	/*
+	if ( cv_depth_image->image.cols % cv_rgb_image->image.cols != 0 )
+	{
+		ROS_ERROR_THROTTLE( 1.0, "RGB width must be multiple of depth width!" );
+		return;
+	}
+	*/
+
+	int scale_fac = cv_rgb_image->image.cols / cv_depth_image->image.cols;
+
+	// Resize depth to have the same width as rgb
+	cv::resize( cv_depth_image->image, depth_image_, cvSize(0,0), scale_fac, scale_fac, cv::INTER_NEAREST );
+
+	// Crop rgb so it has the same size as depth
+	rgb_image_ = cv::Mat( cv_rgb_image->image, cv::Rect( 0,0, depth_image_.cols, depth_image_.rows ) );
+
+	assert( depth_image_.cols == rgb_image_.cols && depth_image_.rows == rgb_image_.rows );
+
+	computeFeatures();
+}
+
+void ExtractRgbdFeatures::computeFeatures ( )
 {
   if ( !f_ ) return;
 
-  point_cloud_ = msg;
-
-  if ( ( width_ != (int)point_cloud_->width ) || ( height_ != (int)point_cloud_->height ) )
+  if ( ( width_ != (int)rgb_image_.cols ) || ( height_ != (int)rgb_image_.rows ) )
   {
     ROS_INFO ( "Image size has changed." );
 
@@ -258,8 +227,10 @@ void ExtractRgbdFeatures::computeFeatures ( const sensor_msgs::PointCloud2::Cons
 
 void ExtractRgbdFeatures::imageSizeChanged( )
 {
-	width_ = point_cloud_->width;
-	height_ = point_cloud_->height;
+	width_ = rgb_image_.cols;
+	height_ = rgb_image_.rows;
+
+	ROS_INFO( "Image resolution: %i x %i", width_, height_ );
 
 	integral_image_.clean();
 	integral_image_.init( width_, height_ );
@@ -279,15 +250,12 @@ void ExtractRgbdFeatures::fillIntensityImage( )
 {
   static double norm = 1.0 / 255.0 / 3.0;
 
-  unsigned char *rgb = ( unsigned char* ) & ( point_cloud_->data ) [16];
-  int point_step = point_cloud_->point_step;
-
   for ( int y=0; y<height_; ++y )
   {
     for ( int x=0; x<width_; ++x )
     {
+    	cv::Vec3b rgb = rgb_image_.at<cv::Vec3b>( y, x );
     	input_image_[y][x] = double( rgb[0]+rgb[1]+rgb[2] ) * norm;
-      rgb += point_step;
     }
   }
 }
@@ -295,13 +263,12 @@ void ExtractRgbdFeatures::fillIntensityImage( )
 
 void ExtractRgbdFeatures::fillChromaImage( )
 {
-  unsigned char *rgb = ( unsigned char* ) & ( point_cloud_->data ) [16];
-  int point_step = point_cloud_->point_step;
-
   for ( int y=0; y<height_; ++y )
   {
     for ( int x=0; x<width_; ++x )
     {
+    	cv::Vec3b rgb = rgb_image_.at<cv::Vec3b>( y, x );
+
     	double max_rg = rgb[0] > rgb[1] ? rgb[0] : rgb[1];
     	double max_gb = rgb[1] > rgb[2] ? rgb[1] : rgb[2];
     	double max_rgb = max_rg > max_gb ? max_rg : max_gb;
@@ -313,7 +280,6 @@ void ExtractRgbdFeatures::fillChromaImage( )
     	double chroma = max_rgb - min_rgb;
 
     	input_image_[y][x] = chroma / 255.0;
-      rgb += point_step;
     }
   }
 }
@@ -321,18 +287,16 @@ void ExtractRgbdFeatures::fillChromaImage( )
 
 void ExtractRgbdFeatures::fillDepthImage( )
 {
-  float *z = ( float* ) & ( point_cloud_->data ) [ 2*sizeof(float) ];
-  int point_step = point_cloud_->point_step / sizeof(float);
-
   double depth = 1;
 
   for ( int y=0; y<height_; ++y )
   {
     for ( int x=0; x<width_; ++x )
     {
-      if ( !isnan(*z) ) depth = *z;
+    	float_t z = depth_image_.at<float_t>( y, x );
+
+      if ( !isnan(z) ) depth = z;
       input_image_[y][x] = depth;
-      z += point_step;
     }
   }
 }
@@ -355,22 +319,19 @@ void ExtractRgbdFeatures::fillIntegralImage( )
 
 void ExtractRgbdFeatures::calcScaleMap( )
 {
-  float *z = ( float* ) & ( point_cloud_->data ) [ 2*sizeof(float) ];
-  int point_step = point_cloud_->point_step / sizeof(float);
-
-  //calc scale map
-//#pragma omp parallel for
   for ( int y=0; y<height_; ++y )
   {
-    for ( int x=0; x<width_; ++x, z += point_step )
+    for ( int x=0; x<width_; ++x )
     {
-      if ( isnan(*z) )
+    	float_t z = depth_image_.at<float_t>( y, x );
+
+      if ( isnan(z) )
       {
         scale_map_[y][x] = -1;
         continue;
       }
 
-      scale_map_[y][x] = f_ / *z;
+      scale_map_[y][x] = f_ / z;
     }
   }
 }

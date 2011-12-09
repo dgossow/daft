@@ -11,14 +11,21 @@
   <depend package="visualization_msgs" />
   <depend package="sensor_msgs" />
 
-  <depend package="image_transport" />
+  <depend package="nodelet" />
+
   <depend package="tf" />
+  <depend package="image_transport" />
+  <depend package="message_filters" />
   <depend package="dynamic_reconfigure" />
   
-  <depend package="opencv2" />
+  <depend package="cv_bridge" />
   <depend package="eigen" />
   
   <depend package="rgbd_features" />
+
+  <export>
+    <nodelet plugin="${prefix}/nodelets.xml" />
+  </export>
     
 </package>
 

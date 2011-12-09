@@ -14,9 +14,13 @@ int main( int argc, char** argv )
 
   rgbd_evaluator::RgbdEvaluator * fd = new rgbd_evaluator::RgbdEvaluator(comm_nh, param_nh);
 
-  ros::spin();
+  while ( ros::ok() )
+  {
+  	ros::spinOnce();
+  }
+
+  ROS_INFO( "Exiting.." );
 
   delete fd;
 
-  ROS_INFO( "Exiting.." );
 }

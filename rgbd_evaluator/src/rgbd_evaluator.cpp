@@ -17,15 +17,16 @@ namespace rgbd_evaluator
 
 RgbdEvaluator::RgbdEvaluator ( ros::NodeHandle comm_nh, ros::NodeHandle param_nh ):
 		comm_nh_( comm_nh ),
+	  rgbd_sync_( RgbdSyncPolicy(5), rgb_img_sub_, depth_img_sub_, cam_info_sub_ ),
 		tf_listener_ ( comm_nh, ros::Duration(30) ),
 		extract_rgbd_features_( comm_nh, param_nh ),
 		last_keypoint_num_(0)
 {
-  sub_camerainfo_ = comm_nh.subscribe ( "camera_info", 1, &RgbdEvaluator::cameraInfoCb, this );
+  subscribe();
 
   pub_markers_ = comm_nh.advertise<visualization_msgs::MarkerArray>( "rgbd_features", 0 );
 
-  subscribe();
+  rgbd_sync_.registerCallback( boost::bind( &RgbdEvaluator::rgbdImageCb, this, _1, _2 , _3 ) );
 }
 
 
@@ -35,13 +36,20 @@ RgbdEvaluator::~RgbdEvaluator ()
 
 void RgbdEvaluator::subscribe()
 {
-	  sub_pointcloud2_ = comm_nh_.subscribe ( "points", 1, &RgbdEvaluator::pointCloudCb, this );
-	  ROS_INFO ("Subscribed to cloud on: %s", sub_pointcloud2_.getTopic ().c_str ());
+	rgb_img_sub_.subscribe(comm_nh_, "rgb_image", 1);
+	depth_img_sub_.subscribe(comm_nh_, "depth_image", 1);
+	cam_info_sub_.subscribe(comm_nh_, "camera_info", 1);
+
+  ROS_INFO ("Subscribed to RGB image on: %s", rgb_img_sub_.getTopic().c_str ());
+  ROS_INFO ("Subscribed to depth image on: %s", depth_img_sub_.getTopic().c_str ());
+  ROS_INFO ("Subscribed to camera info on: %s", cam_info_sub_.getTopic().c_str ());
 }
 
 void RgbdEvaluator::unsubscribe()
 {
-	sub_pointcloud2_ = ros::Subscriber();
+	rgb_img_sub_.unsubscribe();
+	depth_img_sub_.unsubscribe();
+	cam_info_sub_.unsubscribe();
 	ROS_INFO ("Sleeping.");
 }
 
@@ -102,31 +110,15 @@ void RgbdEvaluator::publishKpMarkers( const std::map< double, std::vector<rgbd_f
 	pub_markers_.publish( marker_array );
 }
 
-void RgbdEvaluator::pointCloudCb ( const sensor_msgs::PointCloud2::ConstPtr& point_cloud )
+void RgbdEvaluator::rgbdImageCb(const sensor_msgs::Image::ConstPtr rgb_img,
+		const sensor_msgs::Image::ConstPtr depth_img, const sensor_msgs::CameraInfo::ConstPtr cam_info )
 {
+	ROS_INFO("received rgbd");
+
+	extract_rgbd_features_.processCameraInfo( cam_info );
+
 	// detect keypoints
-
-	extract_rgbd_features_.processPointCloud( point_cloud );
-
-	// make cv::Mat out of RGB values
-
-	unsigned char *rgb = ( unsigned char* ) & ( point_cloud->data ) [16];
-	int point_step = point_cloud->point_step;
-	int width = point_cloud->width;
-	int height = point_cloud->height;
-
-	cv::Mat image( height, width, CV_8UC3 );
-
-	for ( int y=0; y<height; ++y )
-	{
-		for ( int x=0; x<width; ++x )
-		{
-			image.at<cv::Vec3b>(y,x)[0] = rgb[0];
-			image.at<cv::Vec3b>(y,x)[1] = rgb[1];
-			image.at<cv::Vec3b>(y,x)[2] = rgb[2];
-			rgb += point_step;
-		}
-	}
+	extract_rgbd_features_.processRGBDImage( rgb_img, depth_img );
 
 	// get 3D points & publish Markers
 
@@ -145,12 +137,7 @@ void RgbdEvaluator::pointCloudCb ( const sensor_msgs::PointCloud2::ConstPtr& poi
 		used_scales_.insert( keypoints[i]._physical_scale );
 	}
 
-	publishKpMarkers( keypoints_by_size, point_cloud->header.frame_id, point_cloud->header.stamp, "current_kps", 0, 0, 1, 0 );
-}
-
-void RgbdEvaluator::cameraInfoCb ( const sensor_msgs::CameraInfo::ConstPtr& msg )
-{
-	extract_rgbd_features_.processCameraInfo( msg );
+	publishKpMarkers( keypoints_by_size, rgb_img->header.frame_id, rgb_img->header.stamp, "current_kps", 0, 0, 1, 0 );
 }
 
 }

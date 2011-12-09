@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <math.h>
 
-#define LINEAR_SCALE_INTERPOLATION
+#define USE_LINEAR_SCALE_INTERPOLATION
 
 namespace rgbd_features
 {
@@ -59,13 +59,13 @@ void filter( rgbd_features::IntegralImage& iImage,
              double** oFilteredImage )
 {
     FilterT filter( iImage );
-#pragma omp parallel for
+//#pragma omp parallel for
     for ( unsigned y = 0; y < iImage.getHeight(); y++ )
     {
         for ( unsigned x = 0; x < iImage.getWidth(); ++x )
         {
             double scale = iScaleImage[y][x] * iScale;// * 0.25 - 1;
-            if ( scale <= 1.0 )
+            if ( scale <= 2.0 )
             {
                 oFilteredImage[y][x] = std::numeric_limits<double>::quiet_NaN();
                 continue;
@@ -76,10 +76,10 @@ void filter( rgbd_features::IntegralImage& iImage,
                 continue;
             }
 
-#ifdef LINEAR_SCALE_INTERPOLATION
+#ifdef USE_LINEAR_SCALE_INTERPOLATION
             float t = scale - floor(scale);
-            oFilteredImage[y][x] = (1.0-t) * filter.getValue( x, y, floor(scale) )
-                + t * filter.getValue( x, y, ceil(scale) );
+            oFilteredImage[y][x] = (1.0-t) * filter.getValue( x, y, int(scale) )
+                + t * filter.getValue( x, y, int(scale)+1 );
 #else
             oFilteredImage[y][x] = filter.getValue( x, y, scale+0.5 );
 #endif
@@ -122,63 +122,8 @@ void filterMaxima( IntegralImage& iImage,
   }
 }
 
-#if 0
-template <int WindowSize>
-void filterByDepthEdges( double** iScaleImage,
-    double pixel_size,
-    std::vector< rgbd_features::KeyPoint >& ioKp,
-    double iThresh )
-{
-  std::vector< rgbd_features::KeyPoint > kp = ioKp;
-  ioKp.clear();
-  ioKp.reserve( kp.size() );
-
-  for ( unsigned k=0; k<kp.size(); k++ )
-  {
-    int x = kp[k]._x;
-    int y = kp[k]._y;
-
-    double window = kp[k]._image_scale * WindowSize;
-
-    if ( window < 1 ) window = 1;
-
-    double scale_min = kp[k]._physical_scale;
-    double scale_max = 0;
-
-    bool isMax = true;
-    for ( int v = 0; isMax && v <= window; v++ )
-    {
-      for ( int u = 0; isMax && u <= window; u++ )
-      {
-        if (u==0 && v==0)
-        {
-          continue;
-        }
-
-        if ( isnan( iScaleImage[y+v][x+u] ) ||
-             ( iScaleImage[y+v][x+u] < scale_min ) ||
-             ( iScaleImage[y+v][x+u] > scale_max ) )
-        {
-          isMax=false;
-        }
-      }
-    }
-
-
-    float t = image_scale - floor(image_scale);
-    double response = (1.0-t) * filter.getValue( x, y, floor(image_scale) )
-        + t * filter.getValue( x, y, ceil(image_scale) );
-
-    if ( response > iThresh )
-    {
-      ioKp.push_back( kp[k] );
-    }
-  }
-}
-#endif
-
 }
 
-#undef LINEAR_SCALE_INTERPOLATION
+#undef USE_LINEAR_SCALE_INTERPOLATION
 
 #endif //__rgbd_features_keypointdetector_h
