@@ -4,7 +4,7 @@
   <node pkg="dynamic_reconfigure" type="dynparam" name="load_openni_params"
         args="load /camera/driver $(find rgbd_evaluator)/cfg/openni_params.yaml"/>
         
-  <arg name="standalone" default="false"/>
+  <arg name="standalone" default="true"/>
   <arg if="$(arg standalone)" name="nodelet_args" value="standalone rgbd_evaluator/RgbdEvaluatorNodelet"/>
   <arg unless="$(arg standalone)" name="nodelet_args" value="load rgbd_evaluator/RgbdEvaluatorNodelet camera_nodelet_manager"/>
   
