@@ -117,14 +117,6 @@ void PointCloudXyzrgbNodelet::imageCb(const sensor_msgs::ImageConstPtr& depth_ms
     return;
   }
 
-  float fshift=log2( rgb_msg->width / depth_msg->width );
-
-	if ( fshift != floor(fshift) )
-	{
-		ROS_ERROR_THROTTLE( 1.0, "The width of the RGB image (%d) must be 2^n times the width of the depth image (%d)!", rgb_msg->width, depth_msg->width );
-		return;
-	}
-
   // Supported color encodings: RGB8, BGR8, MONO8
   int red_offset, green_offset, blue_offset, color_step;
   if (rgb_msg->encoding == enc::RGB8)
@@ -154,16 +146,24 @@ void PointCloudXyzrgbNodelet::imageCb(const sensor_msgs::ImageConstPtr& depth_ms
     return;
   }
 
-	int scale_fac = rgb_msg->width / depth_msg->width;
-	unsigned shift = fshift;
+	float fscale_fac = (float)rgb_msg->width / (float)depth_msg->width;
+  float fshift=log2( fscale_fac );
 
-	ROS_INFO( "scale_fac %d shift %d", scale_fac, shift );
+	if ( fshift != floor(fshift) )
+	{
+		ROS_ERROR_THROTTLE( 1.0, "The width of the RGB image (%d) must be 2^n times the width of the depth image (%d)!", rgb_msg->width, depth_msg->width );
+		return;
+	}
+
+	int scale_fac = fscale_fac;
+	unsigned shift = fshift;
 
   // Allocate new point cloud message
   PointCloud::Ptr cloud_msg (new PointCloud);
   cloud_msg->header = depth_msg->header; // Use depth image time stamp
-  cloud_msg->height = scale_fac * depth_msg->height;
-  cloud_msg->width = scale_fac * depth_msg->width;
+  // Assume that the RGB image might have additional or missing pixels at the bottom
+  cloud_msg->height = std::min( rgb_msg->height, scale_fac * depth_msg->height );
+  cloud_msg->width = rgb_msg->width;
   cloud_msg->is_dense = false;
   cloud_msg->points.resize (cloud_msg->height * cloud_msg->width);
 
