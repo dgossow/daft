@@ -27,10 +27,20 @@ void FixedFramePublisher::transformsChanged()
 {
 	tf::StampedTransform marker_1_transform,marker_2_transform,marker_3_transform;
 
+	if ( !tf_listener_.frameExists( "/marker_1" ) ||
+	     !tf_listener_.frameExists( "/marker_2" ) ||
+	     !tf_listener_.frameExists( "/marker_3" ) )
+	{
+	  return;
+	}
+
+        std::string parent_frame;
+
 	try {
-		tf_listener_.lookupTransform( "openni_camera", "marker_1", ros::Time(0), marker_1_transform );
-		tf_listener_.lookupTransform( "openni_camera", "marker_2", ros::Time(0), marker_2_transform );
-		tf_listener_.lookupTransform( "openni_camera", "marker_3", ros::Time(0), marker_3_transform );
+	        tf_listener_.getParent("/marker_1", ros::Time(0), parent_frame);
+		tf_listener_.lookupTransform( parent_frame, "/marker_1", ros::Time(0), marker_1_transform );
+		tf_listener_.lookupTransform( parent_frame, "/marker_2", ros::Time(0), marker_2_transform );
+		tf_listener_.lookupTransform( parent_frame, "/marker_3", ros::Time(0), marker_3_transform );
 	}
 	catch ( std::runtime_error err )
 	{
@@ -54,7 +64,7 @@ void FixedFramePublisher::transformsChanged()
 
 	tf::StampedTransform center_transform;
 	center_transform.child_frame_id_ = "marker_center";
-	center_transform.frame_id_ = "openni_camera";
+	center_transform.frame_id_ = parent_frame;
 	center_transform.setOrigin( center );
 	center_transform.setBasis( basis );
 
