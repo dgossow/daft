@@ -1,0 +1,10 @@
+<launch>
+ 
+  <!-- Launch OpenNI driver. -->
+  <include file="$(find openni_launch)/launch/openni.launch" />
+
+  <!-- Configure OpenNI in the right way. -->
+  <node pkg="dynamic_reconfigure" type="dynparam" name="load_openni_params"
+        args="load /camera/driver $(find rgbd_evaluator)/cfg/openni_params.yaml" />
+
+</launch>
