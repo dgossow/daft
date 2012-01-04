@@ -1,0 +1,17 @@
+<launch>
+ 
+  <arg name="bagfile"/>
+    
+  <!-- Configure OpenNI in the right way. -->
+  <node pkg="dynamic_reconfigure" type="dynparam" name="load_openni_params"
+        args="load /camera/driver $(find rgbd_evaluator)/cfg/openni_params.yaml"/>
+        
+  <node pkg="record_bagfile" type="record_node" name="record_node" output="screen">
+    <remap from="rgb_image" to="/camera/rgb/image_rect_color"/>
+    <remap from="depth_image" to="/camera/depth_registered/image_rect"/>
+    <remap from="camera_info" to="/camera/rgb/camera_info"/>
+    <remap from="point_cloud" to="/camera/depth_registered/points"/>
+    <param name="bagfile" value="$(arg bagfile)"/>
+  </node>
+  
+</launch>

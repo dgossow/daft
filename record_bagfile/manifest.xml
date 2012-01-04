@@ -1,0 +1,33 @@
+<package>
+  <description brief="record_bagfile">
+
+     record_bagfile
+
+  </description>
+  <author>praktikum</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/record_bagfile</url>
+
+  <depend package="std_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="rosbag"/>
+  <depend package="pcl_ros"/>
+  <depend package="tf"/>
+  <depend package="ar_fixed_frame"/>
+  <depend package="ar_kinect"/>
+  <depend package="ar_pose"/>
+  
+  <depend package="visualization_msgs" />
+  <depend package="sensor_msgs" />
+  <depend package="nodelet" />
+  <depend package="image_transport" />
+  <depend package="message_filters" />
+  <depend package="dynamic_reconfigure" />
+  <depend package="cv_bridge" />
+  <depend package="eigen" />
+  <depend package="rgbd_features" />
+
+</package>
+
+
