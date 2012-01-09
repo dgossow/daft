@@ -32,3 +32,5 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 rosbuild_add_boost_directories()
 rosbuild_add_executable(record_node src/record_node.cpp)
 rosbuild_add_executable(record_node src/record_bagfile.cpp)
+
+rosbuild_add_executable(transform_msg_to_tf src/transform_msg_to_tf.cpp)
