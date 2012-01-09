@@ -21,11 +21,22 @@ gencfg()
 
 #set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS}" )
 
-# Make nodelet
-rosbuild_add_library (rgbd_evaluator_nodelet 
+rosbuild_add_library (rgbd_evaluator
 src/rgbd_evaluator.cpp
 src/extract_rgbd_features.cpp
+)
+
+# Make nodelet
+rosbuild_add_library (rgbd_evaluator_nodelet 
 src/rgbd_evaluator_nodelet.cpp
 )
 target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+target_link_libraries(rgbd_evaluator_nodelet rgbd_evaluator)
+
+# Make node
+rosbuild_add_executable (rgbd_evaluator_node 
+src/rgbd_evaluator_node.cpp
+)
+target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+target_link_libraries(rgbd_evaluator_node rgbd_evaluator)
 
