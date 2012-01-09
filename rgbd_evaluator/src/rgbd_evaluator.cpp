@@ -17,7 +17,7 @@ namespace rgbd_evaluator
 
 RgbdEvaluator::RgbdEvaluator ( ros::NodeHandle comm_nh, ros::NodeHandle param_nh ):
 		comm_nh_( comm_nh ),
-	  rgbd_sync_( RgbdSyncPolicy(5), rgb_img_sub_, depth_img_sub_, cam_info_sub_ ),
+	        rgbd_sync_( RgbdSyncPolicy(5), rgb_img_sub_, depth_img_sub_, cam_info_sub_ ),
 		tf_listener_ ( comm_nh, ros::Duration(30) ),
 		extract_rgbd_features_( comm_nh, param_nh ),
 		last_keypoint_num_(0)

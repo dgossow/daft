@@ -45,9 +45,9 @@ private:
 	message_filters::Subscriber<sensor_msgs::Image> depth_img_sub_;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub_;
 
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
+        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
-  message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync_;
+        message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync_;
 
 	ros::Publisher pub_markers_;
 

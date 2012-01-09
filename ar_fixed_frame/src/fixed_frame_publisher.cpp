@@ -9,6 +9,8 @@
 
 #include <boost/bind.hpp>
 
+#include <geometry_msgs/PoseStamped.h>
+
 namespace ar_fixed_frame
 {
 
@@ -63,7 +65,7 @@ void FixedFramePublisher::transformsChanged()
 	basis=basis.transpose();
 
 	tf::StampedTransform center_transform;
-	center_transform.child_frame_id_ = "marker_center";
+	center_transform.child_frame_id_ = "/marker_center";
 	center_transform.frame_id_ = parent_frame;
 	center_transform.setOrigin( center );
 	center_transform.setBasis( basis );
