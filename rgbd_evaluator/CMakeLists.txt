@@ -4,7 +4,7 @@ include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (ROS_BUILD_TYPE RelWithDebInfo)
 rosbuild_init ()
-#rosbuild_add_boost_directories ()
+rosbuild_add_boost_directories ()
 add_definitions (-Wall -O3 -Winvalid-pch -pipe -funroll-loops -fPIC)
 rosbuild_check_for_sse ()
 
@@ -39,4 +39,11 @@ src/rgbd_evaluator_node.cpp
 )
 target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
 target_link_libraries(rgbd_evaluator_node rgbd_evaluator)
+
+# Make proprocessing app
+rosbuild_add_executable (rgbd_preprocessing 
+src/rgbd_evaluator_preprocessing.cpp
+)
+target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+target_link_libraries(rgbd_preprocessing rgbd_evaluator)
 
