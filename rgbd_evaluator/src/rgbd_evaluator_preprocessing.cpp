@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <LinearMath/btQuaternion.h>
+#include <LinearMath/btMatrix3x3.h>
+#include <LinearMath/btVector3.h>
+
 namespace rgbd_evaluator
 {
 
@@ -57,7 +61,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
   image_store_.push_back( ImageData() );
 
-  // Load all messages into our stereo dataset
+  // Load all messages into our stereo datas#include <math.h>et
   BOOST_FOREACH(rosbag::MessageInstance const m, view)
   {
       // load rgb image
@@ -67,7 +71,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       if (p_rgb_img != NULL)
       {
 
-        std::cout << "rgb_img available" << std::endl;
+        //std::cout << "rgb_img available" << std::endl;
 
         if ( image_store_.back().image )
         {
@@ -76,9 +80,10 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         }
 
         uint32_t i = 0;
-        char fileName[500];
 
-        while(bagfile_name_[i] != '.')
+        char fileName[BUFF_SIZE];
+
+        while(bagfile_name_[i] != '.' && i < BUFF_SIZE)
         {
           fileName[i] = bagfile_name_.c_str()[i];
           i++;
@@ -90,7 +95,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         std::cout << "Writing to "<< fileName << std::endl;
 
-        // transform bag image to cvimage
+        // transform bag image to cvimage#include <math.h>
         cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_rgb_img);
 
         // store data in vectorImageData
@@ -116,7 +121,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
       if ( p_center_transform != NULL )
       {
-        std::cout << "center_transform available" << std::endl;
+        //std::cout << "center_transform available" << std::endl;
 
         if ( image_store_.back().approx_transform )
         {
@@ -143,19 +148,120 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
 void RgbdEvaluatorPreprocessing::calculateHomography()
 {
+  uint32_t count = 1;
   std::vector< ImageData >::iterator it;
+  btTransform transformOrigin;
+  btTransform transformCamX;
+  cv::Mat imageOrigin;
+
+  btTransform transform_cam_x_to_origin;
+
+  bool first = true;
+
+  std::cout << "Start transforming " << count << "..." << std::endl;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = image_store_.begin(); it != image_store_.end()-1; it++)
   {
-      std::cout << "Z: " << it->approx_transform.get()->getOrigin().z()  << std::endl;
+
+    // store first transforms and images
+    if(first)
+    {
+      transformOrigin = *(it->approx_transform.get());
+      imageOrigin = it->image.get()->image;
+      first = false;
+      continue;
+    }
+
+    transformCamX = *(it->approx_transform.get());
+
+    transform_cam_x_to_origin = transformCamX.inverse() * transformOrigin;
+
+    cv::Matx33f homography_init = calculateInitialHomography(transform_cam_x_to_origin, transformOrigin);
+
+    std::cout << "Warping image("<<imageOrigin.cols<<", "<<imageOrigin.rows<< ")"<< std::endl;
+
+    cv::Mat tempMat = it->image.get()->image;
+
+    cv::warpPerspective(imageOrigin, tempMat, cv::Mat(homography_init), cv::Size(imageOrigin.cols,imageOrigin.rows));//, cv::INTER_LINEAR, cv::BORDER_CONSTANT, 0);
+
+    cv::imshow("Source Image", imageOrigin);
+    cv::waitKey(30);
+    cv::imshow("Destination Image", tempMat);
+    cv::waitKey(30);
+
+//    std::cout << "Homography_0_to_"<< count << std::endl;
+//
+//    // temporary
+//    int i,j;
+//    for(i=0; i<3; i++)
+//    {
+//      for(j=0;j<3;j++)
+//      {
+//
+//        std::cout << homography_init(i,j) << "  ";
+//      }
+//      std::cout << std::endl;
+//    }
+
+    writeHomographyToFile(homography_init, count);
+
+    count++;
+    std::cout << "Press any key to continue\n\r" << std::endl;
+    getchar();
+
   }
 
-  // calculate homographys
+}
 
+cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform trans, btTransform transOrigin)
+{
+  float_t d;
+  tf::Point p_temp = trans.getOrigin();
 
+  // Translation
+  cv::Matx31f T(p_temp.x(), p_temp.y(), p_temp.z());
 
+  btMatrix3x3 m_temp(trans.getRotation());
 
+  //Rotation
+  cv::Matx33f R(m_temp.getRow(0).getX(), m_temp.getRow(0).getY(), m_temp.getRow(0).getZ(),
+                           m_temp.getRow(1).getX(), m_temp.getRow(1).getY(), m_temp.getRow(1).getZ(),
+                           m_temp.getRow(2).getX(), m_temp.getRow(2).getY(), m_temp.getRow(2).getZ());
+  //d
+  d = transOrigin.getOrigin().getZ();
+
+  p_temp = transOrigin.getOrigin();
+  //N
+  cv::Matx13f N(p_temp.x(), p_temp.y(), p_temp.z());
+  //Calculate init Homography
+  cv::Matx33f homography_init = R + (1/d) * T * N;
+
+  return homography_init;
+}
+
+void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, uint32_t count)
+{
+  uint32_t i,j;
+  std::fstream file;
+
+  char fileName[BUFF_SIZE];
+  char stdName[] = "Homography_0_to_";
+
+  sprintf(fileName, "%s%d%c.dat",stdName, count, '\0');
+
+  file.open(fileName, std::ios::out);
+
+  for(i=0; i<3; i++)
+  {
+    for(j=0;j<3;j++)
+    {
+      file << homography(i,j) << "\t";
+    }
+    file << std::endl;
+  }
+
+  file.close();
 }
 
 

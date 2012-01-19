@@ -45,9 +45,13 @@ public:
 
 private:
 
+  cv::Matx33f calculateInitialHomography(btTransform trans, btTransform transOrigin);
+  void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
+
   std::string bagfile_name_;
   rosbag::Bag bag_;
   cv_bridge::CvImagePtr tmp_image_;
+  static const uint32_t BUFF_SIZE = 500;
 
   struct ImageData {
     boost::shared_ptr<cv_bridge::CvImage> image;
@@ -60,6 +64,7 @@ private:
   };
 
   std::vector< ImageData > image_store_;
+
 };
 
 }
