@@ -47,10 +47,10 @@ src/test_rgbd_cv_node.cpp
 )
 target_link_libraries(test_rgbd_cv ${OpenCV_LIBS})
 
-# Make OpenCV test node
-rosbuild_add_executable (find_tracks
-src/find_tracks_node.cpp
+# Make proprocessing app
+rosbuild_add_executable (rgbd_preprocessing 
+src/rgbd_evaluator_preprocessing.cpp
 )
-target_link_libraries(find_tracks ${OpenCV_LIBS})
-
+target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+target_link_libraries(rgbd_preprocessing rgbd_evaluator)
 
