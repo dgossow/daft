@@ -42,22 +42,19 @@ RgbdEvaluatorPreprocessing::~RgbdEvaluatorPreprocessing()
 void RgbdEvaluatorPreprocessing::createTestFiles()
 {
   uint32_t count = 0;
+  bool got_cam_info = false;
 
   // Image topics to load
   std::vector<std::string> topics;
   topics.push_back("rgb_img");
   topics.push_back("center_transform");
+  topics.push_back("cam_info");
 
   rosbag::View view(bag_, rosbag::TopicQuery(topics));
 
-  // create gui windows
-  cv::namedWindow("Source Image", CV_WINDOW_AUTOSIZE);
-  cv::waitKey(30);
-  cv::namedWindow("Destination Image", CV_WINDOW_AUTOSIZE);
-  cv::waitKey(30);
-
   sensor_msgs::Image::ConstPtr p_current_img;
   geometry_msgs::TransformStamped::ConstPtr p_current_transform;
+  sensor_msgs::CameraInfo::ConstPtr p_cam_info;
 
   image_store_.push_back( ImageData() );
 
@@ -79,23 +76,14 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
           return;
         }
 
-        uint32_t i = 0;
-
         char fileName[BUFF_SIZE];
-
-        while(bagfile_name_[i] != '.' && i < BUFF_SIZE)
-        {
-          fileName[i] = bagfile_name_.c_str()[i];
-          i++;
-        }
-        fileName[i] = '\0';
-
+        createFileName(fileName);
 
         sprintf(fileName, "%s_%d.ppm%c",fileName, count, '\0');
 
         std::cout << "Writing to "<< fileName << std::endl;
 
-        // transform bag image to cvimage#include <math.h>
+        // transform bag image to cvimage
         cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_rgb_img);
 
         // store data in vectorImageData
@@ -104,17 +92,9 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         // write data to file
         cv::imwrite(std::string(fileName),ptr->image );
 
-        // show images
-        cv::imshow("Source Image", image_store_.front().image->image);
-        cv::waitKey(30);
-
-        if(count >= 1)
-        {
-          cv::imshow("Destination Image", image_store_.back().image->image);
-          cv::waitKey(30);
-        }
-
       }
+
+      /**********************************************************************************************************************/
 
       // load center transform
       geometry_msgs::TransformStamped::ConstPtr p_center_transform = m.instantiate<geometry_msgs::TransformStamped>();
@@ -135,13 +115,33 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         image_store_.back().approx_transform = boost::make_shared<btTransform>(transform);
       }
 
+      /**********************************************************************************************************************/
+
+      // load cam info
+      sensor_msgs::CameraInfo::ConstPtr p_cam_info = m.instantiate<sensor_msgs::CameraInfo>();
+
+      if(( p_cam_info != NULL ) && ( got_cam_info == false ))
+      {
+        //std::cout << "camera_info available" << std::endl;
+
+        boost::array<double,9> cam_info = p_cam_info->K;
+
+        K = cv::Matx33f(cam_info.at(0), cam_info.at(1), cam_info.at(2),
+                        cam_info.at(3), cam_info.at(4), cam_info.at(5),
+                        cam_info.at(6), cam_info.at(7), cam_info.at(8));
+
+        got_cam_info = true;
+      }
+
+      /**********************************************************************************************************************/
+
       // if the current image data is complete, go to next one
       if ( image_store_.back().isComplete() )
       {
         image_store_.push_back( ImageData() );
-        std::cout << "ImageData_"<< count << " complete! Press any key to continue\n\r" << std::endl;
+        //std::cout << "ImageData_"<< count << " complete! Press any key to continue\n\r" << std::endl;
+        //getchar();
         count++;
-        getchar();
       }
   }
 }
@@ -150,92 +150,83 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 {
   uint32_t count = 1;
   std::vector< ImageData >::iterator it;
-  btTransform transformOrigin;
-  btTransform transformCamX;
-  cv::Mat imageOrigin;
+  btTransform transform_original;
+  btTransform transform_camx;
+  cv::Mat image_original;
 
-  btTransform transform_cam_x_to_origin;
+  btTransform transform_camx_to_original;
 
-  bool first = true;
-
-  std::cout << "Start transforming " << count << "..." << std::endl;
+  bool first_image = true;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = image_store_.begin(); it != image_store_.end()-1; it++)
   {
 
     // store first transforms and images
-    if(first)
+    if(first_image)
     {
-      transformOrigin = *(it->approx_transform.get());
-      imageOrigin = it->image.get()->image;
-      first = false;
+      transform_original = *(it->approx_transform.get());
+      image_original = it->image.get()->image;
+      first_image = false;
+      cv::imshow("Original Image", image_original);
+      cv::waitKey(30);
       continue;
     }
 
-    transformCamX = *(it->approx_transform.get());
+    transform_camx = *(it->approx_transform.get());
 
-    transform_cam_x_to_origin = transformCamX.inverse() * transformOrigin;
+    // calculate transform from camera position x to original position
+    transform_camx_to_original = transform_original * transform_camx.inverse();
 
-    cv::Matx33f homography_init = calculateInitialHomography(transform_cam_x_to_origin, transformOrigin);
+    cv::Matx33f homography_init = calculateInitialHomography(transform_camx_to_original, transform_camx);
 
-    std::cout << "Warping image("<<imageOrigin.cols<<", "<<imageOrigin.rows<< ")"<< std::endl;
+    cv::Mat image_camx = it->image.get()->image;
+    cv::Mat image_warped;
 
-    cv::Mat tempMat = it->image.get()->image;
+    // perspective warping
+    cv::warpPerspective(image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows));//, cv::INTER_LINEAR, cv::BORDER_CONSTANT, 0);
 
-    cv::warpPerspective(imageOrigin, tempMat, cv::Mat(homography_init), cv::Size(imageOrigin.cols,imageOrigin.rows));//, cv::INTER_LINEAR, cv::BORDER_CONSTANT, 0);
-
-    cv::imshow("Source Image", imageOrigin);
+    // show images
+    cv::imshow("Current Image", image_camx);
     cv::waitKey(30);
-    cv::imshow("Destination Image", tempMat);
+    cv::imshow("Warped Image", image_warped);
     cv::waitKey(30);
 
-//    std::cout << "Homography_0_to_"<< count << std::endl;
-//
-//    // temporary
-//    int i,j;
-//    for(i=0; i<3; i++)
-//    {
-//      for(j=0;j<3;j++)
-//      {
-//
-//        std::cout << homography_init(i,j) << "  ";
-//      }
-//      std::cout << std::endl;
-//    }
+    // store homgraphy
+    writeHomographyToFile(homography_init, count++);
 
-    writeHomographyToFile(homography_init, count);
-
-    count++;
-    std::cout << "Press any key to continue\n\r" << std::endl;
+    std::cout << "Press any key to continue" << std::endl;
     getchar();
 
   }
 
 }
 
-cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform trans, btTransform transOrigin)
+cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_camx)
 {
-  float_t d;
-  tf::Point p_temp = trans.getOrigin();
-
   // Translation
-  cv::Matx31f T(p_temp.x(), p_temp.y(), p_temp.z());
-
-  btMatrix3x3 m_temp(trans.getRotation());
+  tf::Point T_temp = transform_camx_to_original.getOrigin();
+  cv::Matx31f T(T_temp.x(), T_temp.y(), T_temp.z());
 
   //Rotation
-  cv::Matx33f R(m_temp.getRow(0).getX(), m_temp.getRow(0).getY(), m_temp.getRow(0).getZ(),
-                           m_temp.getRow(1).getX(), m_temp.getRow(1).getY(), m_temp.getRow(1).getZ(),
-                           m_temp.getRow(2).getX(), m_temp.getRow(2).getY(), m_temp.getRow(2).getZ());
-  //d
-  d = transOrigin.getOrigin().getZ();
+  btMatrix3x3 R_temp(transform_camx_to_original.getRotation());
+  cv::Matx33f R( R_temp.getColumn(0).getX(), R_temp.getColumn(1).getX(), R_temp.getColumn(2).getX(),
+                 R_temp.getColumn(0).getY(), R_temp.getColumn(1).getY(), R_temp.getColumn(2).getY(),
+                 R_temp.getColumn(0).getZ(), R_temp.getColumn(1).getZ(), R_temp.getColumn(2).getZ());
 
-  p_temp = transOrigin.getOrigin();
   //N
-  cv::Matx13f N(p_temp.x(), p_temp.y(), p_temp.z());
+  tf::Vector3 N_temp = transform_camx.getBasis() * btVector3(0,0,1);
+  cv::Matx13f N(N_temp.x(), N_temp.y(), N_temp.z());
+
+  //d
+  T_temp = transform_camx.getOrigin();
+  float_t d = ( N * (cv::Matx31f(T_temp.x(), T_temp.y(), T_temp.z())) ) (0);
+
   //Calculate init Homography
   cv::Matx33f homography_init = R + (1/d) * T * N;
+
+  // + intrinsic-parameter-matrix
+  homography_init = K * homography_init * K.inv();
 
   return homography_init;
 }
@@ -264,6 +255,31 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   file.close();
 }
 
+void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
+{
+  std::cout << std::setprecision( 3 ) << std::right << std::fixed;
+  for ( int row = 0; row < 3; ++ row )
+  {
+    for ( int col = 0; col < 3; ++ col )
+    {
+      std::cout << std::setw( 5 ) << (double)M( row, col ) << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+void RgbdEvaluatorPreprocessing::createFileName(char* fileName)
+{
+  uint32_t i = 0;
+
+  while(bagfile_name_[i] != '.' && i < BUFF_SIZE)
+  {
+    fileName[i] = bagfile_name_.c_str()[i];
+    i++;
+  }
+  fileName[i] = '\0';
+}
+
 
 } // end namespace
 
@@ -281,5 +297,9 @@ int main( int argc, char** argv )
   rgbd_evaluator::RgbdEvaluatorPreprocessing fd(fileName);
   fd.createTestFiles();
   fd.calculateHomography();
+
+
+  std::cout << "Exiting.." << std::endl;
+  return 0;
 }
 
