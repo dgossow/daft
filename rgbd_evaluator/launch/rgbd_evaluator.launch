@@ -11,8 +11,7 @@
   <!-- Load RGBD Evaluator either standalone
        or into the same nodelet manager as OpenNI -->
   <node pkg="nodelet" type="nodelet" name="rgbd_evaluator" args="$(arg nodelet_args)" output="screen">
-    <remap from="rgb_image" to="/camera/rgb/image_rect_color"/>
-    <remap from="depth_image" to="/camera/depth_registered/image_rect"/>
+    <remap from="points" to="/camera/depth_registered/points"/>
     <remap from="camera_info" to="/camera/rgb/camera_info"/>
   </node>
   

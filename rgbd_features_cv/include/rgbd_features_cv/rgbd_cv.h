@@ -26,7 +26,7 @@ public:
     static const unsigned int DEFAULT_N_LEVELS = 1;
     static const float DEFAULT_DET_THRESHOLD = 0.02;
     static const float DEFAULT_PF_THRESHOLD = 0.0;
-    static const float DEFAULT_BASE_SCALE = 10;
+    static const float DEFAULT_BASE_SCALE = 0.025;
     static const float DEFAULT_SCALE_FACTOR = 2.0;
 
     /** default constructor */

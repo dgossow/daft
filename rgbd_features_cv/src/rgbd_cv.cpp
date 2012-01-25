@@ -8,6 +8,7 @@
 #include <rgbd_features_cv/feature_detection.h>
 
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 namespace cv
 {
@@ -42,17 +43,31 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
 
   // Convert 8-Bit to Float
   Mat gray_image_float = gray_image;
-  if ( gray_image_float.type() != CV_32S )
+  if ( gray_image_float.type() != CV_64F )
   {
-    gray_image.convertTo( gray_image_float, CV_32S, 1.0/255.0, 0.0 );
+    gray_image.convertTo( gray_image_float, CV_64F, 1.0/255.0, 0.0 );
   }
+
+  Mat1d::iterator it = gray_image_float.begin<double>();
+  double maxv=0;
+  for (; it != gray_image_float.end<double>(); ++it)
+  {
+    maxv = std::max( *it, maxv );
+  }
+
+  std::cout << "max: " << maxv << std::endl;
+
+  cv::imshow("gray",gray_image_float);
 
   // Construct integral image for fast smoothing (box filter)
   Mat1d integral_image;
-  integral( gray_image, integral_image, CV_32S);
+  integral( gray_image_float, integral_image);
+
+  assert( integral_image.rows == gray_image.rows+1 && integral_image.cols == gray_image.cols+1 );
 
   // Compute scale map from depth map
   float f = camera_matrix(0,0);
+  std::cout << "f: " << f << std::endl;
   Mat1d scale_map( gray_image.rows, gray_image.cols );
 
   switch ( depth_map.type() )
@@ -62,9 +77,10 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
       f *= 1000.0;
       Mat1d::iterator scale_it = scale_map.begin(), scale_map_end = scale_map.end();
       MatConstIterator_<uint16_t> depth_it = depth_map.begin<uint16_t>();
+      std::cout << *depth_it << std::endl;
       for (; scale_it != scale_map_end ; ++scale_it, ++depth_it)
       {
-        *scale_it = *depth_it ? f / float(*depth_it) : 0.0f;
+        *scale_it = *depth_it != (uint16_t)(-1) ? f / float(*depth_it) : 1.0f;
       }
     }
     break;
@@ -75,7 +91,7 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
       MatConstIterator_<float> depth_it = depth_map.begin<float>();
       for (; scale_it != scale_map_end ; ++scale_it, ++depth_it)
       {
-        *scale_it = *depth_it ? f / *depth_it : 0.0f;
+        *scale_it = !isnan(*depth_it) ? f / *depth_it : -1.0f;
       }
     }
     break;
@@ -89,9 +105,12 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
 
   double scale = detector_params_.base_scale_;
   Mat1d detector_image;
+  detector_image.create( gray_image.rows, gray_image.cols );
 
+  // detect keypoints
   for( unsigned scale_level = 0; scale_level < detector_params_.scale_levels_; scale_level++, scale *= detector_params_.scale_step_ )
   {
+    // compute filter response for all pixels
     switch ( detector_params_.detector_type_ )
     {
     case DetectorParams::DET_DOB:
@@ -101,7 +120,21 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
       return;
     }
 
-    findMaxima( detector_image, scale_map, scale, keypoints, detector_params_.det_threshold_ );
+    // find maxima in response
+    findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+
+    // filter found maxima by applying a threshold on a second kernel
+    switch ( detector_params_.postfilter_type_ )
+    {
+    case DetectorParams::PF_NONE:
+      break;
+    case DetectorParams::PF_HARRIS:
+      filterKeypoints<harris>( integral_image, detector_params_.pf_threshold_, keypoints );
+      break;
+    default:
+      return;
+    }
+
   }
 }
 

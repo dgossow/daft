@@ -4,6 +4,9 @@
 
 #include <opencv2/core/core.hpp>
 
+#include <iostream>
+
+
 #ifndef rgbd_features_filter_h_
 #define rgbd_features_filter_h_
 
@@ -22,7 +25,7 @@ inline double integral( const Mat1d &ii, int start_x, int end_x, int start_y, in
   assert( end_y>0 );
   assert( end_x<ii.cols );
   assert( end_y<ii.rows );
-  return ii[end_y][end_x] + ii[start_y][start_x] - ii[end_y][start_x] - ii[start_y][end_x];
+  return ii(end_y,end_x) + ii(start_y,start_x) - ii(end_y,start_x) - ii(start_y,end_x);
 }
 
 inline double area(int start_x, int end_x, int start_y, int end_y)
@@ -31,10 +34,9 @@ inline double area(int start_x, int end_x, int start_y, int end_y)
 }
 
 // return false if the square at (x,y) with size s*2 intersect the image border
-static inline bool checkBounds ( Mat1d ii, int x, int y, int s )
+inline bool checkBounds ( Mat1d ii, int x, int y, int s )
 {
-    return ( x > s && x + s < ii.cols &&
-             y > s && y + s < ii.rows );
+  return ( (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
 }
 
 
@@ -104,6 +106,7 @@ inline double dxy( const Mat1d &ii, int x, int y, int s )
 */
 inline double dob( const Mat1d &ii, int x, int y, int s )
 {
+  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
   if ( checkBounds( ii, x, y, 2*s ) )
   {
     double val = 4 * integral ( ii, x - s,  x + s, y - s, y + s )
@@ -111,6 +114,11 @@ inline double dob( const Mat1d &ii, int x, int y, int s )
 
     double val_norm = val / double(12.0*s*s);
     return std::abs(val_norm);
+    /*
+    if ( val_norm < 0.0 )
+      return std::abs(val_norm);
+    return 0;
+    */
   }
 
   return std::numeric_limits<double>::quiet_NaN();

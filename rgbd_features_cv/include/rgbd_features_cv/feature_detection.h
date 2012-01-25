@@ -16,39 +16,87 @@
 namespace cv
 {
 
-void findMaxima( const cv::Mat1d &filtered_image,
+/*!
+ Compute the kernel response for every pixel of the given image.
+ The kernel size at (x,y) will be scale_map(x,y) * base_scale.
+ The template argument specifies the filter kernel, which takes as
+ arguments the integral image, x, y, and the scaling factor.
+ @tparam     F          The kernel function f(ii,x,y,s)
+ @param[in]  ii         The Integral Image
+ @param[in]  scale_map  The scale map (scale multiplier per pixel)
+ @param[in]  base_scale The global scale multiplier
+ @param[out] img_out    The output image
+ */
+template <double (*F)(const Mat1d&, int, int, int)>
+void filterImage( const cv::Mat1d &ii,
+                  const cv::Mat1d &scale_map,
+                  double base_scale,
+                  cv::Mat1d &img_out );
+
+/*!
+ Find the local maxima in the given image with a minimal value of thresh,
+ The width & height of the local neighbourhood searched is
+ scale_map(x,y) * base_scale.
+ @param[in]  img        The input image
+ @param[in]  scale_map  The scale map (scale multiplier per pixel)
+ @param[in]  base_scale The global scale multiplier
+ @param[in]  thresh     Minimum threshold for local maxima
+ @param[out] kp         The keypoints (input & output)
+ */
+void findMaxima( const cv::Mat1d &img,
                  const cv::Mat1d &scale_map,
                  double base_scale,
-                 std::vector< KeyPoint >& kp,
-                 double threshold = 0.1 );
+                 double thresh,
+                 std::vector< KeyPoint >& kp );
+
+/*!
+ Compute the kernel response for each keypoint and reject those
+ with a response below the threshold.
+ The kernel size at (x,y) will be scale_map(x,y) * base_scale.
+ The template argument specifies the filter kernel, which takes as
+ arguments the integral image, x, y, and the scaling factor.
+ @tparam        F       The kernel function f(ii,x,y,s)
+ @param[in]     ii      The integral image
+ @param[in]     thresh  Keypoint with a lower kernel response below this will be
+ @param[in,out] kp      The keypoints (input & output)
+ */
+template <double (*F)(const Mat1d&, int, int, int)>
+void filterKeypoints( const cv::Mat1d& ii,
+                      double thresh,
+                      std::vector< KeyPoint >& kp );
+
+// ----------------------------------------------------
 
 template <double (*F)(const Mat1d&, int, int, int)>
 void filterImage( const cv::Mat1d &ii,
                   const cv::Mat1d &scale_map,
                   double base_scale,
-                  cv::Mat1d &filtered_image )
+                  cv::Mat1d &img_out )
 {
-  for ( int y = 0; y < ii.rows; y++ )
+  img_out.create( ii.rows-1, ii.cols-1 );
+  for ( int y = 0; y < ii.rows-1; y++ )
   {
-    for ( int x = 0; x < ii.cols; ++x )
+    for ( int x = 0; x < ii.cols-1; ++x )
     {
       double s = scale_map[y][x] * base_scale;
       if ( s <= 2.0 )
       {
-        filtered_image[y][x] = std::numeric_limits<double>::quiet_NaN();
+        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
         continue;
       }
 
-      float t = s - floor(s);
-      filtered_image[y][x] = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
+      int s_floor = floor(s);
+      float t = s - s_floor;
+      img_out(y,x) = (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
+      img_out(y,x) *= 255;
     }
   }
 }
 
 template <double (*F)(const Mat1d&, int, int, int)>
 void filterKeypoints( const cv::Mat1d& ii,
-    std::vector< KeyPoint >& kp,
-    double threshold = 0.1 )
+                      double thresh,
+                      std::vector< KeyPoint >& kp )
 {
   std::vector< KeyPoint > kp_in = kp;
 
@@ -72,14 +120,14 @@ void filterKeypoints( const cv::Mat1d& ii,
     float t = s - floor(s);
     double response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
 
-    if ( response > threshold )
+    if ( response > thresh )
     {
       kp.push_back( kp_in[k] );
     }
 
 #ifdef DEBUG_OUTPUT
     fall << response << " " << kp_in[k]._score << std::endl;
-    if ( response > threshold )
+    if ( response > thresh )
       ffiltered << response << " " << kp_in[k]._score << std::endl;
 #endif
   }
