@@ -47,6 +47,8 @@ public:
 private:
 
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
+  std::vector<cv::Point> extractHarrisCornerPoints(cv::Mat image_original);
+
   void printMat(cv::Matx33f M);
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
   void createFileName(char* s);
@@ -54,7 +56,7 @@ private:
   std::string bagfile_name_;
   rosbag::Bag bag_;
   cv_bridge::CvImagePtr tmp_image_;
-  cv::Matx33f K;
+  cv::Matx33f K_;
 
   static const uint32_t BUFF_SIZE = 500;
 

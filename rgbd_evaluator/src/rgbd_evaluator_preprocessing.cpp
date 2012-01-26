@@ -58,13 +58,13 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
   image_store_.push_back( ImageData() );
 
-  // Load all messages into our stereo datas#include <math.h>et
+  // Load all messages into our stereo dataset
   BOOST_FOREACH(rosbag::MessageInstance const m, view)
   {
       // load rgb image
       sensor_msgs::Image::ConstPtr p_rgb_img = m.instantiate<sensor_msgs::Image>();
 
-      //check if this message arrived
+      //check if rgb_img message arrived
       if (p_rgb_img != NULL)
       {
 
@@ -117,7 +117,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
       /**********************************************************************************************************************/
 
-      // load cam info
+      // load cam_info
       sensor_msgs::CameraInfo::ConstPtr p_cam_info = m.instantiate<sensor_msgs::CameraInfo>();
 
       if(( p_cam_info != NULL ) && ( got_cam_info == false ))
@@ -126,9 +126,9 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         boost::array<double,9> cam_info = p_cam_info->K;
 
-        K = cv::Matx33f(cam_info.at(0), cam_info.at(1), cam_info.at(2),
-                        cam_info.at(3), cam_info.at(4), cam_info.at(5),
-                        cam_info.at(6), cam_info.at(7), cam_info.at(8));
+        K_ = cv::Matx33f(cam_info.at(0), cam_info.at(1), cam_info.at(2),
+                         cam_info.at(3), cam_info.at(4), cam_info.at(5),
+                         cam_info.at(6), cam_info.at(7), cam_info.at(8));
 
         got_cam_info = true;
       }
@@ -149,14 +149,19 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 void RgbdEvaluatorPreprocessing::calculateHomography()
 {
   uint32_t count = 1;
+  bool first_image = true;
+
   std::vector< ImageData >::iterator it;
+  std::vector<cv::Point> corner_vector_original;
+  std::vector<cv::Point> corner_vector_camx;
+
   btTransform transform_original;
   btTransform transform_camx;
-  cv::Mat image_original;
-
   btTransform transform_camx_to_original;
 
-  bool first_image = true;
+  cv::Mat image_original;
+  cv::Mat harris_corners_original;
+  cv::Mat harris_corners_camx_norm;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = image_store_.begin(); it != image_store_.end()-1; it++)
@@ -165,13 +170,21 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // store first transforms and images
     if(first_image)
     {
+      // get original image
       transform_original = *(it->approx_transform.get());
       image_original = it->image.get()->image;
       first_image = false;
+
+      // extract original harris corner points
+      corner_vector_original = extractHarrisCornerPoints(image_original);
+
       cv::imshow("Original Image", image_original);
       cv::waitKey(30);
+
       continue;
     }
+
+    /**************************** calculate initial homography ***************************************************************/
 
     transform_camx = *(it->approx_transform.get());
 
@@ -184,7 +197,33 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     cv::Mat image_warped;
 
     // perspective warping
-    cv::warpPerspective(image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows));//, cv::INTER_LINEAR, cv::BORDER_CONSTANT, 0);
+    cv::warpPerspective(image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows));
+
+    /**************************** calculate precise homography **************************************************************/
+
+    std::vector<cv::Matx31f> corner_vector_camx_warped;
+
+    corner_vector_camx = extractHarrisCornerPoints(image_camx);
+
+    uint32_t i;
+    for(i = 0; i < corner_vector_camx.size(); i++)
+    {
+      cv::Matx31f point_temp(corner_vector_camx.at(i).x, corner_vector_camx.at(i).y, 1.0);
+      cv::Matx31f point_warped = cv::Matx33f(homography_init) * point_temp ;
+
+      corner_vector_camx_warped.push_back( point_warped );
+
+      cv::circle( image_warped, cv::Point( point_warped.val[0]/point_warped.val[2], point_warped.val[1]/point_warped.val[2] ), 5,  cv::Scalar(0), 2, 8, 0 );
+
+    }
+
+    // TODO: warp harris corner points from cam_x to cam_original; find corresponding points --> cv::findHomography
+
+
+
+
+    /*************************************************************************************************************************/
+
 
     // show images
     cv::imshow("Current Image", image_camx);
@@ -192,7 +231,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     cv::imshow("Warped Image", image_warped);
     cv::waitKey(30);
 
-    // store homgraphy
+    // store homography
     writeHomographyToFile(homography_init, count++);
 
     std::cout << "Press any key to continue" << std::endl;
@@ -226,9 +265,46 @@ cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform t
   cv::Matx33f homography_init = R + (1/d) * T * N;
 
   // + intrinsic-parameter-matrix
-  homography_init = K * homography_init * K.inv();
+  homography_init = K_ * homography_init * K_.inv();
 
   return homography_init;
+}
+
+
+std::vector<cv::Point> RgbdEvaluatorPreprocessing::extractHarrisCornerPoints(cv::Mat image)
+{
+  std::vector<cv::Point> keypoint_vector;
+
+  cv::Mat image_grayscale;
+  cv::Mat harris_corners;
+  cv::Mat harris_corners_norm;
+
+  double_t k = 0.04;
+  uint32_t block_size = 5;
+  uint32_t sobel_aperature = 3;
+  int32_t threshold = 150;
+
+  // convert image to grayscale
+  cv::cvtColor(image, image_grayscale, CV_RGB2GRAY);
+  cv::cornerHarris(image_grayscale, harris_corners, block_size, sobel_aperature, k);
+
+  // normalizing
+  cv::normalize( harris_corners, harris_corners_norm, 0, 255, cv::NORM_MINMAX, CV_32FC1, cv::Mat() );
+
+  // extract harris corner points or draw a circle around corners
+  for( int j = 0; j < harris_corners_norm.rows ; j++ )
+  {
+    for( int i = 0; i < harris_corners_norm.cols; i++ )
+    {
+       if( (int32_t) harris_corners_norm.at<float>(j,i) > threshold )
+       {
+         keypoint_vector.push_back(cv::Point(i,j));
+         cv::circle( image, cv::Point( i, j ), 5,  cv::Scalar(0), 2, 8, 0 );
+       }
+    }
+  }
+
+  return keypoint_vector;
 }
 
 void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, uint32_t count)
