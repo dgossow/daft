@@ -44,10 +44,16 @@ void filterImage( const cv::Mat1d &ii,
  @param[out] kp         The keypoints (input & output)
  */
 void findMaxima( const cv::Mat1d &img,
-                 const cv::Mat1d &scale_map,
-                 double base_scale,
-                 double thresh,
-                 std::vector< KeyPoint >& kp );
+     const cv::Mat1d &scale_map,
+     double base_scale,
+     double thresh,
+     std::vector< KeyPoint >& kp );
+
+void findMaximaMipMap( const cv::Mat1d &img,
+    const cv::Mat1d &scale_map,
+    double base_scale,
+    double thresh,
+    std::vector< KeyPoint >& kp );
 
 /*!
  Compute the kernel response for each keypoint and reject those
@@ -65,6 +71,10 @@ void filterKeypoints( const cv::Mat1d& ii,
                       double thresh,
                       std::vector< KeyPoint >& kp );
 
+
+
+// ----------------------------------------------------
+// -- Implementation ----------------------------------
 // ----------------------------------------------------
 
 template <double (*F)(const Mat1d&, int, int, int)>
@@ -81,7 +91,7 @@ void filterImage( const cv::Mat1d &ii,
       double s = scale_map[y][x] * base_scale;
       if ( s <= 2.0 )
       {
-        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
+        img_out(y,x) = 0;//std::numeric_limits<double>::quiet_NaN();
         continue;
       }
 

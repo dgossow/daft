@@ -10,6 +10,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <boost/timer.hpp>
+
 namespace cv
 {
 
@@ -55,9 +57,9 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
     maxv = std::max( *it, maxv );
   }
 
-  std::cout << "max: " << maxv << std::endl;
+  //std::cout << "max: " << maxv << std::endl;
 
-  cv::imshow("gray",gray_image_float);
+  //cv::imshow("gray",gray_image_float);
 
   // Construct integral image for fast smoothing (box filter)
   Mat1d integral_image;
@@ -67,7 +69,6 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
 
   // Compute scale map from depth map
   float f = camera_matrix(0,0);
-  std::cout << "f: " << f << std::endl;
   Mat1d scale_map( gray_image.rows, gray_image.cols );
 
   switch ( depth_map.type() )
@@ -111,7 +112,7 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
   for( unsigned scale_level = 0; scale_level < detector_params_.scale_levels_; scale_level++, scale *= detector_params_.scale_step_ )
   {
     // compute filter response for all pixels
-    switch ( detector_params_.detector_type_ )
+    switch ( detector_params_.det_type_ )
     {
     case DetectorParams::DET_DOB:
       filterImage<dob>( integral_image, scale_map, scale, detector_image );
@@ -121,10 +122,39 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
     }
 
     // find maxima in response
-    findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+    switch ( detector_params_.max_search_algo_ )
+    {
+    case DetectorParams::MAX_FAST:
+      findMaximaMipMap( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+      break;
+    case DetectorParams::MAX_EVAL:
+      {
+      boost::timer timer;
+      timer.restart();
+      for ( int i=0; i<100; i++ )
+      {
+        keypoints.clear();
+        keypoints.reserve(50000);
+        findMaximaMipMap( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+      }
+      std::cout << "findMaximaMipMap execution time [ms]: " << timer.elapsed()*10 << std::endl;
+      timer.restart();
+      for ( int i=0; i<100; i++ )
+      {
+        keypoints.clear();
+        keypoints.reserve(50000);
+        findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+      }
+      std::cout << "findMaxima execution time [ms]: " << timer.elapsed()*10 << std::endl;
+      }
+      break;
+    default:
+      findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+      return;
+    }
 
     // filter found maxima by applying a threshold on a second kernel
-    switch ( detector_params_.postfilter_type_ )
+    switch ( detector_params_.pf_type_ )
     {
     case DetectorParams::PF_NONE:
       break;
