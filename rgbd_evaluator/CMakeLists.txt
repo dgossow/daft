@@ -2,8 +2,8 @@ cmake_minimum_required (VERSION 2.4.6)
 
 include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
-#set (ROS_BUILD_TYPE RelWithDebInfo)
-set (ROS_BUILD_TYPE Debug)
+set (ROS_BUILD_TYPE RelWithDebInfo)
+#set (ROS_BUILD_TYPE Debug)
 rosbuild_init ()
 #rosbuild_add_boost_directories ()
 #add_definitions (-Wall -O3 -Winvalid-pch -pipe -funroll-loops -fPIC)
@@ -20,7 +20,7 @@ rosbuild_find_ros_package(dynamic_reconfigure)
 include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
 gencfg()
 
-#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS}" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
 rosbuild_add_library (rgbd_evaluator
 src/rgbd_evaluator.cpp
