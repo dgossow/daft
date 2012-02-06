@@ -19,6 +19,7 @@
 
 #include <sensor_msgs/Image.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <sensor_msgs/CameraInfo.h>
 
 #include <LinearMath/btTransform.h>
 
@@ -45,12 +46,18 @@ public:
 
 private:
 
-  cv::Matx33f calculateInitialHomography(btTransform trans, btTransform transOrigin);
+  cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
+  std::vector<cv::Point> extractHarrisCornerPoints(cv::Mat image_original);
+
+  void printMat(cv::Matx33f M);
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
+  void createFileName(char* s);
 
   std::string bagfile_name_;
   rosbag::Bag bag_;
   cv_bridge::CvImagePtr tmp_image_;
+  cv::Matx33f K_;
+
   static const uint32_t BUFF_SIZE = 500;
 
   struct ImageData {
@@ -64,7 +71,6 @@ private:
   };
 
   std::vector< ImageData > image_store_;
-
 };
 
 }
