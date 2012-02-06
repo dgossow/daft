@@ -139,8 +139,7 @@ inline double dob( const Mat1d &ii, int x, int y, int s )
 */
 inline double laplace( const Mat1d &ii, int x, int y, int s )
 {
-
-  if ( checkBounds( ii, x, y, 2*s ) )
+  if ( checkBounds( ii, x, y, 3*s ) )
   {
     double ii_dxx = dxx( ii, x, y, s );
     double ii_dyy = dyy( ii, x, y, s );

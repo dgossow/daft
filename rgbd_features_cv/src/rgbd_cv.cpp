@@ -70,6 +70,7 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
   // Compute scale map from depth map
   float f = camera_matrix(0,0);
   Mat1d scale_map( gray_image.rows, gray_image.cols );
+  Mat1d scale_map( gray_image.rows, gray_image.cols );
 
   switch ( depth_map.type() )
   {
@@ -117,6 +118,12 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
     case DetectorParams::DET_DOB:
       filterImage<dob>( integral_image, scale_map, scale, detector_image );
       break;
+    case DetectorParams::DET_LAPLACE:
+      filterImage<laplace>( integral_image, scale_map, scale*0.7, detector_image );
+      break;
+    case DetectorParams::DET_HARRIS:
+      filterImage<harris>( integral_image, scale_map, scale, detector_image );
+      break;
     default:
       return;
     }
@@ -124,6 +131,9 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
     // find maxima in response
     switch ( detector_params_.max_search_algo_ )
     {
+    case DetectorParams::MAX_WINDOW:
+      findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
+      break;
     case DetectorParams::MAX_FAST:
       findMaximaMipMap( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
       break;
@@ -149,7 +159,6 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
       }
       break;
     default:
-      findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, keypoints );
       return;
     }
 
@@ -166,6 +175,26 @@ void RgbdFeatures::detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Ma
     }
 
   }
+
+  Mat1d::iterator det_it = detector_image.begin();
+  double maxval = 0;
+  for (; det_it != detector_image.end() ; ++det_it, ++det_it)
+  {
+    maxval = std::max( maxval, *det_it );
+  }
+
+#if 1
+  cv::Mat display_image;
+  detector_image.convertTo( display_image, CV_8UC1, 1.0 / maxval * 255.0, 0.0 );
+
+  //cvtColor( detector_image, display_image, CV_BGR2GRAY );
+
+  std::ostringstream s;
+  s << "Kp type=" << detector_params_.det_type_;
+
+  cv::drawKeypoints( display_image, keypoints, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::imshow( s.str(), display_image );
+#endif
 }
 
 

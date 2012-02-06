@@ -51,7 +51,8 @@ void findMaxima( const cv::Mat1d &img,
         continue;
       }
 
-      int window = (s+0.5) / 2.0;
+      // Round scale, substract the one extra pixel we have in the center
+      int window = s*0.5; //(s+0.5) / 2.0 - 0.5;
       if ( window < 1 ) window = 1;
 
       //static const int window = 1;
@@ -84,28 +85,83 @@ void findMaxima( const cv::Mat1d &img,
   }
 }
 
+
+
+
 // Helper struct + comparison
 struct MaxProp
 {
   // function value
   float max_value;
 
-  // index in original image
-  unsigned int idx;
-
   // index inside (last) 2x2 block. Layout:
   // 0 1
   // 2 3
   unsigned int block_idx;
 
+  // index in original image
+  unsigned int idx;
+
   // still needs check for local max
   bool need_check;
 
-  friend bool operator< ( const MaxProp& lhs, const MaxProp& rhs )
+  inline operator float() const
   {
-    return lhs.max_value < rhs.max_value;
+    return max_value;
   }
 };
+
+template<typename T>
+inline unsigned int maxIdx(const T& x0, const T& x1, const T& x2, const T& x3)
+{
+  return x0>x1
+      ? ( x2>x3 ? (x0>x2?0:2) : (x0>x3?0:3) )
+      : ( x2>x3 ? (x1>x2?1:2) : (x1>x3?1:3) );
+}
+
+template<typename T>
+inline bool isLocalMax( float cv, const T& max_map,
+    unsigned max_idx, bool win_5x5, unsigned w )
+{
+  if ( win_5x5 )
+  {
+    return
+        cv > max_map[max_idx-2*w-1] &&
+        cv > max_map[max_idx-2*w] &&
+        cv > max_map[max_idx-2*w+1] &&
+        cv > max_map[max_idx-w-2] &&
+        cv > max_map[max_idx-w-1] &&
+        cv > max_map[max_idx-w] &&
+        cv > max_map[max_idx-w+1] &&
+        cv > max_map[max_idx-w+2] &&
+        cv > max_map[max_idx-2] &&
+        cv > max_map[max_idx-1] &&
+        cv > max_map[max_idx+1] &&
+        cv > max_map[max_idx+2] &&
+        cv > max_map[max_idx+w-2] &&
+        cv > max_map[max_idx+w-1] &&
+        cv > max_map[max_idx+w] &&
+        cv > max_map[max_idx+w+1] &&
+        cv > max_map[max_idx+w+2] &&
+        cv > max_map[max_idx+2*w-1] &&
+        cv > max_map[max_idx+2*w] &&
+        cv > max_map[max_idx+2*w+1];
+  }
+  else
+  {
+    return
+        cv > max_map[max_idx-w-1] &&
+        cv > max_map[max_idx-w] &&
+        cv > max_map[max_idx-w+1] &&
+        cv > max_map[max_idx-1] &&
+        cv > max_map[max_idx+1] &&
+        cv > max_map[max_idx+w-1] &&
+        cv > max_map[max_idx+w] &&
+        cv > max_map[max_idx+w+1];
+  }
+}
+
+//define DGB_F
 
 void findMaximaMipMap( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
@@ -120,186 +176,133 @@ void findMaximaMipMap( const cv::Mat1d &img,
 
   double max_dim = std::max( img.rows, img.cols );
 
-  unsigned w = img.cols;
-  unsigned h = img.rows;
-  unsigned map_size = img.rows*img.cols;
+  unsigned w_next = img.cols;
+  unsigned h_next = img.rows;
+  unsigned next_map_size = img.rows*img.cols;
 
-  std::vector< MaxProp > last_map;
+  std::vector< MaxProp > max_map;
 
-  //std::ofstream f;
-  //f.open( "/tmp/wt.csv" );
+#ifdef DGB_F
+  std::ofstream f;
+  f.open( "/tmp/wt2.csv" );
+#endif
 
   // compute max levels
-  for ( int current_scale = 2; current_scale<max_dim; current_scale*=2 )
+  for ( int px_size = 1; px_size<max_dim; px_size*=2 )
   {
-    const unsigned w2 = w;
-    w /= 2;
-    h /= 2;
-    map_size = w*h;
+    const unsigned w = w_next;
+    const unsigned h = h_next;
+    w_next /= 2;
+    h_next /= 2;
+    next_map_size = w_next*h_next;
 
-    if ( w<3 || h<3 ) break;
+    if ( w_next<3 || h_next<3 ) break;
 
-    std::vector< MaxProp > curr_map( map_size );
+    const int next_px_size = px_size * 2;
+
+    // the next map is going to be half as wide/tall as the current
+    std::vector< MaxProp > next_max_map( next_map_size );
 
     // fixed value for rounding to next scale level
     // the factor is computed to minimize the error in
     // search area: sqrt(5/2) * 1.5
-    float s_thresh = current_scale * 1.41 * 1.5;
+    //float s_thresh_old = float(next_px_size) * 1.41 * 1.5;
+
+    // above this threshold. take a 5x5 instead of a 3x3 neighbourhood
+    float s_thresh = float(next_px_size*3) * 0.889756521;
+    float s_thresh_2 = float(next_px_size*3) * 0.645497224;
 
     //std::cout << "Mipmap level " << current_scale << " thresh " << s_thresh << " size " << w << " x " << h << std::endl;
 
-    const int diff[4][5] = {
-        {  -w2-1,    -w2,  -w2+1,   -1,   w2-1 },
-        {    -w2,  -w2+1,  -w2+2,    2,   w2+2 },
-        {     -1,   w2-1, 2*w2-1, 2*w2, 2*w2+1 },
-        {   2*w2, 2*w2+1, 2*w2+2, w2+2,      2 } };
+    const int block_idx_offset[4] = { 0, 1, w, w + 1};
 
     unsigned remaining_checks = 0;
 
-    // compute max values in 2x2 blocks of higher level
-    for ( unsigned y = 1; y < h-1; y++ )
+    for ( unsigned y_next = 0; y_next < h_next; y_next++ )
     {
-      for ( unsigned x = 1; x < w-1; ++x )
+      for ( unsigned x_next = 0; x_next < w_next; ++x_next )
       {
-        unsigned x2 = 2*x;
-        unsigned y2 = 2*y;
+        unsigned x = 2*x_next;
+        unsigned y = 2*y_next;
 
+        unsigned i_next = x_next + y_next*w_next;
         unsigned i = x + y*w;
-        unsigned i2 = x2 + y2*w2;
 
-        if ( current_scale == 2 )
+        unsigned max_blockidx,max_idx;
+
+        // compute max values in 2x2 blocks of higher level
+        if ( px_size == 1 )
         {
-          double* last_map = reinterpret_cast<double*>(img.data);
-          unsigned int max_idx12,max_idx34;
-          unsigned int max_blockidx12,max_blockidx34;
-          float max_val12,max_val34,max_val;
-
-          if ( last_map[i2] > last_map[i2+1] )
-          {
-            max_val12 = last_map[i2];
-            max_idx12 = i2;
-            max_blockidx12 = 0;
-          }
-          else
-          {
-            max_val12 = last_map[i2+1];
-            max_idx12 = i2+1;
-            max_blockidx12 = 1;
-          }
-          if ( last_map[i2+w2] > last_map[i2+w2+1] )
-          {
-            max_val34 = last_map[i2+w2];
-            max_idx34 = i2+w2;
-            max_blockidx34 = 2;
-          }
-          else
-          {
-            max_val34 = last_map[i2+w2+1];
-            max_idx34 = i2+1+w2;
-            max_blockidx34 = 3;
-          }
-          if ( max_val12 > max_val34 )
-          {
-            MaxProp& p = curr_map[i];
-            p.max_value = max_val12;
-            p.idx = max_idx12;
-            p.block_idx = max_blockidx12;
-            p.need_check = max_val12 > thresh;
-          }
-          else
-          {
-            MaxProp& p = curr_map[i];
-            p.max_value = max_val34;
-            p.idx = max_idx34;
-            p.block_idx = max_blockidx34;
-            p.need_check = max_val34 > thresh;
-          }
+          double* max_map = reinterpret_cast<double*>(img.data);
+          max_blockidx = maxIdx(max_map[i], max_map[i+1], max_map[i+w], max_map[i+w+1]);
+          MaxProp& p = next_max_map[i_next];
+          max_idx = i + block_idx_offset[max_blockidx];
+          p.idx = max_idx;
+          p.max_value = max_map[max_idx];
+          p.need_check = p.max_value > thresh;
         }
         else
         {
-          MaxProp max_12 = std::max( last_map[i2], last_map[i2+1] );
-          MaxProp max_34 = std::max( last_map[i2+w2], last_map[i2+w2+1] );
-          curr_map[i] = std::max( max_12, max_34 );
+          max_blockidx = maxIdx(max_map[i], max_map[i+1], max_map[i+w], max_map[i+w+1]);
+          max_idx = i + block_idx_offset[max_blockidx];
+          next_max_map[i_next] = max_map[max_idx];
         }
 
-
-        // check if greatest value it is a local max in the last level
-        if ( curr_map[i].need_check )
+        if ( next_max_map[i_next].need_check )
         {
-          double cv = curr_map[i].max_value;
-          unsigned idx = curr_map[i].block_idx;
+          // if we have reached the nearest level to the actual scale,
+          // check for local maximum
+          double s = (reinterpret_cast<double*>(scale_map.data))[next_max_map[i_next].idx] * base_scale;
 
-          bool is_local_max;
-
-          if ( current_scale == 2 )
+          if ( s <= s_thresh )
           {
-            double* last_map = reinterpret_cast<double*>(img.data);
-            is_local_max =
-                cv > last_map[i2+diff[idx][0]] &&
-                cv > last_map[i2+diff[idx][1]] &&
-                cv > last_map[i2+diff[idx][2]] &&
-                cv > last_map[i2+diff[idx][3]] &&
-                cv > last_map[i2+diff[idx][4]];
+#ifdef DGB_F
+            int old_window = s*0.5; //(s+0.5) / 2.0 - 0.5;
+            if ( old_window < 1 ) old_window = 1;
+            // this is the real side length of the window used.
+            old_window = 2*old_window + 1;
+
+            float new_window = s > s_thresh_2 ? 4.58 * float(px_size) : 3 * float(px_size);
+
+            f << s << ", " << old_window << ", " << new_window << std::endl;
+#endif
+
+            next_max_map[i_next].need_check = false;
+
+            if ( ( x > 2 ) && ( y > 2 ) && ( x < w-2 ) && ( y < h-2 ) )
+            {
+              float cv = next_max_map[i_next].max_value;
+
+              bool is_local_max;
+
+              if ( px_size == 1 )
+              {
+//                inline bool isLocalMax( double cv, const T& max_map,
+//                    unsigned max_idx, bool win_5x5, unsigned w )
+                double* max_map = reinterpret_cast<double*>(img.data);
+                is_local_max = isLocalMax( cv, max_map, max_idx, s > s_thresh_2, w );
+              }
+              else
+              {
+                is_local_max = isLocalMax( cv, max_map, max_idx, s > s_thresh_2, w );
+              }
+
+              if ( is_local_max )
+              {
+                unsigned kp_x = next_max_map[i_next].idx % img.cols;
+                unsigned kp_y = next_max_map[i_next].idx / img.cols;
+
+                // make keypoint
+                kp.push_back( KeyPoint ( kp_x, kp_y, s, -1, cv ) );
+              }
+            }
           }
           else
-          {
-            is_local_max =
-                cv > last_map[i2+diff[idx][0]].max_value &&
-                cv > last_map[i2+diff[idx][1]].max_value &&
-                cv > last_map[i2+diff[idx][2]].max_value &&
-                cv > last_map[i2+diff[idx][3]].max_value &&
-                cv > last_map[i2+diff[idx][4]].max_value;
-          }
-
-          if ( is_local_max )
-          {
-              curr_map[i].block_idx = x%2 + (y%2)*2;
-
-              double s = (reinterpret_cast<double*>(scale_map.data))[curr_map[i].idx] * base_scale;
-
-              if ( s <= s_thresh )
-              {
-                is_local_max = false;
-
-                unsigned kp_x = curr_map[i].idx % img.cols;
-                unsigned kp_y = curr_map[i].idx / img.cols;
-
-                int window = s / 2;
-                if ( window < 1 ) window = 1;
-                window = 2*window + 1;
-
-                //f << s << ", " << window << ", " << current_scale * 3 / 2 << std::endl;
-
-                if (isnan( img[kp_y-1][kp_x-1] ) ||
-                    isnan( img[kp_y-1][kp_x  ] ) ||
-                    isnan( img[kp_y-1][kp_x+1] ) ||
-                    isnan( img[kp_y  ][kp_x-1] ) ||
-                    isnan( img[kp_y  ][kp_x  ] ) ||
-                    isnan( img[kp_y  ][kp_x+1] ) ||
-                    isnan( img[kp_y+1][kp_x-1] ) ||
-                    isnan( img[kp_y+1][kp_x  ] ) ||
-                    isnan( img[kp_y+1][kp_x+1] ))
-                {
-
-                } else if ( kp_x-s > 0 &&
-                     kp_x+s < img.cols &&
-                     kp_y-s > 0 &&
-                     kp_y+s < img.rows )
-                {
-                  //std::cout<<kp_x<<" "<<kp_y<<" s="<<s<<" thresh="<<s_thresh<< std::endl;
-
-                  // make keypoint
-                  kp.push_back( KeyPoint ( kp_x, kp_y, s, -1, cv ) );
-                }
-              }
-          }
-
-          curr_map[i].need_check = is_local_max;
-          if ( is_local_max )
           {
             remaining_checks++;
           }
         }
+
       }
     }
 
@@ -310,11 +313,10 @@ void findMaximaMipMap( const cv::Mat1d &img,
       break;
     }
 
-    last_map.swap( curr_map );
+    max_map.swap( next_max_map );
   }
-  //f.close();
+
   //std::cout << "Found " << kp.size() << " keypoints" << std::endl;
 }
-
 
 } 

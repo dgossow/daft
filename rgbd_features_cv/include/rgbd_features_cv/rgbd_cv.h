@@ -29,7 +29,7 @@ public:
   {
     enum { DET_DOB=0, DET_LAPLACE=1, DET_HARRIS=2 };
     enum { PF_NONE=0, PF_HARRIS=1 };
-    enum { MAX_WINDOW=0, MAX_FAST=1, MAX_EVAL=2 };
+    enum { MAX_WINDOW=0, MAX_FAST=1, MAX_EVAL=3 };
 
     static const unsigned int DEFAULT_N_LEVELS = 1;
     static const float DEFAULT_DET_THRESHOLD = 0.02;

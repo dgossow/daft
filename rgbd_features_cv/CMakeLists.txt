@@ -17,7 +17,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR})
 find_package(OpenCV REQUIRED)
 include_directories (${OpenCV_INCLUDE_DIR})
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS}" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
 # Make shared library
 rosbuild_add_library (rgbd_features_cv
