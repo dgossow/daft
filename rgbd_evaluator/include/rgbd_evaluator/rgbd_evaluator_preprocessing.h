@@ -47,11 +47,11 @@ public:
 private:
 
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
-  std::vector<cv::Point> extractHarrisCornerPoints(cv::Mat image_original);
 
   void printMat(cv::Matx33f M);
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
   void createFileName(char* s);
+  double_t calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x);
 
   std::string bagfile_name_;
   rosbag::Bag bag_;
@@ -59,6 +59,9 @@ private:
   cv::Matx33f K_;
 
   static const uint32_t BUFF_SIZE = 500;
+  static const uint32_t MAX_DISTANCE_THRES = 12;
+  static const uint32_t MIN_CORRESPONDENCES = 4;
+  static const uint32_t FAST_THRES = 100;
 
   struct ImageData {
     boost::shared_ptr<cv_bridge::CvImage> image;

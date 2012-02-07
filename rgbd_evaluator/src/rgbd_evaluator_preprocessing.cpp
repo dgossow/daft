@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <LinearMath/btQuaternion.h>
 #include <LinearMath/btMatrix3x3.h>
@@ -152,14 +153,15 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   bool first_image = true;
 
   std::vector< ImageData >::iterator it;
-  std::vector<cv::Point> corner_vector_original;
-  std::vector<cv::Point> corner_vector_camx;
+  std::vector<cv::KeyPoint> corner_vector_original;
+  std::vector<cv::KeyPoint> corner_vector_camx;
 
   btTransform transform_original;
   btTransform transform_camx;
   btTransform transform_camx_to_original;
 
   cv::Mat image_original;
+  cv::Mat image_grayscale;
   cv::Mat harris_corners_original;
   cv::Mat harris_corners_camx_norm;
 
@@ -175,9 +177,13 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       image_original = it->image.get()->image;
       first_image = false;
 
-      // extract original harris corner points
-      corner_vector_original = extractHarrisCornerPoints(image_original);
+      // convert image to grayscale
+      cv::cvtColor(image_original, image_grayscale, CV_RGB2GRAY);
 
+      cv::FAST(image_grayscale, corner_vector_original, FAST_THRES, true);
+      cv::drawKeypoints(image_original, corner_vector_original, image_original);
+
+      // store original corner points
       cv::imshow("Original Image", image_original);
       cv::waitKey(30);
 
@@ -201,34 +207,87 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     /**************************** calculate precise homography **************************************************************/
 
-    std::vector<cv::Matx31f> corner_vector_camx_warped;
+    std::vector<cv::Point2f> corner_vector_src;
+    std::vector<cv::Point2f> corner_vector_dest;
+    std::vector<cv::KeyPoint> corner_vector_warped;
 
-    corner_vector_camx = extractHarrisCornerPoints(image_camx);
+
+    // convert image to grayscale
+    cv::cvtColor(image_warped, image_grayscale, CV_RGB2GRAY);
+    cv::FAST(image_grayscale, corner_vector_camx, FAST_THRES, true);
+    cv::drawKeypoints(image_warped, corner_vector_camx, image_warped);
+
+    // corner correspondences
+    uint32_t correspondences[corner_vector_camx.size()];
 
     uint32_t i;
+
     for(i = 0; i < corner_vector_camx.size(); i++)
     {
-      cv::Matx31f point_temp(corner_vector_camx.at(i).x, corner_vector_camx.at(i).y, 1.0);
-      cv::Matx31f point_warped = cv::Matx33f(homography_init) * point_temp ;
+      bool correspondence_found = false;
 
-      corner_vector_camx_warped.push_back( point_warped );
+      cv::KeyPoint warped_point( corner_vector_camx.at(i) );
 
-      cv::circle( image_warped, cv::Point( point_warped.val[0]/point_warped.val[2], point_warped.val[1]/point_warped.val[2] ), 5,  cv::Scalar(0), 2, 8, 0 );
+      corner_vector_warped.push_back( warped_point );
+
+      // find correspondences
+      uint32_t j=0;
+      double_t min_distance = MAX_DISTANCE_THRES;
+      correspondences[i] = 0;
+
+      for(j = 0; j < corner_vector_original.size(); j++)
+      {
+          double_t tmp = calculateEuclidianDistance(corner_vector_original.at(j), warped_point);
+
+          if(min_distance >= tmp)
+          {
+              correspondences[i] = j;
+              min_distance = tmp;
+              correspondence_found = true;
+
+              //printf("i=%d \t j=%d: \t Distance = %f\n\r",i,j, min_distance);
+          }
+      }
+
+      if(correspondence_found == true)
+      {
+          // store corresponding original point
+          corner_vector_src.push_back( cv::Point2f( corner_vector_warped.at(i).pt.x,
+                                                    corner_vector_warped.at(i).pt.y ));
+
+          corner_vector_dest.push_back( cv::Point2f( corner_vector_original.at(correspondences[i]).pt.x,
+                                                     corner_vector_original.at(correspondences[i]).pt.y ));
+      }
 
     }
 
-    // TODO: warp harris corner points from cam_x to cam_original; find corresponding points --> cv::findHomography
+    printf("Found correspondences: %d\n\r", (uint32_t)corner_vector_src.size() );
 
+    cv::Matx33f precise_homography;
 
+    if(corner_vector_src.size() < MIN_CORRESPONDENCES)
+    {
+      std::cout << "Not enough correspondences found! Exiting..." << std::endl;
+      return;
+    }
 
+    precise_homography = cv::findHomography( corner_vector_src, corner_vector_dest , CV_RANSAC, 5 );
+
+    printMat(cv::Matx33f(precise_homography));
+
+    cv::Mat image_warped_precise;
+
+    // perspective warping precise
+    cv::warpPerspective(image_warped, image_warped_precise, cv::Mat(precise_homography), cv::Size(image_warped.cols,image_warped.rows));
 
     /*************************************************************************************************************************/
-
 
     // show images
     cv::imshow("Current Image", image_camx);
     cv::waitKey(30);
     cv::imshow("Warped Image", image_warped);
+    cv::waitKey(30);
+    cv::imshow("Precise warped Image", image_warped_precise);
     cv::waitKey(30);
 
     // store homography
@@ -270,42 +329,6 @@ cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform t
   return homography_init;
 }
 
-
-std::vector<cv::Point> RgbdEvaluatorPreprocessing::extractHarrisCornerPoints(cv::Mat image)
-{
-  std::vector<cv::Point> keypoint_vector;
-
-  cv::Mat image_grayscale;
-  cv::Mat harris_corners;
-  cv::Mat harris_corners_norm;
-
-  double_t k = 0.04;
-  uint32_t block_size = 5;
-  uint32_t sobel_aperature = 3;
-  int32_t threshold = 150;
-
-  // convert image to grayscale
-  cv::cvtColor(image, image_grayscale, CV_RGB2GRAY);
-  cv::cornerHarris(image_grayscale, harris_corners, block_size, sobel_aperature, k);
-
-  // normalizing
-  cv::normalize( harris_corners, harris_corners_norm, 0, 255, cv::NORM_MINMAX, CV_32FC1, cv::Mat() );
-
-  // extract harris corner points or draw a circle around corners
-  for( int j = 0; j < harris_corners_norm.rows ; j++ )
-  {
-    for( int i = 0; i < harris_corners_norm.cols; i++ )
-    {
-       if( (int32_t) harris_corners_norm.at<float>(j,i) > threshold )
-       {
-         keypoint_vector.push_back(cv::Point(i,j));
-         cv::circle( image, cv::Point( i, j ), 5,  cv::Scalar(0), 2, 8, 0 );
-       }
-    }
-  }
-
-  return keypoint_vector;
-}
 
 void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, uint32_t count)
 {
@@ -354,6 +377,12 @@ void RgbdEvaluatorPreprocessing::createFileName(char* fileName)
     i++;
   }
   fileName[i] = '\0';
+}
+
+double_t RgbdEvaluatorPreprocessing::calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x)
+{
+  double_t edistance = sqrt(pow(corner_original.pt.x - corner_x.pt.x, 2) + pow(corner_original.pt.y - corner_x.pt.y, 2));
+  return edistance;
 }
 
 
