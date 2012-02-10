@@ -53,22 +53,26 @@ private:
   void createFileName(char* s);
   double_t calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x);
 
-  std::string bagfile_name_;
+  std::string file_path_;
   rosbag::Bag bag_;
   cv_bridge::CvImagePtr tmp_image_;
   cv::Matx33f K_;
 
   static const uint32_t BUFF_SIZE = 500;
-  static const uint32_t MAX_DISTANCE_THRES = 12;
+  static const uint32_t MAX_CORRESPONDENCES_DIST_THRES = 10;
   static const uint32_t MIN_CORRESPONDENCES = 4;
-  static const uint32_t FAST_THRES = 100;
 
-  struct ImageData {
+  static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 25;
+  static const uint32_t MAX_FEATURE_NUMBER = 100;
+
+  struct ImageData
+  {
     boost::shared_ptr<cv_bridge::CvImage> image;
     boost::shared_ptr<btTransform> approx_transform;
     //...
 
-    bool isComplete() {
+    bool isComplete()
+    {
       return image.get() && approx_transform.get();
     }
   };

@@ -21,13 +21,13 @@
 namespace rgbd_evaluator
 {
 
-RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string bagfile_name)
+RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string file_path)
 {
-  std::cout << "Reading bagfile from " << bagfile_name.c_str() << std::endl;
+  std::cout << "Reading bagfile from " << file_path.c_str() << std::endl;
 
-  bagfile_name_ = bagfile_name;
+  file_path_ = file_path;
 
-  bag_.open(bagfile_name, rosbag::bagmode::Read);
+  bag_.open(file_path, rosbag::bagmode::Read);
 
 }
 
@@ -73,7 +73,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         if ( image_store_.back().image )
         {
-          std::cout << "There is an image already for the current dataset! Bagfile invalid." << std::endl;
+          std::cout << "There is an imfile_path_age already for the current dataset! Bagfile invalid." << std::endl;
           return;
         }
 
@@ -153,8 +153,8 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   bool first_image = true;
 
   std::vector< ImageData >::iterator it;
-  std::vector<cv::KeyPoint> corner_vector_original;
-  std::vector<cv::KeyPoint> corner_vector_camx;
+  std::vector<cv::Point2f> feature_vector_original;
+  std::vector<cv::KeyPoint> keypoint_vector_original;
 
   btTransform transform_original;
   btTransform transform_camx;
@@ -162,8 +162,8 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
   cv::Mat image_original;
   cv::Mat image_grayscale;
-  cv::Mat harris_corners_original;
-  cv::Mat harris_corners_camx_norm;
+
+  cv::Matx33f homography_complete;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = image_store_.begin(); it != image_store_.end()-1; it++)
@@ -173,19 +173,21 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     if(first_image)
     {
       // get original image
-      transform_original = *(it->approx_transform.get());
+      transform_original = *( it->approx_transform.get() );
       image_original = it->image.get()->image;
       first_image = false;
 
       // convert image to grayscale
-      cv::cvtColor(image_original, image_grayscale, CV_RGB2GRAY);
+      cv::cvtColor( image_original, image_grayscale, CV_RGB2GRAY );
+      cv::goodFeaturesToTrack( image_grayscale, feature_vector_original, MAX_FEATURE_NUMBER, 0.01,
+                               MIN_FEATURE_NEIGHBOUR_DIST, cv::noArray(), 3, true );
 
-      cv::FAST(image_grayscale, corner_vector_original, FAST_THRES, true);
-      cv::drawKeypoints(image_original, corner_vector_original, image_original);
+      cv::KeyPoint::convert( feature_vector_original, keypoint_vector_original );
+      //cv::drawKeypoints( image_original, keypoint_vector_original, image_original );
 
       // store original corner points
-      cv::imshow("Original Image", image_original);
-      cv::waitKey(30);
+//    cv::imshow("Original Image", image_original);
+//    cv::waitKey(30);
 
       continue;
     }
@@ -197,101 +199,122 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // calculate transform from camera position x to original position
     transform_camx_to_original = transform_original * transform_camx.inverse();
 
-    cv::Matx33f homography_init = calculateInitialHomography(transform_camx_to_original, transform_camx);
+    cv::Matx33f homography_init = calculateInitialHomography( transform_camx_to_original, transform_camx );
 
     cv::Mat image_camx = it->image.get()->image;
     cv::Mat image_warped;
 
     // perspective warping
-    cv::warpPerspective(image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows));
+    cv::warpPerspective( image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
 
     /**************************** calculate precise homography **************************************************************/
 
-    std::vector<cv::Point2f> corner_vector_src;
-    std::vector<cv::Point2f> corner_vector_dest;
-    std::vector<cv::KeyPoint> corner_vector_warped;
-
+    std::vector<cv::Point2f> keypoints_camx;
+    std::vector<cv::Point2f> keypoints_original;
+    std::vector<cv::Point2f> feature_vector_camx;
+    std::vector<cv::KeyPoint> keypoint_vector_camx;
 
     // convert image to grayscale
-    cv::cvtColor(image_warped, image_grayscale, CV_RGB2GRAY);
-    cv::FAST(image_grayscale, corner_vector_camx, FAST_THRES, true);
-    cv::drawKeypoints(image_warped, corner_vector_camx, image_warped);
+    cv::cvtColor( image_warped, image_grayscale, CV_RGB2GRAY );
+    cv::goodFeaturesToTrack( image_grayscale, feature_vector_camx, MAX_FEATURE_NUMBER, 0.01, MIN_FEATURE_NEIGHBOUR_DIST );
+
+    cv::KeyPoint::convert( feature_vector_camx, keypoint_vector_camx );
+    cv::drawKeypoints( image_warped, keypoint_vector_camx, image_warped );
 
     // corner correspondences
-    uint32_t correspondences[corner_vector_camx.size()];
+    uint32_t correspondences[keypoint_vector_camx.size()];
 
     uint32_t i;
 
-    for(i = 0; i < corner_vector_camx.size(); i++)
+    for(i = 0; i < keypoint_vector_camx.size(); i++)
     {
       bool correspondence_found = false;
 
-      cv::KeyPoint warped_point( corner_vector_camx.at(i) );
-
-      corner_vector_warped.push_back( warped_point );
-
       // find correspondences
       uint32_t j=0;
-      double_t min_distance = MAX_DISTANCE_THRES;
+      double_t min_distance = MAX_CORRESPONDENCES_DIST_THRES;
       correspondences[i] = 0;
 
-      for(j = 0; j < corner_vector_original.size(); j++)
+      for(j = 0; j < keypoint_vector_original.size(); j++)
       {
-          double_t tmp = calculateEuclidianDistance(corner_vector_original.at(j), warped_point);
+          double_t tmp = calculateEuclidianDistance( keypoint_vector_original.at(j), keypoint_vector_camx.at(i) );
 
           if(min_distance >= tmp)
           {
               correspondences[i] = j;
               min_distance = tmp;
               correspondence_found = true;
-
-              //printf("i=%d \t j=%d: \t Distance = %f\n\r",i,j, min_distance);
           }
       }
 
       if(correspondence_found == true)
       {
           // store corresponding original point
-          corner_vector_src.push_back( cv::Point2f( corner_vector_warped.at(i).pt.x,
-                                                    corner_vector_warped.at(i).pt.y ));
+          keypoints_camx.push_back( cv::Point2f( keypoint_vector_camx.at(i).pt.x,
+                                                 keypoint_vector_camx.at(i).pt.y ) );
 
-          corner_vector_dest.push_back( cv::Point2f( corner_vector_original.at(correspondences[i]).pt.x,
-                                                     corner_vector_original.at(correspondences[i]).pt.y ));
+          keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(correspondences[i]).pt.x,
+                                                     keypoint_vector_original.at(correspondences[i]).pt.y ) );
       }
 
     }
 
-    printf("Found correspondences: %d\n\r", (uint32_t)corner_vector_src.size() );
+    printf("Found correspondences: %d\n\r", (uint32_t)keypoints_camx.size() );
 
-    cv::Matx33f precise_homography;
+    cv::Matx33f homography_precise;
 
-    if(corner_vector_src.size() < MIN_CORRESPONDENCES)
+
+    if(keypoints_camx.size() < MIN_CORRESPONDENCES || keypoints_original.size() < MIN_CORRESPONDENCES )
     {
       std::cout << "Not enough correspondences found! Exiting..." << std::endl;
       return;
     }
 
-    precise_homography = cv::findHomography( corner_vector_src, corner_vector_dest , CV_RANSAC, 5 );
+    homography_precise = cv::findHomography( keypoints_camx, keypoints_original , CV_LMEDS, 2 );
 
-    printMat(cv::Matx33f(precise_homography));
+    homography_complete = homography_precise * homography_init;
+
+    printMat( cv::Matx33f(homography_complete) );
 
     cv::Mat image_warped_precise;
 
     // perspective warping precise
-    cv::warpPerspective(image_warped, image_warped_precise, cv::Mat(precise_homography), cv::Size(image_warped.cols,image_warped.rows));
+    cv::warpPerspective( image_camx, image_warped_precise, cv::Mat(homography_complete), cv::Size(image_warped.cols,image_warped.rows) );
+
+
+    //transform keypoints from warped image into precise warped image
+    for ( uint32_t i=0; i < keypoints_camx.size(); i++ )
+    {
+      cv::Matx31f kp_xyw( keypoints_camx[i].x, keypoints_camx[i].y, 1);
+
+      kp_xyw = homography_precise * kp_xyw;
+      //corner_vector_src;
+      keypoints_camx[i].x = kp_xyw.val[0] / kp_xyw.val[2];
+      keypoints_camx[i].y = kp_xyw.val[1] / kp_xyw.val[2];
+    }
+
+    cv::Mat image_original_clone( image_original.clone() );
+
+    for ( uint32_t i=0; i<keypoints_camx.size(); i++ )
+    {
+      cv::line( image_warped_precise, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
+      cv::line( image_original_clone, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
+    }
 
     /*************************************************************************************************************************/
 
     // show images
-    cv::imshow("Current Image", image_camx);
-    cv::waitKey(30);
-    cv::imshow("Warped Image", image_warped);
-    cv::waitKey(30);
-    cv::imshow("Precise warped Image", image_warped_precise);
+//    cv::imshow("Current Image", image_camx);
+//    cv::waitKey(30);
+//    cv::imshow("Warped Image", image_warped);
+//    cv::waitKey(30);
+
+    cv::imshow( "Precise warped Image", image_warped_precise );
+    cv::imshow( "Original Image", image_original_clone );
     cv::waitKey(30);
 
     // store homography
-    writeHomographyToFile(homography_init, count++);
+    writeHomographyToFile( homography_complete, count++ );
 
     std::cout << "Press any key to continue" << std::endl;
     getchar();
@@ -338,7 +361,7 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   char fileName[BUFF_SIZE];
   char stdName[] = "Homography_0_to_";
 
-  sprintf(fileName, "%s%d%c.dat",stdName, count, '\0');
+  sprintf(fileName, "%s%s%d%c.dat", file_path_.c_str(),stdName, count, '\0');
 
   file.open(fileName, std::ios::out);
 
@@ -371,9 +394,9 @@ void RgbdEvaluatorPreprocessing::createFileName(char* fileName)
 {
   uint32_t i = 0;
 
-  while(bagfile_name_[i] != '.' && i < BUFF_SIZE)
+  while(file_path_[i] != '.' && i < BUFF_SIZE)
   {
-    fileName[i] = bagfile_name_.c_str()[i];
+    fileName[i] = file_path_.c_str()[i];
     i++;
   }
   fileName[i] = '\0';
