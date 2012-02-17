@@ -12,6 +12,7 @@ rosbuild_check_for_sse ()
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
+include_directories (${PROJECT_SOURCE_DIR}/include/rgbd_features_cv/)
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
@@ -21,8 +22,9 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native
 
 # Make shared library
 rosbuild_add_library (rgbd_features_cv
-src/rgbd_cv.cpp
+src/daft.cpp
 src/feature_detection.cpp
+src/keypoint3d.cpp
 )
 
 target_link_libraries(rgbd_features_cv ${OpenCV_LIBS})

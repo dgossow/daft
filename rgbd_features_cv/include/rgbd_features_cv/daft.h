@@ -8,26 +8,21 @@
 #ifndef __RGBD_CV_H__
 #define __RGBD_CV_H__
 
+#include "keypoint3d.h"
+
 namespace cv
 {
-/*
-void make3DKeypoints( const cv::Matx33f& camera_matrix,
-    const cv::Mat1d& scale_map,
-    std::vector< KeyPoint >& kp_in,
-    std::vector< KeyPoint >& kp_in
-    );
-*/
 
 /*!
-  RGBD features implementation.
+  Extracts keypoints from an image based on intensity and depth data
 */
-class RgbdFeatures
+class DAFT
 {
 public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_LAPLACE=1, DET_HARRIS=2 };
+    enum { DET_DOB=0, DET_LAPLACE=1, DET_HARRIS=2, DET_DOBP=3 };
     enum { PF_NONE=0, PF_HARRIS=1 };
     enum { MAX_WINDOW=0, MAX_FAST=1, MAX_EVAL=3 };
 
@@ -68,35 +63,29 @@ public:
     /** The number of levels in the scale pyramid */
     unsigned int scale_levels_;
 
-    /** Which detector to use (Hessian, Difference-of-Boxes, Harris) */
+    /** Which detector to use */
     int det_type_;
 
     /** Minimal response threshold for the detector */
     double det_threshold_;
 
-    /** Postfilter applied to output of first detector (None, Hessian) */
+    /** Postfilter applied to output of first detector */
     int pf_type_;
 
     /** Minimal response threshold for the post filter */
     double pf_threshold_;
 
-    /** Postfilter applied to output of first detector (None, Hessian) */
+    /** How to search for maxima? */
     int max_search_algo_;
 
-  };
-
-  struct Keypoint: public cv::KeyPoint
-  {
-    CV_PROP_RW float physical_size; //!< diameter (in meters) of the meaningful keypoint neighborhood
-    CV_PROP_RW Point3f pt3d; //!< 3D position in the camera frame
   };
 
   /** Constructor
    * @param detector_params parameters to use
    */
-  RgbdFeatures(const DetectorParams & detector_params = DetectorParams());
+  DAFT(const DetectorParams & detector_params = DetectorParams());
 
-  ~RgbdFeatures();
+  ~DAFT();
 
   /** Detect salient keypoints on a rectified depth+intensity image
    * @param image the image to compute the features and descriptors on
@@ -105,7 +94,7 @@ public:
    * @param keypoints the resulting keypoints
    */
   void detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f camera_matrix,
-      std::vector<cv::KeyPoint> & keypoints);
+      std::vector<KeyPoint3D> & keypoints);
 
 private:
 

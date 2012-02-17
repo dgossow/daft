@@ -18,7 +18,7 @@
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
-cv::RgbdFeatures rgbd_features;
+cv::DAFT rgbd_features;
 
 cv_bridge::CvImageConstPtr orig_rgb_image;
 cv_bridge::CvImageConstPtr orig_depth_image;

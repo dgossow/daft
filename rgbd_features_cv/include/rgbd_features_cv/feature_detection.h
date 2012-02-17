@@ -13,6 +13,8 @@
 
 #include <fstream>
 
+#include "keypoint3d.h"
+
 namespace cv
 {
 
@@ -28,10 +30,18 @@ namespace cv
  @param[out] img_out    The output image
  */
 template <double (*F)(const Mat1d&, int, int, int)>
-void filterImage( const cv::Mat1d &ii,
+void convolve( const cv::Mat1d &ii,
                   const cv::Mat1d &scale_map,
                   double base_scale,
                   cv::Mat1d &img_out );
+
+template <double (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+void convolveAffine( const cv::Mat1d &ii,
+    const cv::Mat1d &scale_map,
+    const cv::Mat1f &depth_map,
+    const cv::Matx33f& camera_matrix,
+    double base_scale,
+    cv::Mat1d &img_out );
 
 /*!
  Find the local maxima in the given image with a minimal value of thresh,
@@ -47,13 +57,13 @@ void findMaxima( const cv::Mat1d &img,
      const cv::Mat1d &scale_map,
      double base_scale,
      double thresh,
-     std::vector< KeyPoint >& kp );
+     std::vector< KeyPoint3D >& kp );
 
 void findMaximaMipMap( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
     double thresh,
-    std::vector< KeyPoint >& kp );
+    std::vector< KeyPoint3D >& kp );
 
 /*!
  Compute the kernel response for each keypoint and reject those
@@ -69,7 +79,7 @@ void findMaximaMipMap( const cv::Mat1d &img,
 template <double (*F)(const Mat1d&, int, int, int)>
 void filterKeypoints( const cv::Mat1d& ii,
                       double thresh,
-                      std::vector< KeyPoint >& kp );
+                      std::vector< KeyPoint3D >& kp );
 
 
 
@@ -78,10 +88,10 @@ void filterKeypoints( const cv::Mat1d& ii,
 // ----------------------------------------------------
 
 template <double (*F)(const Mat1d&, int, int, int)>
-void filterImage( const cv::Mat1d &ii,
-                  const cv::Mat1d &scale_map,
-                  double base_scale,
-                  cv::Mat1d &img_out )
+void convolve( const cv::Mat1d &ii,
+    const cv::Mat1d &scale_map,
+    double base_scale,
+    cv::Mat1d &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
   for ( int y = 0; y < ii.rows-1; y++ )
@@ -91,24 +101,49 @@ void filterImage( const cv::Mat1d &ii,
       double s = scale_map[y][x] * base_scale;
       if ( s <= 2.0 )
       {
-        img_out(y,x) = 0;//std::numeric_limits<double>::quiet_NaN();
+        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
         continue;
       }
 
-      int s_floor = floor(s);
+      // compute filter response with linear interpolation
+      int s_floor = s;
       float t = s - s_floor;
       img_out(y,x) = (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
-      img_out(y,x) *= 255;
+    }
+  }
+}
+
+template <double (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+void convolveAffine( const cv::Mat1d &ii,
+    const cv::Mat1d &scale_map,
+    const cv::Mat1f &depth_map,
+    const cv::Matx33f& camera_matrix,
+    double base_scale,
+    cv::Mat1d &img_out )
+{
+  img_out.create( ii.rows-1, ii.cols-1 );
+  for ( int y = 0; y < ii.rows-1; y++ )
+  {
+    for ( int x = 0; x < ii.cols-1; ++x )
+    {
+      double s = scale_map[y][x] * base_scale;
+      if ( s <= 2.0 )
+      {
+        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
+        continue;
+      }
+
+      img_out(y,x) = F( ii, depth_map, camera_matrix, x, y, s, base_scale );
     }
   }
 }
 
 template <double (*F)(const Mat1d&, int, int, int)>
 void filterKeypoints( const cv::Mat1d& ii,
-                      double thresh,
-                      std::vector< KeyPoint >& kp )
+    double thresh,
+    std::vector< KeyPoint3D >& kp )
 {
-  std::vector< KeyPoint > kp_in = kp;
+  std::vector< KeyPoint3D > kp_in = kp;
 
   kp.clear();
   kp.reserve( kp_in.size() );
@@ -125,7 +160,7 @@ void filterKeypoints( const cv::Mat1d& ii,
     int x = kp_in[k].pt.x;
     int y = kp_in[k].pt.y;
 
-    double s = kp_in[k].size;
+    double s = kp_in[k].size / 2.0;
 
     float t = s - floor(s);
     double response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );

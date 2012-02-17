@@ -17,20 +17,18 @@ void findMaxima( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
     double thresh,
-    std::vector< KeyPoint >& kp )
+    std::vector< KeyPoint3D >& kp )
 {
-  //#pragma omp parallel for
   //find maxima in sxs neighbourhood
   for ( int y = 3; y < img.rows-3; y++ )
   {
     for ( int x = 3; x < img.cols-3; ++x )
     {
-      /*
       if ( img[y][x] < thresh || isnan( img[y][x] ) )
       {
         continue;
       }
-*/
+
       double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
 
       if ( x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
@@ -52,7 +50,7 @@ void findMaxima( const cv::Mat1d &img,
       }
 
       // Round scale, substract the one extra pixel we have in the center
-      int window = s*0.5; //(s+0.5) / 2.0 - 0.5;
+      int window = s; //(s+0.5) / 2.0 - 0.5;
       if ( window < 1 ) window = 1;
 
       //static const int window = 1;
@@ -78,8 +76,7 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-//#pragma omp critical
-        kp.push_back( KeyPoint ( x, y, s, -1, img[y][x] ) );
+        kp.push_back( cv::KeyPoint3D ( x, y, s*2, base_scale, -1, img[y][x] ) );
       }
     }
   }
@@ -167,7 +164,7 @@ void findMaximaMipMap( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
     double thresh,
-    std::vector< KeyPoint >& kp )
+    std::vector< KeyPoint3D >& kp )
 {
   if ( !img.isContinuous() )
   {
@@ -209,8 +206,8 @@ void findMaximaMipMap( const cv::Mat1d &img,
     //float s_thresh_old = float(next_px_size) * 1.41 * 1.5;
 
     // above this threshold. take a 5x5 instead of a 3x3 neighbourhood
-    float s_thresh = float(next_px_size*3) * 0.889756521;
-    float s_thresh_2 = float(next_px_size*3) * 0.645497224;
+    float s_thresh = float(px_size*3) * 0.889756521;
+    float s_thresh_2 = float(px_size*3) * 0.645497224;
 
     //std::cout << "Mipmap level " << current_scale << " thresh " << s_thresh << " size " << w << " x " << h << std::endl;
 
@@ -292,8 +289,19 @@ void findMaximaMipMap( const cv::Mat1d &img,
                 unsigned kp_x = next_max_map[i_next].idx % img.cols;
                 unsigned kp_y = next_max_map[i_next].idx / img.cols;
 
-                // make keypoint
-                kp.push_back( KeyPoint ( kp_x, kp_y, s, -1, cv ) );
+                if (finite( img[kp_y-1][kp_x-1] ) &&
+                    finite( img[kp_y-1][kp_x  ] ) &&
+                    finite( img[kp_y-1][kp_x+1] ) &&
+                    finite( img[kp_y  ][kp_x-1] ) &&
+                    finite( img[kp_y  ][kp_x  ] ) &&
+                    finite( img[kp_y  ][kp_x+1] ) &&
+                    finite( img[kp_y+1][kp_x-1] ) &&
+                    finite( img[kp_y+1][kp_x  ] ) &&
+                    finite( img[kp_y+1][kp_x+1] ))
+                {
+                  // make keypoint
+                  kp.push_back( KeyPoint3D ( kp_x, kp_y, s*2, base_scale, -1, cv ) );
+                }
               }
             }
           }
