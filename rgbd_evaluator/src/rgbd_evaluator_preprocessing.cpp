@@ -25,7 +25,19 @@ RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string file_path)
 {
   std::cout << "Reading bagfile from " << file_path.c_str() << std::endl;
 
-  file_path_ = file_path;
+  splitFileName(file_path);
+
+  // create folder to store images and homography --> should be in /home/... otherwise root permissions neccessary
+  std::string makeFolder;
+  makeFolder.append("mkdir ");
+  makeFolder.append(file_created_folder_);
+
+  if( system(makeFolder.c_str()) < 0) // -1 on error
+  {
+    std::cout << "Error when executing: " << makeFolder  << std::endl;
+    std::cout << "--> check user permissions"  << std::endl;
+    return;
+  }
 
   bag_.open(file_path, rosbag::bagmode::Read);
 
@@ -69,18 +81,25 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       if (p_rgb_img != NULL)
       {
 
-        //std::cout << "rgb_img available" << std::endl;
-
         if ( image_store_.back().image )
         {
           std::cout << "There is an imfile_path_age already for the current dataset! Bagfile invalid." << std::endl;
           return;
         }
 
-        char fileName[BUFF_SIZE];
-        createFileName(fileName);
+        std::string fileName;
 
-        sprintf(fileName, "%s_%d.ppm%c",fileName, count, '\0');
+        // convert integer to string
+        std::stringstream ss;
+        ss << count;
+
+        fileName.append(file_created_folder_);
+        fileName.append("/");
+        fileName.append(file_folder_);
+        fileName.append("_");
+
+        fileName.append(ss.str());
+        fileName.append(".ppm");
 
         std::cout << "Writing to "<< fileName << std::endl;
 
@@ -295,6 +314,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     cv::Mat image_original_clone( image_original.clone() );
 
+    // show error via lines
     for ( uint32_t i=0; i<keypoints_camx.size(); i++ )
     {
       cv::line( image_warped_precise, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
@@ -310,6 +330,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 //    cv::waitKey(30);
 
     cv::imshow( "Precise warped Image", image_warped_precise );
+    cv::waitKey(30);
     cv::imshow( "Original Image", image_original_clone );
     cv::waitKey(30);
 
@@ -358,12 +379,18 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   uint32_t i,j;
   std::fstream file;
 
-  char fileName[BUFF_SIZE];
-  char stdName[] = "Homography_0_to_";
+  std::stringstream ss;
+  ss << count;
 
-  sprintf(fileName, "%s%s%d%c.dat", file_path_.c_str(),stdName, count, '\0');
+  // create filepath
+  std::string homographyName;
+  homographyName.append(file_created_folder_);
+  homographyName.append("/");
+  homographyName.append("Homography_0_");
+  homographyName.append(ss.str());
+  homographyName.append(".dat");
 
-  file.open(fileName, std::ios::out);
+  file.open(homographyName.c_str(), std::ios::out);
 
   for(i=0; i<3; i++)
   {
@@ -390,24 +417,33 @@ void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
   }
 }
 
-void RgbdEvaluatorPreprocessing::createFileName(char* fileName)
-{
-  uint32_t i = 0;
-
-  while(file_path_[i] != '.' && i < BUFF_SIZE)
-  {
-    fileName[i] = file_path_.c_str()[i];
-    i++;
-  }
-  fileName[i] = '\0';
-}
-
 double_t RgbdEvaluatorPreprocessing::calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x)
 {
   double_t edistance = sqrt(pow(corner_original.pt.x - corner_x.pt.x, 2) + pow(corner_original.pt.y - corner_x.pt.y, 2));
   return edistance;
 }
 
+void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
+{
+  size_t found;
+  std::cout << "Splitting: " << str << std::endl;
+  found=str.find_last_of("/\\");
+
+  file_path_ = str.substr(0,found);
+  file_name_ = str.substr(found+1);
+
+  found = file_name_.find_last_of(".");
+  file_folder_ = file_name_.substr(0,found);
+
+  file_created_folder_.append(file_path_);
+  file_created_folder_.append("/");
+  file_created_folder_.append(file_folder_);
+
+  std::cout << " path: " << file_path_ << std::endl;
+  std::cout << " file: " << file_name_ << std::endl;
+  std::cout << " folder: " << file_folder_ << std::endl;
+  std::cout << " created folder: " << file_created_folder_ << std::endl;
+}
 
 } // end namespace
 
@@ -425,7 +461,6 @@ int main( int argc, char** argv )
   rgbd_evaluator::RgbdEvaluatorPreprocessing fd(fileName);
   fd.createTestFiles();
   fd.calculateHomography();
-
 
   std::cout << "Exiting.." << std::endl;
   return 0;
