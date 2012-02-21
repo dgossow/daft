@@ -54,7 +54,7 @@ RgbdEvaluatorPreprocessing::~RgbdEvaluatorPreprocessing()
 
 void RgbdEvaluatorPreprocessing::createTestFiles()
 {
-  uint32_t count = 0;
+  uint32_t count = 1;
   bool got_cam_info = false;
 
   // Image topics to load
@@ -83,7 +83,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         if ( image_store_.back().image )
         {
-          std::cout << "There is an imfile_path_age already for the current dataset! Bagfile invalid." << std::endl;
+          std::cout << "There is an image already for the current dataset! Bagfile invalid." << std::endl;
           return;
         }
 
@@ -95,9 +95,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         fileName.append(file_created_folder_);
         fileName.append("/");
-        fileName.append(file_folder_);
-        fileName.append("_");
-
+        fileName.append("img");
         fileName.append(ss.str());
         fileName.append(".ppm");
 
@@ -168,7 +166,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
 void RgbdEvaluatorPreprocessing::calculateHomography()
 {
-  uint32_t count = 1;
+  uint32_t count = 2;
   bool first_image = true;
 
   std::vector< ImageData >::iterator it;
@@ -386,9 +384,9 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   std::string homographyName;
   homographyName.append(file_created_folder_);
   homographyName.append("/");
-  homographyName.append("Homography_0_");
+  homographyName.append("H1to");
   homographyName.append(ss.str());
-  homographyName.append(".dat");
+  homographyName.append("p");
 
   file.open(homographyName.c_str(), std::ios::out);
 
