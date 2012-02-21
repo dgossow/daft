@@ -12,7 +12,7 @@ namespace cv
 
 // Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
 // using the given integral image
-inline double integral( const Mat1d &ii, int start_x, int end_x, int start_y, int end_y )
+inline float integrate( const Mat1d &ii, int start_x, int end_x, int start_y, int end_y )
 {
   assert( start_x>0 );
   assert( start_y>0 );
@@ -37,7 +37,7 @@ inline bool checkBounds ( Mat1d ii, int x, int y, int s )
   return ( (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
 }
 
-// compute 3d point from camera intrinsics
+// compute 3d point from pixel position, depth and camera intrinsics
 // @param f_inv: 1/f
 // @param cx,cy optical center
 // @param u,v pixel coords
@@ -90,6 +90,7 @@ inline bool computeGradient( const Mat1f &depth_map,
   float dxx = d_xp - 2*d_center + d_xn;
   float dyy = d_yp - 2*d_center + d_yn;
 
+  // test for local planarity
   if ( dxx*dxx + dyy*dyy > sw*sw*10 )
   {
     return false;
@@ -101,55 +102,6 @@ inline bool computeGradient( const Mat1f &depth_map,
   return true;
 }
 
-// compute depth gradient
-inline bool computeGradient2( const Mat1f &depth_map,
-    int x, int y, float sp, float sw, Vec2f& grad )
-{
-  float d_center = depth_map(y,x);
-  float d_right1 = depth_map(y,x+sp);
-  float d_right2 = depth_map(y,x+sp*2);
-  float d_left1 = depth_map(y,x-sp);
-  float d_left2 = depth_map(y,x-sp*2);
-  float d_bottom1 = depth_map(y+sp,x);
-  float d_bottom2 = depth_map(y+sp*2,x);
-  float d_top1 = depth_map(y-sp,x);
-  float d_top2 = depth_map(y-sp*2,x);
-
-  if ( isnan( d_center ) ||
-      ( ( isnan(d_right1) || isnan(d_right2) ) && ( isnan(d_left1) || isnan(d_left2) ) ) ||
-      ( ( isnan(d_top1) || isnan(d_top2) ) && ( isnan(d_bottom1) || isnan(d_bottom2) ) ) )
-  {
-    return false;
-  }
-
-  float dxx_right = std::abs( d_right2 - 2*d_right1 + d_center );
-  float dxx_left = std::abs( d_center - 2*d_left1 + d_left2 );
-
-  if ( isnan( dxx_right ) || dxx_left < dxx_right )
-  {
-    grad[0] = (d_center - d_left1);//2) * 0.5;
-  }
-  else
-  {
-    grad[0] = (d_right1 - d_center);
-  }
-
-  float dxx_top = std::abs( d_top2 - 2*d_top1 + d_center );
-  float dxx_bottom = std::abs( d_center - 2*d_bottom1 + d_bottom2 );
-
-  if ( isnan( dxx_top ) || dxx_bottom < dxx_top )
-  {
-    grad[1] = (d_bottom2 - d_center) * 0.5;
-  }
-  else
-  {
-    grad[1] = (d_center - d_top2) * 0.5;
-  }
-
-  assert( !isnan(grad[0]) && !isnan(grad[1]) );
-
-  return true;
-}
 
 // sp : pixel scale
 // sw : world scale
@@ -171,13 +123,13 @@ inline bool getAffine(
     return false;
   }
 
-  // if the gradient is 0, make axis-aligned circle
+  // if the gradient is 0, make circle
   if ( grad[0] == 0 && grad[1] == 0 )
   {
-    affine(0,0)=1;
+    affine(0,0)=sp;
     affine(0,1)=0;
     affine(1,0)=0;
-    affine(1,1)=1;
+    affine(1,1)=sp;
     return true;
   }
 

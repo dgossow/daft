@@ -23,25 +23,43 @@ namespace cv
  The kernel size at (x,y) will be scale_map(x,y) * base_scale.
  The template argument specifies the filter kernel, which takes as
  arguments the integral image, x, y, and the scaling factor.
- @tparam     F          The kernel function f(ii,x,y,s)
- @param[in]  ii         The Integral Image
- @param[in]  scale_map  The scale map (scale multiplier per pixel)
- @param[in]  base_scale The global scale multiplier
- @param[out] img_out    The output image
+ * @param ii            The Integral Image
+ * @param scale_map     The scale map (scale multiplier per pixel)
+ * @param base_scale    The global scale multiplier
+ * @param min_px_scale  Minimal scale in pixels
+ * @param max_px_scale  Maximal scale in pixels
+ * @param img_out       The output image
  */
-template <double (*F)(const Mat1d&, int, int, int)>
+template <float (*F)(const Mat1d&, int, int, int)>
 void convolve( const cv::Mat1d &ii,
-                  const cv::Mat1d &scale_map,
-                  double base_scale,
-                  cv::Mat1d &img_out );
+    const cv::Mat1f &scale_map,
+    float base_scale,
+    float min_px_scale,
+    float max_px_scale,
+    cv::Mat1f &img_out );
 
-template <double (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+/*!
+ Compute the kernel response for every pixel of the given image.
+ The kernel size and shape will be a local affine transformation.
+ The template argument specifies the filter kernel.
+ * @param ii            The Integral Image
+ * @param scale_map     The scale map (scale multiplier per pixel)
+ * @param depth_map     The depth map (im meters)
+ * @param camera_matrix Camera intrinsics
+ * @param base_scale    The global scale multiplier
+ * @param min_px_scale  Minimal scale in pixels
+ * @param max_px_scale  Maximal scale in pixels
+ * @param img_out       The output image
+ */
+template <float (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
 void convolveAffine( const cv::Mat1d &ii,
-    const cv::Mat1d &scale_map,
+    const cv::Mat1f &scale_map,
     const cv::Mat1f &depth_map,
     const cv::Matx33f& camera_matrix,
-    double base_scale,
-    cv::Mat1d &img_out );
+    float base_scale,
+    float min_px_scale,
+    float max_px_scale,
+    cv::Mat1f &img_out );
 
 /*!
  Find the local maxima in the given image with a minimal value of thresh,
@@ -77,31 +95,42 @@ void findMaximaMipMap( const cv::Mat1d &img,
  @param[in,out] kp      The keypoints (input & output)
  */
 template <double (*F)(const Mat1d&, int, int, int)>
-void filterKeypoints( const cv::Mat1d& ii,
+void filterKpKernel( const cv::Mat1d& ii,
                       double thresh,
                       std::vector< KeyPoint3D >& kp );
 
+/*!
+ Check how strong the maximum is in its local neighbourhood
+ @param[in]     response   The original kernel response image
+ @param[in]     center_fac If this is lower, less keypoints get accepted (range: 0..1)
+ @param[in,out] kp         The keypoints (input & output)
+ */
+void filterKpNeighbours( const cv::Mat1d& response,
+    double center_fac,
+    std::vector< KeyPoint3D >& kp );
 
 
 // ----------------------------------------------------
 // -- Implementation ----------------------------------
 // ----------------------------------------------------
 
-template <double (*F)(const Mat1d&, int, int, int)>
+template <float (*F)(const Mat1d&, int, int, int)>
 void convolve( const cv::Mat1d &ii,
-    const cv::Mat1d &scale_map,
-    double base_scale,
-    cv::Mat1d &img_out )
+    const cv::Mat1f &scale_map,
+    float base_scale,
+    float min_px_scale,
+    float max_px_scale,
+    cv::Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
-      double s = scale_map[y][x] * base_scale;
-      if ( s <= 2.0 )
+      float s = scale_map[y][x] * base_scale;
+      if ( s < min_px_scale || s > max_px_scale )
       {
-        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
+        img_out(y,x) = std::numeric_limits<float>::quiet_NaN();
         continue;
       }
 
@@ -113,23 +142,25 @@ void convolve( const cv::Mat1d &ii,
   }
 }
 
-template <double (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+template <float (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
 void convolveAffine( const cv::Mat1d &ii,
-    const cv::Mat1d &scale_map,
+    const cv::Mat1f &scale_map,
     const cv::Mat1f &depth_map,
     const cv::Matx33f& camera_matrix,
-    double base_scale,
-    cv::Mat1d &img_out )
+    float base_scale,
+    float min_px_scale,
+    float max_px_scale,
+    cv::Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
-      double s = scale_map[y][x] * base_scale;
-      if ( s <= 2.0 )
+      float s = scale_map[y][x] * base_scale;
+      if ( s < min_px_scale || s > max_px_scale )
       {
-        img_out(y,x) = std::numeric_limits<double>::quiet_NaN();
+        img_out(y,x) = std::numeric_limits<float>::quiet_NaN();
         continue;
       }
 
@@ -139,7 +170,7 @@ void convolveAffine( const cv::Mat1d &ii,
 }
 
 template <double (*F)(const Mat1d&, int, int, int)>
-void filterKeypoints( const cv::Mat1d& ii,
+void filterKpKernel( const cv::Mat1d& ii,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
@@ -147,13 +178,6 @@ void filterKeypoints( const cv::Mat1d& ii,
 
   kp.clear();
   kp.reserve( kp_in.size() );
-
-#ifdef DEBUG_OUTPUT
-  std::fstream fall;
-  fall.open( "/tmp/all_resp", std::ios_base::out );
-  std::fstream ffiltered;
-  ffiltered.open( "/tmp/filtered_resp" );
-#endif
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
@@ -169,19 +193,9 @@ void filterKeypoints( const cv::Mat1d& ii,
     {
       kp.push_back( kp_in[k] );
     }
-
-#ifdef DEBUG_OUTPUT
-    fall << response << " " << kp_in[k]._score << std::endl;
-    if ( response > thresh )
-      ffiltered << response << " " << kp_in[k]._score << std::endl;
-#endif
   }
-
-#ifdef DEBUG_OUTPUT
-  fall.close();
-  ffiltered.close();
-#endif
 }
+
 
 }
 

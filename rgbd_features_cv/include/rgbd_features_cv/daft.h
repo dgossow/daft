@@ -5,8 +5,8 @@
 
 #include <opencv2/features2d/features2d.hpp>
 
-#ifndef __RGBD_CV_H__
-#define __RGBD_CV_H__
+#ifndef __DAFT_H__
+#define __DAFT_H__
 
 #include "keypoint3d.h"
 
@@ -22,35 +22,46 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_LAPLACE=1, DET_HARRIS=2, DET_DOBP=3 };
-    enum { PF_NONE=0, PF_HARRIS=1 };
+    enum { DET_DOB=0 };
+    enum { PF_NONE=0, PF_HARRIS=1, PF_NEIGHBOURS=2 };
     enum { MAX_WINDOW=0, MAX_FAST=1, MAX_EVAL=3 };
+    enum { AUTO=-1 };
 
-    static const unsigned int DEFAULT_N_LEVELS = 1;
-    static const float DEFAULT_DET_THRESHOLD = 0.02;
-    static const float DEFAULT_PF_THRESHOLD = 0.0;
-    static const float DEFAULT_BASE_SCALE = 0.025;
+    static const int DEFAULT_SCALE_LEVELS = AUTO;
+    static const float DEFAULT_BASE_SCALE = 1;
     static const float DEFAULT_SCALE_FACTOR = 2.0;
-    static const float DEFAULT_MAX_ALGO = MAX_WINDOW;
+    static const int DEFAULT_MIN_PX_SCALE = 2;
+    static const int DEFAULT_MAX_PX_SCALE = AUTO;
+    static const int DEFAULT_DET = DET_DOB;
+    static const float DEFAULT_DET_THRESHOLD = 0.02;
+    static const int DEFAULT_PF_TYPE = PF_HARRIS;
+    static const float DEFAULT_PF_THRESHOLD = 0.0;
+    static const int DEFAULT_MAX_ALGO = MAX_FAST;
 
     /** default constructor */
     DetectorParams(
         float base_scale = DEFAULT_BASE_SCALE,
         float scale_factor = DEFAULT_SCALE_FACTOR,
-        unsigned int n_levels = DEFAULT_N_LEVELS,
-        int detector_type = DET_DOB,
+        int scale_levels = DEFAULT_SCALE_LEVELS,
+        int min_px_scale = DEFAULT_MIN_PX_SCALE,
+        int max_px_scale = DEFAULT_MAX_PX_SCALE,
+        int detector_type = DEFAULT_DET,
         float det_threshold = DEFAULT_DET_THRESHOLD,
-        int postfilter_type = PF_HARRIS,
+        int postfilter_type = DEFAULT_PF_TYPE,
         float pf_threshold = DEFAULT_PF_THRESHOLD,
-        int max_search_algo = DEFAULT_MAX_ALGO ):
+        int max_search_algo = DEFAULT_MAX_ALGO,
+        bool affine = false ):
           base_scale_(base_scale),
           scale_step_(scale_factor),
-          scale_levels_(n_levels),
+          scale_levels_(scale_levels),
+          min_px_scale_(min_px_scale),
+          max_px_scale_(max_px_scale),
           det_type_(detector_type),
           det_threshold_(det_threshold),
           pf_type_(postfilter_type),
           pf_threshold_(pf_threshold),
-          max_search_algo_(max_search_algo)
+          max_search_algo_(max_search_algo),
+          affine_(affine)
     {
     }
 
@@ -61,7 +72,10 @@ public:
     float scale_step_;
 
     /** The number of levels in the scale pyramid */
-    unsigned int scale_levels_;
+    int scale_levels_;
+
+    int min_px_scale_;
+    int max_px_scale_;
 
     /** Which detector to use */
     int det_type_;
@@ -78,6 +92,8 @@ public:
     /** How to search for maxima? */
     int max_search_algo_;
 
+    /** Use local affine transformation for detection */
+    bool affine_;
   };
 
   /** Constructor
@@ -99,7 +115,7 @@ public:
 private:
 
   /** Parameters tuning RgbdFeatures */
-  DetectorParams detector_params_;
+  DetectorParams params_;
 };
 
 }

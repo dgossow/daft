@@ -17,6 +17,7 @@
 #include <boost/timer.hpp>
 
 #include <rgbd_features_cv/daft.h>
+#include <rgbd_features_cv/preprocessing.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
@@ -41,6 +42,11 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   // Crop rgb so it has the same size as depth
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
 
+  //orig_depth_image->image
+
+  cv::Mat1f depth_image_filtered;
+  improveDepthMap<150>( depth_image, depth_image_filtered, 0.2f );
+
   //assert( depth_image.cols == intensity_image.cols && depth_image.rows == intensity_image.rows );
 
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
@@ -50,14 +56,25 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::DAFT::DetectorParams p1,p2,p3;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
-  p1.det_type_ = p1.DET_DOBP;
-  p1.base_scale_ = 0.0125;
-  p1.scale_levels_ = 2;
-  p1.pf_type_ = p1.PF_NONE;
-  p1.max_search_algo_ = p1.MAX_WINDOW;
+  //p1.det_type_ = p1.DET_DOB;
+  //p1.min_px_scale_ = 4;
+
+  //p1.scale_step_ = 2.0;
+  //p1.det_threshold_ = 0;
+  p1.base_scale_ = 0.025;
+  //p1.scale_levels_ = 1;
+  //p1.pf_type_ = p1.PF_HARRIS;
+  //p1.pf_threshold_ = 0;
+  //p1.max_search_algo_ = p1.MAX_FAST;
 
   p2 = p1;
-  p1.max_search_algo_ = p1.MAX_FAST;
+  p2.affine_ = true;
+  //p2.pf_type_ = p2.PF_NEIGHBOURS;
+  //p2.pf_threshold_ = 0.95;
+
+  //p2.affine_ = true;
+  //p2.pf_type_ = p1.PF_NEIGHBOURS;
+  //p2.pf_threshold_ = 0.85;
   //p2.det_type_ = p1.DET_DOB;
   //p2.det_type_ = p1.DET_LAPLACE;
   //p2.max_search_algo_ = p2.MAX_FAST;
@@ -70,17 +87,12 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
 #if 0
   // compare speeds
-  rgbd_features2.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-
-  rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-
-  // detect keypoints
   {
     boost::timer timer;
     timer.restart();
     for ( int i=0; i<10; i++ )
     {
-      rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints2);
+      rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
     }
     std::cout << "detect 1 execution time [ms]: " << timer.elapsed()*100 << std::endl;
   }
@@ -95,8 +107,8 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   }
 
 #else
-  rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-  rgbd_features2.detect( intensity_image, depth_image, camera_matrix, keypoints2);
+  //rgbd_features1.detect( intensity_image, depth_image_filtered, camera_matrix, keypoints1);
+  rgbd_features2.detect( intensity_image, depth_image_filtered, camera_matrix, keypoints2);
 #endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
@@ -104,21 +116,23 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 #if 1
   // draw
   cv::Mat intensity_image1,intensity_image2;
-  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image1, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  cv::drawKeypoints3D( intensity_image1, keypoints2, intensity_image1, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image2, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  cv::drawKeypoints3D( intensity_image2, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+
+//  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image1, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image1, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+
+//  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image2, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
   std::ostringstream s;
   s << p1.det_type_;
-  cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
+  //cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
 
   s.str("");
   s << p2.det_type_;
   cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
 #endif
 
-  cv::waitKey(3);
+  cv::waitKey(10);
 }
 
 

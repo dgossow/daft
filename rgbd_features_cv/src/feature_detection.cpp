@@ -10,6 +10,8 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <rgbd_features_cv/feature_detection.h>
 
+#include "rgbd_features_cv/filter_kernels.h"
+
 namespace cv
 {
 
@@ -195,19 +197,16 @@ void findMaximaMipMap( const cv::Mat1d &img,
 
     if ( w_next<3 || h_next<3 ) break;
 
-    const int next_px_size = px_size * 2;
-
     // the next map is going to be half as wide/tall as the current
     std::vector< MaxProp > next_max_map( next_map_size );
 
     // fixed value for rounding to next scale level
     // the factor is computed to minimize the error in
     // search area: sqrt(5/2) * 1.5
-    //float s_thresh_old = float(next_px_size) * 1.41 * 1.5;
+    float s_thresh = float(px_size*3) * 0.889756521f;
 
     // above this threshold. take a 5x5 instead of a 3x3 neighbourhood
-    float s_thresh = float(px_size*3) * 0.889756521;
-    float s_thresh_2 = float(px_size*3) * 0.645497224;
+    float s_thresh_2 = float(px_size*3) * 0.645497224f;
 
     //std::cout << "Mipmap level " << current_scale << " thresh " << s_thresh << " size " << w << " x " << h << std::endl;
 
@@ -325,6 +324,40 @@ void findMaximaMipMap( const cv::Mat1d &img,
   }
 
   //std::cout << "Found " << kp.size() << " keypoints" << std::endl;
+}
+
+
+void filterKpNeighbours( const cv::Mat1d& response_map,
+    double center_factor,
+    std::vector< KeyPoint3D >& kp )
+{
+  std::vector< KeyPoint3D > kp_in = kp;
+
+  kp.clear();
+  kp.reserve( kp_in.size() );
+
+  for ( unsigned k=0; k<kp_in.size(); k++ )
+  {
+    int x = kp_in[k].pt.x;
+    int y = kp_in[k].pt.y;
+    int s = int(kp_in[k].size * 0.5 + 0.5);
+
+    if ( checkBounds( response_map, x, y, s ) )
+    {
+      float center_val = kp_in[k].response * center_factor;
+      if (  response_map[y-s][x-s] < center_val &&
+            response_map[y-s][x  ] < center_val &&
+            response_map[y-s][x+s] < center_val &&
+            response_map[y  ][x-s] < center_val &&
+            response_map[y  ][x+s] < center_val &&
+            response_map[y+s][x-s] < center_val &&
+            response_map[y+s][x  ] < center_val &&
+            response_map[y+s][x+s] < center_val )
+      {
+        kp.push_back( kp_in[k] );
+      }
+    }
+  }
 }
 
 } 

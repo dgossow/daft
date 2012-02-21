@@ -4,7 +4,7 @@
 */
 
 #include "rgbd_features_cv/daft.h"
-#include "rgbd_features_cv/filters.h"
+#include "rgbd_features_cv/filter_kernels.h"
 #include "rgbd_features_cv/feature_detection.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
@@ -12,11 +12,13 @@
 
 #include <boost/timer.hpp>
 
+#include <cmath>
+
 namespace cv
 {
 
 DAFT::DAFT(const DetectorParams & detector_params) :
-    detector_params_(detector_params)
+    params_(detector_params)
 {
 
 }
@@ -60,23 +62,73 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     depth_map = depth_map_orig;
   }
 
-  // Compute scale map from depth map
+  // Initialize parameters
+
+  double base_scale = params_.base_scale_;
+  int scale_levels = params_.scale_levels_;
+
+  int max_px_scale = params_.max_px_scale_ == params_.AUTO ?
+      std::min( image.rows, image.cols ) / 32 :
+      params_.max_px_scale_;
+
   const float f = camera_matrix(0,0);
 
-  Mat1d scale_map( gray_image_orig.rows, gray_image_orig.cols );
-  Mat1d::iterator scale_it = scale_map.begin();
-  Mat1d::iterator scale_map_end = scale_map.end();
+
+  // Compute scale map from depth map
+
+  Mat1f scale_map( gray_image_orig.rows, gray_image_orig.cols );
+  Mat1f::iterator scale_it = scale_map.begin();
+  Mat1f::iterator scale_map_end = scale_map.end();
   Mat1f::iterator depth_it = depth_map.begin();
 
-  for (; scale_it != scale_map_end ; ++scale_it, ++depth_it)
+  if ( params_.scale_levels_ == params_.AUTO )
   {
-    if ( isnan(*depth_it) )
+    float min_scale_fac = std::numeric_limits<float>::infinity();
+    float max_scale_fac = 0;
+
+    for (; scale_it != scale_map_end ; ++scale_it, ++depth_it)
     {
-      *scale_it = -1.0f;
+      if ( finite(*depth_it) )
+      {
+        float s = f / *depth_it;
+        *scale_it = s;
+        if ( s > max_scale_fac )
+          max_scale_fac = s;
+        if ( s < min_scale_fac )
+          min_scale_fac = s;
+      }
+      else
+      {
+        *scale_it = -1.0f;
+      }
     }
-    else
+
+    if ( !finite( min_scale_fac ) || max_scale_fac == 0 )
     {
-      *scale_it = f / *depth_it;
+      return;
+    }
+
+    double delta_n_min = params_.min_px_scale_ / (max_scale_fac*params_.base_scale_);
+    double delta_n_max = max_px_scale / (min_scale_fac*params_.base_scale_);
+
+    double n_min = std::ceil( log( delta_n_min ) / log( params_.scale_step_ ) );
+    double n_max = std::floor( log( delta_n_max ) / log( params_.scale_step_ ) );
+
+    base_scale = params_.base_scale_ * std::pow( (double)params_.scale_step_, n_min );
+    scale_levels = n_max - n_min + 1;
+  }
+  else
+  {
+    for (; scale_it != scale_map_end ; ++scale_it, ++depth_it)
+    {
+      if ( isnan(*depth_it) )
+      {
+        *scale_it = -1.0f;
+      }
+      else
+      {
+        *scale_it = f / *depth_it;
+      }
     }
   }
 
@@ -87,28 +139,30 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
   kp.clear();
   kp.reserve(50000);
 
-  Mat1d detector_image;
-  detector_image.create( gray_image_orig.rows, gray_image_orig.cols );
+  Mat1f response_map;
+  response_map.create( gray_image_orig.rows, gray_image_orig.cols );
 
-  double scale = detector_params_.base_scale_;
+  double scale = base_scale;
 
   // detect keypoints
-  for( unsigned scale_level = 0; scale_level < detector_params_.scale_levels_; scale_level++, scale *= detector_params_.scale_step_ )
+  for( int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_ )
   {
+    //float mean_response;
+
     // compute filter response for all pixels
-    switch ( detector_params_.det_type_ )
+    switch ( params_.det_type_ )
     {
     case DetectorParams::DET_DOB:
-      convolve<dob>( ii, scale_map, scale, detector_image );
-      break;
-    case DetectorParams::DET_LAPLACE:
-      convolve<laplace>( ii, scale_map, scale, detector_image );
-      break;
-    case DetectorParams::DET_HARRIS:
-      convolve<harris>( ii, scale_map, scale, detector_image );
-      break;
-    case DetectorParams::DET_DOBP:
-      convolveAffine<dobAffine>( ii, scale_map, depth_map, camera_matrix, scale, detector_image );
+      if ( params_.affine_ )
+      {
+        convolveAffine<dobAffine>( ii, scale_map, depth_map, camera_matrix,
+            scale, params_.min_px_scale_, max_px_scale, response_map );
+      }
+      else
+      {
+        convolve<dob>( ii, scale_map, scale*0.886,
+            params_.min_px_scale_, max_px_scale, response_map );
+      }
       break;
     default:
       return;
@@ -118,13 +172,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     unsigned kp_first = kp.size();
 
     // find maxima in response
-    switch ( detector_params_.max_search_algo_ )
+    switch ( params_.max_search_algo_ )
     {
     case DetectorParams::MAX_WINDOW:
-      findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, kp );
+      findMaxima( response_map, scale_map, scale, params_.det_threshold_, kp );
       break;
     case DetectorParams::MAX_FAST:
-      findMaximaMipMap( detector_image, scale_map, scale, detector_params_.det_threshold_, kp );
+      findMaximaMipMap( response_map, scale_map, scale, params_.det_threshold_, kp );
       break;
     case DetectorParams::MAX_EVAL:
       {
@@ -134,7 +188,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       {
         kp.clear();
         kp.reserve(50000);
-        findMaximaMipMap( detector_image, scale_map, scale, detector_params_.det_threshold_, kp );
+        findMaximaMipMap( response_map, scale_map, scale, params_.det_threshold_, kp );
       }
       std::cout << "findMaximaMipMap execution time [ms]: " << timer.elapsed()*10 << std::endl;
       timer.restart();
@@ -142,22 +196,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       {
         kp.clear();
         kp.reserve(50000);
-        findMaxima( detector_image, scale_map, scale, detector_params_.det_threshold_, kp );
+        findMaxima( response_map, scale_map, scale, params_.det_threshold_, kp );
       }
       std::cout << "findMaxima execution time [ms]: " << timer.elapsed()*10 << std::endl;
       }
-      break;
-    default:
-      return;
-    }
-
-    // filter found maxima by applying a threshold on a second kernel
-    switch ( detector_params_.pf_type_ )
-    {
-    case DetectorParams::PF_NONE:
-      break;
-    case DetectorParams::PF_HARRIS:
-      filterKeypoints<harris>( ii, detector_params_.pf_threshold_, kp );
       break;
     default:
       return;
@@ -172,31 +214,77 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       int kp_y = kp[k].pt.y;
       pt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
       //todo: normal
-      getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, scale, kp[k].affine_mat );
+      getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp[k].affine_mat );
     }
 
-  }
+#if 0
+    {
+      static int i=0;
+      cv::Mat display_image;
+      response_map.convertTo( display_image, CV_8UC1, 900, 0.0 );
 
+      vector<KeyPoint3D> kp2;
+      for ( unsigned k=kp_first; k<kp.size(); k++ )
+      {
+        KeyPoint3D kp_curr = kp[k];
+        int kp_x = kp[k].pt.x;
+        int kp_y = kp[k].pt.y;
+        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp_curr.affine_mat );
+        kp2.push_back(kp_curr);
+      }
 
-#if 1
-  {
-  cv::Mat display_image;
-  detector_image.convertTo( display_image, CV_8UC1, 512.0, 0.0 );
+      cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-  cv::drawKeypoints3D( display_image, kp, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      std::ostringstream s;
+      s << "frame # " << i;
+      cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
-  std::ostringstream s;
-  s << "Detector type=" << detector_params_.det_type_;
-  cv::imshow( s.str(), display_image );
+      s.str("");
+      s << "Detector type=" << params_.det_type_ << " scale = " << scale << " affine = " << params_.affine_;
+      cv::imshow( s.str(), display_image );
 
-  /*
-  cv::imshow( "dep orig", depth_map_orig );
-  cv::imshow( "dep", depth_map );
-  cv::imshow( "det", detector_image );
-  cv::imshow( "scale", scale_map );
-  */
-  }
+      /*
+      cv::imshow( "dep orig", depth_map_orig );
+      cv::imshow( "dep", depth_map );
+      cv::imshow( "det", detector_image );
+      cv::imshow( "scale", scale_map );
+      */
+
+      i++;
+    }
 #endif
+
+  }
+
+  // filter found maxima by applying a threshold on a second kernel
+  switch ( params_.pf_type_ )
+  {
+  case DetectorParams::PF_NONE:
+    break;
+  case DetectorParams::PF_HARRIS:
+    filterKpKernel<harris>( ii, params_.pf_threshold_, kp );
+    break;
+  case DetectorParams::PF_NEIGHBOURS:
+    filterKpNeighbours( response_map, params_.pf_threshold_, kp );
+    break;
+  default:
+    return;
+  }
+
+  // assign 3d points, normals and local affine params
+  float f_inv = 1.0 / f;
+  float cx = camera_matrix(0,2);
+  float cy = camera_matrix(1,2);
+  for ( unsigned k=0; k<kp.size(); k++ )
+  {
+    int kp_x = kp[k].pt.x;
+    int kp_y = kp[k].pt.y;
+    pt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
+    //todo: normal
+    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp[k].affine_mat );
+  }
+
+
 }
 
 }
