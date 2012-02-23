@@ -36,10 +36,6 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path)
   }
 
   cv::DAFT::DetectorParams params;
-  params.det_type_ = params.DET_DOBP;
-  params.base_scale_ = 0.002;
-  params.scale_levels_ = 10;
-
   daft_ = cv::DAFT( params );
 
   bag_.open(file_path, rosbag::bagmode::Read);
@@ -179,7 +175,7 @@ void ExtractDetectorFile::extractKeypoints()
     storeKeypoints(keypoints_, ++count);
 
     std::cout << "Press any Key to continue!" << std::endl;
-    getchar();
+    //getchar();
   }
 
 }
@@ -211,7 +207,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
   for ( it = keypoints.begin(); it != keypoints.end(); it++ )
   {
-    cv::Matx22f mat_affine = it->affine_mat;
+    cv::Matx22f mat_affine;// = it->affine_mat;
 
     ax = mat_affine(0,0);
     bx = mat_affine(1,0);

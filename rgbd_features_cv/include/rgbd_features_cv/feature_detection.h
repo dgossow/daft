@@ -115,6 +115,16 @@ void filterKpNeighbours( const cv::Mat1d& response,
 // ----------------------------------------------------
 
 template <float (*F)(const Mat1d&, int, int, int)>
+inline float interpolateKernel( const cv::Mat1d &ii,
+    int x, int y, float s )
+{
+  int s_floor = s;
+  float t = s - s_floor;
+  return (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
+}
+
+
+template <float (*F)(const Mat1d&, int, int, int)>
 void convolve( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
     float base_scale,
@@ -122,6 +132,7 @@ void convolve( const cv::Mat1d &ii,
     float max_px_scale,
     cv::Mat1f &img_out )
 {
+  float nan = std::numeric_limits<float>::quiet_NaN();
   img_out.create( ii.rows-1, ii.cols-1 );
   for ( int y = 0; y < ii.rows-1; y++ )
   {
@@ -130,14 +141,17 @@ void convolve( const cv::Mat1d &ii,
       float s = scale_map[y][x] * base_scale;
       if ( s < min_px_scale || s > max_px_scale )
       {
-        img_out(y,x) = std::numeric_limits<float>::quiet_NaN();
+        img_out(y,x) = nan;
         continue;
       }
 
       // compute filter response with linear interpolation
-      int s_floor = s;
-      float t = s - s_floor;
-      img_out(y,x) = (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
+      img_out(y,x) = interpolateKernel<F>( ii, x, y, s );
+
+      /*
+      int s_round = int ( s + 0.5f );
+      img_out(y,x) = F( ii, x, y, s_round );
+      */
     }
   }
 }
@@ -153,6 +167,7 @@ void convolveAffine( const cv::Mat1d &ii,
     cv::Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
+  float nan = std::numeric_limits<float>::quiet_NaN();
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
@@ -160,7 +175,7 @@ void convolveAffine( const cv::Mat1d &ii,
       float s = scale_map[y][x] * base_scale;
       if ( s < min_px_scale || s > max_px_scale )
       {
-        img_out(y,x) = std::numeric_limits<float>::quiet_NaN();
+        img_out(y,x) = nan;
         continue;
       }
 

@@ -133,6 +133,36 @@ inline float dob( const Mat1d &ii, int x, int y, int s )
   return std::numeric_limits<float>::quiet_NaN();
 }
 
+/*
+ *  0  0  0  0
+ *  0  1  1  0
+ *  0  1  1  0
+ *  0  0  0  0
+ */
+inline float iiMean( const Mat1d &ii, int x, int y, int s )
+{
+  return integrate ( ii, x - s,  x + s, y - s, y + s ) / float(4*s*s);
+}
+
+/*
+ *  0  0  0  0
+ * -1 -1  1  1
+ * -1 -1  1  1
+ *  0  0  0  0
+ */
+inline float iiDx( const Mat1d &ii, int x, int y, int s )
+{
+    return ( integrate ( ii, x,  x + 2*s, y - s, y + s )
+           - integrate ( ii, x - 2*s,  x, y - s, y + s ) ) / float(4*s*s);
+  return 0;
+}
+inline float iiDy( const Mat1d &ii, int x, int y, int s )
+{
+    return ( integrate ( ii, x - s,  x + s, y, y + 2*s )
+           - integrate ( ii, x - s,  x + s, y - 2*s, y ) ) / float(4*s*s);
+  return 0;
+}
+
 
 /* Compute Harris corner measure h(x,y)
  * Value range: 0..1

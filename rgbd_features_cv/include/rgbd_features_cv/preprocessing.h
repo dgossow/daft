@@ -146,6 +146,7 @@ void improveDepthMap( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, flo
       }
     }
   }
+
 /*
   cv::imshow( "inter_x", inter_x );
   cv::imshow( "inter_y", inter_y );

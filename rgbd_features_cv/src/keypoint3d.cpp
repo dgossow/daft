@@ -23,12 +23,20 @@ static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar&
 
   if( flags & DrawMatchesFlags::DRAW_RICH_KEYPOINTS )
   {
-    float angle = atan2( (double)p.affine_mat(0,1), (double)p.affine_mat(0,0) );
-    Size2f bsize( 2*cv::norm( p.affine_mat.row(0) ), 2*cv::norm( p.affine_mat.row(1) ) );
-
-    cv::RotatedRect box( p.pt, bsize, angle/M_PI*180.0 );
-
-    ellipse( img, box, color, 1, 16 );
+    if ( p.affine_major >= 0 && p.affine_minor >= 0 )
+    {
+      Size2f bsize( p.affine_major, p.affine_minor );
+      cv::RotatedRect box( p.pt, bsize, p.affine_angle/M_PI*180.0 );
+      ellipse( img, box, color, 1, 16 );
+    }
+    else
+    {
+      //int radius = p.size * draw_multiplier / 2;
+      int radius = 3 * draw_multiplier;
+      Point center( cvRound(p.pt.x * draw_multiplier), cvRound(p.pt.y * draw_multiplier) );
+      circle( img, center, radius, color, 1, CV_AA, draw_shift_bits );
+      //std::cout << "circ";
+    }
   }
   else
   {

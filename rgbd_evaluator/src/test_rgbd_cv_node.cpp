@@ -36,22 +36,35 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   int scale_fac = orig_intensity_image->image.cols / orig_depth_image->image.cols;
 
+  /*
   // Resize depth to have the same width as rgb
   cv::resize( orig_depth_image->image, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
 
   // Crop rgb so it has the same size as depth
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
+  */
+
+  depth_image = orig_depth_image->image;
+
+  // make intensity image smaller
+  cv::Mat intensity_image_tmp = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols*scale_fac, depth_image.rows*scale_fac ) );
+
+  cv::resize( intensity_image_tmp, intensity_image, cvSize(depth_image.cols, depth_image.rows) );
 
   //orig_depth_image->image
 
-  cv::Mat1f depth_image_filtered;
-  improveDepthMap<150>( depth_image, depth_image_filtered, 0.2f );
+  cv::Mat1f depth_image_filtered1,depth_image_filtered2;
+  improveDepthMap<30>( depth_image, depth_image_filtered1, 0.2f );
+
+  cv::GaussianBlur( depth_image_filtered1, depth_image_filtered2, cv::Size(), 2, 2 );
 
   //assert( depth_image.cols == intensity_image.cols && depth_image.rows == intensity_image.rows );
 
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
 
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
+
+  camera_matrix(1,2) /= 2;
 
   cv::DAFT::DetectorParams p1,p2,p3;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
@@ -69,6 +82,12 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   p2 = p1;
   p2.affine_ = true;
+  p2.base_scale_ = 0.05;
+  p2.det_threshold_ = 0.1;
+  p2.pf_type_ = p2.PF_NONE;
+  p2.scale_levels_ = 1;
+  p2.max_px_scale_ = 1000;
+  p2.min_px_scale_ = 4;
   //p2.pf_type_ = p2.PF_NEIGHBOURS;
   //p2.pf_threshold_ = 0.95;
 
@@ -87,6 +106,10 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
 #if 0
   // compare speeds
+  for ( int i=0; i<10; i++ )
+  {
+    rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
+  }
   {
     boost::timer timer;
     timer.restart();
@@ -95,6 +118,10 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
       rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
     }
     std::cout << "detect 1 execution time [ms]: " << timer.elapsed()*100 << std::endl;
+  }
+  for ( int i=0; i<10; i++ )
+  {
+    rgbd_features2.detect( intensity_image, depth_image, camera_matrix, keypoints1);
   }
   {
     boost::timer timer;
@@ -107,13 +134,13 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   }
 
 #else
-  //rgbd_features1.detect( intensity_image, depth_image_filtered, camera_matrix, keypoints1);
-  rgbd_features2.detect( intensity_image, depth_image_filtered, camera_matrix, keypoints2);
+  //rgbd_features1.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints1);
+  rgbd_features2.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints2);
 #endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
 
-#if 1
+#if 0
   // draw
   cv::Mat intensity_image1,intensity_image2;
 
@@ -155,8 +182,8 @@ int main( int argc, char** argv )
   ROS_INFO ("Subscribed to depth image on: %s", depth_img_sub.getTopic().c_str ());
   ROS_INFO ("Subscribed to camera info on: %s", cam_info_sub.getTopic().c_str ());
 
-  //cv::namedWindow("RGB");
-  //cv::namedWindow("Depth");
-
-  ros::spin();
+  while( ros::ok() )
+  {
+    ros::spinOnce();
+  }
 }

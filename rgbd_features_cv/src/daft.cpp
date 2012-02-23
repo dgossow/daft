@@ -6,9 +6,11 @@
 #include "rgbd_features_cv/daft.h"
 #include "rgbd_features_cv/filter_kernels.h"
 #include "rgbd_features_cv/feature_detection.h"
+#include "rgbd_features_cv/descriptor_computation.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 
 #include <boost/timer.hpp>
 
@@ -28,7 +30,7 @@ DAFT::~DAFT()
 
 }
 
-void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx33f camera_matrix,
+void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx33f K,
     std::vector<KeyPoint3D> & kp)
 {
   if ( image.size != depth_map_orig.size )
@@ -71,7 +73,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       std::min( image.rows, image.cols ) / 32 :
       params_.max_px_scale_;
 
-  const float f = camera_matrix(0,0);
+  const float f = K(0,0);
 
 
   // Compute scale map from depth map
@@ -144,6 +146,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
 
   double scale = base_scale;
 
+
   // detect keypoints
   for( int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_ )
   {
@@ -155,7 +158,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_DOB:
       if ( params_.affine_ )
       {
-        convolveAffine<dobAffine>( ii, scale_map, depth_map, camera_matrix,
+        convolveAffine<dobAffine>( ii, scale_map, depth_map, K,
             scale, params_.min_px_scale_, max_px_scale, response_map );
       }
       else
@@ -205,18 +208,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       return;
     }
 
-    float f_inv = 1.0 / f;
-    float cx = camera_matrix(0,2);
-    float cy = camera_matrix(1,2);
-    for ( unsigned k=kp_first; k<kp.size(); k++ )
-    {
-      int kp_x = kp[k].pt.x;
-      int kp_y = kp[k].pt.y;
-      pt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
-      //todo: normal
-      getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp[k].affine_mat );
-    }
-
 #if 0
     {
       static int i=0;
@@ -229,7 +220,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
         KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
-        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp_curr.affine_mat );
+        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size/2,
+            kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
+            kp[k].normal );
         kp2.push_back(kp_curr);
       }
 
@@ -271,18 +264,59 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     return;
   }
 
+  cv::Mat1f patch1,patch2;
+
   // assign 3d points, normals and local affine params
   float f_inv = 1.0 / f;
-  float cx = camera_matrix(0,2);
-  float cy = camera_matrix(1,2);
+  float cx = K(0,2);
+  float cy = K(1,2);
   for ( unsigned k=0; k<kp.size(); k++ )
   {
     int kp_x = kp[k].pt.x;
     int kp_y = kp[k].pt.y;
-    pt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
-    //todo: normal
-    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size, kp[k].affine_mat );
+    getPt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
+
+    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size/2,
+        kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
+        kp[k].normal );
   }
+
+#if 0
+  cv::Mat display_image;
+  cv::drawKeypoints3D( image, kp, display_image, cv::Scalar(0,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+
+  // draw patch for strongest keypoint
+  float resp_max=0;
+  unsigned k_max=0;
+  for ( unsigned k=0; k<kp.size(); k++ )
+  {
+    if ( kp[k].response > resp_max )
+    {
+      k_max = k;
+      resp_max = kp[k].response;
+    }
+  }
+
+  if ( kp.size() > 0 )
+  {
+    int k=k_max;
+    std::stringstream s;
+    s << "max response patch";
+
+    const float scale_fac = 3;//40.0/2.0;
+    getPatch<40>( ii, kp[k], kp[k].world_size * 0.5 * scale_fac, patch1 );
+    getPatch2<40>( ii, depth_map, K, kp[k], kp[k].world_size * 0.5 * scale_fac, patch2, display_image );
+/*
+    cv::Mat1f patch1l,patch2l;
+    cv::resize( patch1, patch1l, Size( 256, 256 ), 0, 0, INTER_NEAREST );
+    cv::resize( patch2, patch2l, Size( 256, 256 ), 0, 0, INTER_NEAREST );
+    imshow( "affine " + s.str(), patch1l );
+    imshow( "projected " + s.str(), patch2l );
+    */
+  }
+
+  imshow( "rgb", display_image );
+#endif
 
 
 }

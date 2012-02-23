@@ -37,6 +37,7 @@ public:
     static const int DEFAULT_PF_TYPE = PF_HARRIS;
     static const float DEFAULT_PF_THRESHOLD = 0.0;
     static const int DEFAULT_MAX_ALGO = MAX_FAST;
+    static const bool DEFAULT_AFFINE = true;
 
     /** default constructor */
     DetectorParams(
@@ -50,7 +51,7 @@ public:
         int postfilter_type = DEFAULT_PF_TYPE,
         float pf_threshold = DEFAULT_PF_THRESHOLD,
         int max_search_algo = DEFAULT_MAX_ALGO,
-        bool affine = false ):
+        bool affine = DEFAULT_AFFINE ):
           base_scale_(base_scale),
           scale_step_(scale_factor),
           scale_levels_(scale_levels),

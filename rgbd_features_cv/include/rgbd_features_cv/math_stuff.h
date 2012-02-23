@@ -14,13 +14,11 @@ namespace cv
 // using the given integral image
 inline float integrate( const Mat1d &ii, int start_x, int end_x, int start_y, int end_y )
 {
-  assert( start_x>0 );
-  assert( start_y>0 );
-  assert( start_x<ii.cols );
-  assert( start_y<ii.rows );
-  assert( end_x>0 );
-  assert( end_y>0 );
+  assert( start_x>=0 );
+  assert( end_x>start_x );
   assert( end_x<ii.cols );
+  assert( start_y>=0 );
+  assert( end_y>start_y );
   assert( end_y<ii.rows );
   return ii(end_y,end_x) + ii(start_y,start_x) - ii(end_y,start_x) - ii(start_y,end_x);
 }
@@ -42,12 +40,18 @@ inline bool checkBounds ( Mat1d ii, int x, int y, int s )
 // @param cx,cy optical center
 // @param u,v pixel coords
 // @param p output point in 3d
-inline void pt3d( float f_inv, float cx, float cy, float u, float v, float z, Point3f& p )
+inline void getPt3d( float f_inv, float cx, float cy, float u, float v, float z, Point3f& p )
 {
   float zf = z*f_inv;
   p.x = zf * (u-cx);
   p.y = zf * (v-cy);
   p.z = z;
+}
+
+inline void getPt2d( const Point3f& p, float f, float cx, float cy, Point2f& v )
+{
+  v.x = p.x * f / p.z + cx;
+  v.y = p.y * f / p.z + cy;
 }
 
 // approximate 1 / sqrt(x) with accuracy ~2%
@@ -110,26 +114,25 @@ inline bool getAffine(
     const Mat1f &depth_map,
     int x, int y,
     float sp, float sw,
-    Matx22f &affine )
+    float &angle, float &major, float &minor,
+    Point3f& normal )
 {
   // the depth gradient
   Vec2f grad;
 
-  if ( !checkBounds( ii, x, y, sp*2 ) )
-    return false;
-
-  if ( !computeGradient( depth_map, x, y, sp, sw, grad ) )
+  if ( !checkBounds( ii, x, y, sp*2 )  ||
+       !computeGradient( depth_map, x, y, sp, sw, grad ) )
   {
+    major = minor = sp;
+    angle = 0;
     return false;
   }
 
   // if the gradient is 0, make circle
   if ( grad[0] == 0 && grad[1] == 0 )
   {
-    affine(0,0)=sp;
-    affine(0,1)=0;
-    affine(1,0)=0;
-    affine(1,1)=sp;
+    major = minor = sp;
+    angle = 0;
     return true;
   }
 
@@ -140,13 +143,14 @@ inline bool getAffine(
   Vec2f grad_norm = grad * fastInverseSqrt( grad_len_2 );
 
   // compute the minor axis length
-  float len_minor = sp * fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
-  affine(1,0) = grad_norm[0] * len_minor;
-  affine(1,1) = grad_norm[1] * len_minor;
+  minor = 2 * sp * fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
+  major = 2 * sp;
+  angle = atan2( grad_norm[0], -grad_norm[1] );
 
-  // normalize the major axis
-  affine(0,0) = -grad_norm[1] * float(sp);
-  affine(0,1) = grad_norm[0] * float(sp);
+  normal.x = grad[0] / sw;
+  normal.y = grad[1] / sw;
+  normal.z = -1.0f;
+  normal = normal * (1.0 / cv::norm( normal ));
 
   return true;
 }

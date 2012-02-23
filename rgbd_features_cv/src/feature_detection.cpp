@@ -78,7 +78,7 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-        kp.push_back( cv::KeyPoint3D ( x, y, s*2, base_scale, -1, img[y][x] ) );
+        kp.push_back( cv::KeyPoint3D ( x, y, s*2.0, base_scale*2.0, -1, img[y][x] ) );
       }
     }
   }
@@ -299,7 +299,7 @@ void findMaximaMipMap( const cv::Mat1d &img,
                     finite( img[kp_y+1][kp_x+1] ))
                 {
                   // make keypoint
-                  kp.push_back( KeyPoint3D ( kp_x, kp_y, s*2, base_scale, -1, cv ) );
+                  kp.push_back( KeyPoint3D ( kp_x, kp_y, s*2, base_scale*2.0, -1, cv ) );
                 }
               }
             }
