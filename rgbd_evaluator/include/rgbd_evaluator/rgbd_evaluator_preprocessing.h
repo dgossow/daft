@@ -38,7 +38,7 @@ class RgbdEvaluatorPreprocessing
 {
 public:
 
-  RgbdEvaluatorPreprocessing(std::string);
+  RgbdEvaluatorPreprocessing(std::string, bool reverse_order);
   virtual ~RgbdEvaluatorPreprocessing();
 
   void createTestFiles();
@@ -60,6 +60,8 @@ private:
   std::string file_name_;
   std::string file_folder_;
   std::string file_created_folder_;
+
+  bool reverse_order_;
 
   rosbag::Bag bag_;
 

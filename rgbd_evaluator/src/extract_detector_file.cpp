@@ -36,6 +36,8 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path)
   }
 
   cv::DAFT::DetectorParams params;
+  params.max_px_scale_ = 1000;
+  params.pf_threshold_ = 0.0005;
   daft_ = cv::DAFT( params );
 
   bag_.open(file_path, rosbag::bagmode::Read);
@@ -169,13 +171,16 @@ void ExtractDetectorFile::extractKeypoints()
 
     cv::drawKeypoints3D(rgb_img, keypoints_, img_out, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    //cv::imshow("KEYPOINTS", img_out);
-    //cv::waitKey(30);
+    cv::imshow("KEYPOINTS", img_out);
+    cv::waitKey(30);
 
     storeKeypoints(keypoints_, ++count);
 
-    //std::cout << "Press any Key to continue!" << std::endl;
-    //getchar();
+
+#if 0
+    std::cout << "Press any Key to continue!" << std::endl;
+    getchar();
+#endif
   }
 
 }
@@ -207,33 +212,27 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
   for ( it = keypoints.begin(); it != keypoints.end(); it++ )
   {
-    cv::Matx22f mat_affine;// = it->affine_mat;
-
-    ax = mat_affine(0,0);
-    bx = mat_affine(1,0);
-    ay = mat_affine(0,1);
-    by = mat_affine(1,1);
+    ax = cos( it->affine_angle );
+    ay = sin( it->affine_angle );
+    bx = -ay;
+    by = ax;
 
     alpha_a = atan2(ay,ax);
     alpha_b = atan2(by,bx);
 
-    a_length = sqrt(pow(ax,2)+pow(ay,2));
-    b_length = sqrt(pow(bx,2)+pow(by,2));
+    a_length = it->affine_major;
+    b_length = it->affine_minor;
 
     ax = cos(alpha_a);
     bx = cos(alpha_b);
     ay = sin(alpha_a);
     by = sin(alpha_b);
 
-//    std::cout << "ax: " << ax << "\tay: " << ay << "\tbx: " << bx << "\tby: " << by << "\t|a|: " << a_length << "\t|b|: " << b_length << std::endl;
-
     A = ( pow(ax,2) * pow(b_length,2) + pow(bx,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
 
     B = 2 * ( ( ax * ay * pow(b_length,2) + bx * by * pow(a_length,2)) ) / (pow(a_length,2) * pow(b_length,2) );
 
     C = ( pow(ay,2) * pow(b_length,2) + pow(by,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
-
-//    std::cout << "x: " << it->pt.x << "\ty: " << it->pt.y << "\tA: " << A << "\tB: " << B << "\tC: " << C << std::endl;
 
     file << it->pt.x << "  " << it->pt.y << "  " << A << "  " << B << "  " << C << std::endl;
 

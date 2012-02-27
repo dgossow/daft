@@ -21,9 +21,11 @@
 namespace rgbd_evaluator
 {
 
-RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string file_path)
+RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string file_path, bool reverse_order)
 {
   std::cout << "Reading bagfile from " << file_path.c_str() << std::endl;
+
+  reverse_order_ = reverse_order;
 
   splitFileName(file_path);
 
@@ -74,6 +76,15 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
   // Load all messages into our stereo dataset
   BOOST_FOREACH(rosbag::MessageInstance const m, view)
   {
+      // if the current image data is complete, go to next one
+      if ( image_store_.back().isComplete() )
+      {
+        image_store_.push_back( ImageData() );
+        //std::cout << "ImageData_"<< count << " complete! Press any key to continue\n\r" << std::endl;
+        //getchar();
+        count++;
+      }
+
       // load rgb image
       sensor_msgs::Image::ConstPtr p_rgb_img = m.instantiate<sensor_msgs::Image>();
 
@@ -150,17 +161,6 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         got_cam_info = true;
       }
-
-      /**********************************************************************************************************************/
-
-      // if the current image data is complete, go to next one
-      if ( image_store_.back().isComplete() )
-      {
-        image_store_.push_back( ImageData() );
-        //std::cout << "ImageData_"<< count << " complete! Press any key to continue\n\r" << std::endl;
-        //getchar();
-        count++;
-      }
   }
 }
 
@@ -182,8 +182,23 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
   cv::Matx33f homography_complete;
 
+  int it_step;
+  std::vector< ImageData >::iterator it_end,it_begin;
+  if ( reverse_order_ )
+  {
+    it_step = -1;
+    it_begin = image_store_.end()-1;
+    it_end = image_store_.begin()-1;
+  }
+  else
+  {
+    it_step = 1;
+    it_begin = image_store_.begin();
+    it_end = image_store_.end();
+  }
+
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
-  for (it = image_store_.begin(); it != image_store_.end()-1; it++)
+  for (it = it_begin; it != it_end; it+=it_step)
   {
 
     // store first transforms and images
@@ -200,12 +215,14 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
                                MIN_FEATURE_NEIGHBOUR_DIST, cv::noArray(), 3, true );
 
       cv::KeyPoint::convert( feature_vector_original, keypoint_vector_original );
-      //cv::drawKeypoints( image_original, keypoint_vector_original, image_original );
+#if 0
 
-      // store original corner points
-//    cv::imshow("Original Image", image_original);
-//    cv::waitKey(30);
+      cv::drawKeypoints( image_original, keypoint_vector_original, image_original );
 
+       //store original corner points
+      cv::imshow("Original Image", image_original);
+      cv::waitKey(30);
+#endif
       continue;
     }
 
@@ -224,7 +241,12 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // perspective warping
     cv::warpPerspective( image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
 
-    cv::imshow( "Original Image", image_original );
+
+    cv::Mat tmp1,image_orig_rewarped;
+    cv::warpPerspective( image_original, tmp1, cv::Mat(homography_init.inv()), cv::Size(image_original.cols,image_original.rows) );
+    cv::warpPerspective( tmp1, image_orig_rewarped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
+
+    cv::imshow( "Original Image (Re-Warped)", image_orig_rewarped );
     cv::waitKey(30);
     cv::imshow( "Warped Image", image_warped );
     cv::waitKey(30);
@@ -245,7 +267,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
         std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
       }
 
-      if( calculateNCC( image_warped, image_original, keypoint_vector_original.at(i), keypointNCC) >= 0 )
+      if( calculateNCC( image_warped, image_orig_rewarped, keypoint_vector_original.at(i), keypointNCC) >= 0 )
       {
         keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(i).pt.x,
                                                keypoint_vector_original.at(i).pt.y ) );
@@ -297,21 +319,33 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     /*************************************************************************************************************************/
 
-    // show images
-//    cv::imshow("Current Image", image_camx);
-//    cv::waitKey(30);
-//    cv::imshow("Warped Image", image_warped);
-//    cv::waitKey(30);
-
-    cv::imshow( "Precise warped Image", image_warped_precise );
-    cv::waitKey(30);
+    cv::Mat image_orig_rewarped_precise;
 
     // store homography
     writeHomographyToFile( homography_complete, count++ );
 
+#if 0
+    cv::warpPerspective( image_original, tmp1, cv::Mat(homography_complete.inv()), cv::Size(image_original.cols,image_original.rows) );
+    cv::warpPerspective( tmp1, image_orig_rewarped_precise, cv::Mat(homography_complete), cv::Size(image_original.cols,image_original.rows) );
+
+
+
+    // show images
+    cv::imshow("Current Image", image_camx);
+    cv::waitKey(30);
+    cv::imshow("Warped Image", image_warped);
+    cv::waitKey(30);
+
+    cv::imshow( "Precise warped Image", image_orig_rewarped_precise );
+
+    cv::Mat diff_img;
+    cv::absdiff( image_orig_rewarped_precise, image_warped_precise, diff_img );
+    cv::imshow( "Image Difference", diff_img );
+    cv::waitKey(30);
+
     std::cout << "Press any key to continue" << std::endl;
     getchar();
-
+#endif
   }
 
 }
@@ -478,7 +512,7 @@ void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
 
 int main( int argc, char** argv )
 {
-  if(argc != 2)
+  if(argc < 2)
   {
     std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName>" << std::endl;
     return -1;
@@ -486,7 +520,11 @@ int main( int argc, char** argv )
 
   std::string fileName(argv[1]);
 
-  rgbd_evaluator::RgbdEvaluatorPreprocessing fd(fileName);
+  bool reverse_order = argc > 2 && std::string(argv[2]) == "-r";
+
+  std::cout << "reverse_order " << reverse_order << std::endl;
+
+  rgbd_evaluator::RgbdEvaluatorPreprocessing fd(fileName, reverse_order);
   fd.createTestFiles();
   fd.calculateHomography();
 
