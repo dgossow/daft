@@ -169,12 +169,12 @@ void ExtractDetectorFile::extractKeypoints()
 
     cv::drawKeypoints3D(rgb_img, keypoints_, img_out, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    cv::imshow("KEYPOINTS", img_out);
-    cv::waitKey(30);
+    //cv::imshow("KEYPOINTS", img_out);
+    //cv::waitKey(30);
 
     storeKeypoints(keypoints_, ++count);
 
-    std::cout << "Press any Key to continue!" << std::endl;
+    //std::cout << "Press any Key to continue!" << std::endl;
     //getchar();
   }
 

@@ -224,62 +224,37 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // perspective warping
     cv::warpPerspective( image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
 
+    cv::imshow( "Original Image", image_original );
+    cv::waitKey(30);
+    cv::imshow( "Warped Image", image_warped );
+    cv::waitKey(30);
+
     /**************************** calculate precise homography **************************************************************/
 
     std::vector<cv::Point2f> keypoints_camx;
     std::vector<cv::Point2f> keypoints_original;
-    std::vector<cv::Point2f> feature_vector_camx;
-    std::vector<cv::KeyPoint> keypoint_vector_camx;
 
-    // convert image to grayscale
-    cv::cvtColor( image_warped, image_grayscale, CV_RGB2GRAY );
-    cv::goodFeaturesToTrack( image_grayscale, feature_vector_camx, MAX_FEATURE_NUMBER, 0.01, MIN_FEATURE_NEIGHBOUR_DIST );
-
-    cv::KeyPoint::convert( feature_vector_camx, keypoint_vector_camx );
-    cv::drawKeypoints( image_warped, keypoint_vector_camx, image_warped );
-
-    // corner correspondences
-    uint32_t correspondences[keypoint_vector_camx.size()];
-
-    uint32_t i;
-
-    for(i = 0; i < keypoint_vector_camx.size(); i++)
+    for(uint32_t i = 0; i < keypoint_vector_original.size(); i++)
     {
-      bool correspondence_found = false;
+      // ncc part
+      cv::Mat result;
+      cv::Point2f keypointNCC;
 
-      // find correspondences
-      uint32_t j=0;
-      double_t min_distance = MAX_CORRESPONDENCES_DIST_THRES;
-      correspondences[i] = 0;
-
-      for(j = 0; j < keypoint_vector_original.size(); j++)
+      if((i % 10) == 0)
       {
-          double_t tmp = calculateEuclidianDistance( keypoint_vector_original.at(j), keypoint_vector_camx.at(i) );
-
-          if(min_distance >= tmp)
-          {
-              correspondences[i] = j;
-              min_distance = tmp;
-              correspondence_found = true;
-          }
+        std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
       }
 
-      if(correspondence_found == true)
+      if( calculateNCC( image_warped, image_original, keypoint_vector_original.at(i), keypointNCC) >= 0 )
       {
-          // store corresponding original point
-          keypoints_camx.push_back( cv::Point2f( keypoint_vector_camx.at(i).pt.x,
-                                                 keypoint_vector_camx.at(i).pt.y ) );
+        keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(i).pt.x,
+                                               keypoint_vector_original.at(i).pt.y ) );
 
-          keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(correspondences[i]).pt.x,
-                                                     keypoint_vector_original.at(correspondences[i]).pt.y ) );
+        keypoints_camx.push_back( keypointNCC );
       }
-
     }
 
-    printf("Found correspondences: %d\n\r", (uint32_t)keypoints_camx.size() );
-
-    cv::Matx33f homography_precise;
-
+    printf("Finished...Found correspondences: %d\n\r", (uint32_t)keypoints_camx.size() );
 
     if(keypoints_camx.size() < MIN_CORRESPONDENCES || keypoints_original.size() < MIN_CORRESPONDENCES )
     {
@@ -287,17 +262,18 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       return;
     }
 
-    homography_precise = cv::findHomography( keypoints_camx, keypoints_original , CV_LMEDS, 2 );
+    cv::Matx33f homography_precise;
+//    homography_precise = cv::findHomography( keypoints_camx, keypoints_original , CV_LMEDS, 2 );
+    homography_precise = cv::findHomography( keypoints_camx, keypoints_original, CV_RANSAC, 2 );
 
     homography_complete = homography_precise * homography_init;
 
-    printMat( cv::Matx33f(homography_complete) );
+    printMat( cv::Matx33f( homography_complete) );
 
     cv::Mat image_warped_precise;
 
     // perspective warping precise
     cv::warpPerspective( image_camx, image_warped_precise, cv::Mat(homography_complete), cv::Size(image_warped.cols,image_warped.rows) );
-
 
     //transform keypoints from warped image into precise warped image
     for ( uint32_t i=0; i < keypoints_camx.size(); i++ )
@@ -328,8 +304,6 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 //    cv::waitKey(30);
 
     cv::imshow( "Precise warped Image", image_warped_precise );
-    cv::waitKey(30);
-    cv::imshow( "Original Image", image_original_clone );
     cv::waitKey(30);
 
     // store homography
@@ -369,6 +343,68 @@ cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform t
   homography_init = K_ * homography_init * K_.inv();
 
   return homography_init;
+}
+
+int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC)
+{
+  float_t x_pos = keypoint.pt.x;
+  float_t y_pos = keypoint.pt.y;
+  cv::Mat correlation_img;
+
+  if( ( x_pos - round( SEARCH_WINDOW_SIZE / 2 )-1) < 0 ||
+      ( y_pos - round( SEARCH_WINDOW_SIZE / 2 )-1) < 0 ||
+      ( x_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.cols ||
+      ( y_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.rows )
+  {
+    std::cout << "nccSlidingWindow: keypoint( " << x_pos << ", " << y_pos << " ) out of range" << std::endl;
+    return -1;
+  }
+
+  cv::Rect batch( x_pos - floor( SLIDING_WINDOW_SIZE / 2 ),
+                  y_pos - floor( SLIDING_WINDOW_SIZE / 2 ),
+                  SLIDING_WINDOW_SIZE, SLIDING_WINDOW_SIZE);
+
+  cv::Rect searchRect( x_pos - floor( SEARCH_WINDOW_SIZE / 2 ),
+                  y_pos - floor( SEARCH_WINDOW_SIZE / 2 ),
+                  SEARCH_WINDOW_SIZE, SEARCH_WINDOW_SIZE);
+
+  cv::Mat templ( image_cam_x, batch );
+  cv::Mat searchWin( image_original, searchRect );
+
+  cv::imshow("Batch Image", templ);
+  cv::waitKey(30);
+
+  cv::matchTemplate( searchWin, templ, correlation_img, CV_TM_CCORR_NORMED );
+
+  /* find best matches location */
+  cv::Point minloc, maxloc;
+  double minval = 0, maxval = 0;
+
+  cv::minMaxLoc(correlation_img, &minval, &maxval, &minloc, &maxloc, cv::noArray());
+
+  keypointNCC = keypoint.pt + cv::Point2f(maxloc.x,maxloc.y) -
+      cv::Point2f( (SEARCH_WINDOW_SIZE - SLIDING_WINDOW_SIZE) / 2, (SEARCH_WINDOW_SIZE - SLIDING_WINDOW_SIZE) / 2 );
+  std::cout << "slidingWindow Matrix( " << correlation_img.rows << ", " << correlation_img.cols << " )" << " ... Channels: " << correlation_img.channels()<< std::endl;
+  std::cout << "Minval: " << minval << " Maxval: " << maxval << std::endl;
+  std::cout << "MinLoc: " << minloc.x <<  "  " << minloc.y <<  " MaxLoc: " << maxloc.x <<  "  " << maxloc.y  << std::endl;
+
+  if ( maxval < 0.98 )
+  {
+    return -1;
+  }
+
+#if 0
+  cv::imshow("correlation_img", correlation_img);
+
+  cv::Rect maxCorrWin( maxloc.x, maxloc.y, SLIDING_WINDOW_SIZE, SLIDING_WINDOW_SIZE);
+  cv::Mat maxCorrPatch( searchWin, maxCorrWin );
+  cv::imshow("searchWin", searchWin);
+  cv::imshow("maxCorrPatch", maxCorrPatch);
+  cv::waitKey(30);
+  getchar();
+#endif
+
+  return 0;
 }
 
 
@@ -413,12 +449,6 @@ void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
     }
     std::cout << std::endl;
   }
-}
-
-double_t RgbdEvaluatorPreprocessing::calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x)
-{
-  double_t edistance = sqrt(pow(corner_original.pt.x - corner_x.pt.x, 2) + pow(corner_original.pt.y - corner_x.pt.y, 2));
-  return edistance;
 }
 
 void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)

@@ -48,11 +48,11 @@ private:
 
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
 
+  int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC);
+
   void printMat(cv::Matx33f M);
 
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
-
-  double_t calculateEuclidianDistance(cv::KeyPoint corner_original, cv::KeyPoint corner_x);
 
   void splitFileName (const std::string& str);
 
@@ -71,7 +71,9 @@ private:
   static const uint32_t MAX_CORRESPONDENCES_DIST_THRES = 10;
   static const uint32_t MIN_CORRESPONDENCES = 4;
   static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 25;
-  static const uint32_t MAX_FEATURE_NUMBER = 100;
+  static const uint32_t MAX_FEATURE_NUMBER = 60;
+  static const uint32_t SLIDING_WINDOW_SIZE = 40;
+  static const uint32_t SEARCH_WINDOW_SIZE = 80;
 
   struct ImageData
   {
