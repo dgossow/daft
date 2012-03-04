@@ -75,11 +75,13 @@ inline float fastInverseLen( const Point3f& p )
   return fastInverseSqrt( p.x*p.x + p.y*p.y + p.z*p.z );
 }
 
-// compute depth gradient as meter per pixel
+/** compute depth gradient
+ * @param sp step width in projected pixel
+ */
 inline bool computeGradient(
     const Mat1f &depth_map,
-    int x, int y, float sp, Vec2f& grad )
-{
+    int x, int y, float sp, Vec2f& grad
+) {
   // get depth values from image
   float d_center = depth_map(y,x);
   float d_xp = depth_map(y,x+sp);
@@ -157,6 +159,31 @@ inline bool getAffine(
   normal = normal * normal_length_inv;
 
   return true;
+}
+
+/** Computes A*x^2 + B*x*y + C*y^2 form of ellipse from angle and major/minor axis length */
+inline void ellipseParameters(float angle, float major, float minor, float& A, float& B, float& C)
+{
+  float ax = std::cos(angle);
+  float ay = std::sin(angle);
+  float bx = -ay;
+  float by = ax;
+
+  float a2 = major * major;
+  float b2 = minor * minor;
+
+  A = ax*ax / a2 + bx*bx / b2;
+
+  B = 2.0f * (ax*ay / a2 + bx*by / b2);
+
+  C = ay*ay / a2 + by*by / b2;
+
+}
+
+/** Checks if a point (x,y) is contained in an ellipse of form A*x^2 + B*x*y + C*y^2 */
+inline bool ellipseContains(float x, float y, float A, float B, float C)
+{
+  return A*x*x + B*x*y + C*y*y <= 1.0f;
 }
 
 }

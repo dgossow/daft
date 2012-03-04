@@ -102,12 +102,6 @@ inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-inline float laplaceAffine( const Mat1d &ii, const Mat1f &depth_map,
-    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
-{
-	return 0.5f;
-}
-
 /* Compute simple Laplacian (Difference Of Boxes)
  * Kernel size: 4s x 4s
  * Value range: 0..1
@@ -187,6 +181,12 @@ struct LaplaceKernel
 };
 
 static LaplaceKernel sLaplaceKernel;
+
+inline float laplaceAffine( const Mat1d &ii, const Mat1f &depth_map,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+{
+	return 0.5f;
+}
 
 inline float laplace( const Mat1d &ii, int x, int y, int s )
 {

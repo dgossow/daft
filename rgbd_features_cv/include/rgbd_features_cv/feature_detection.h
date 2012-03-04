@@ -77,6 +77,13 @@ void findMaxima( const cv::Mat1d &img,
      double thresh,
      std::vector< KeyPoint3D >& kp );
 
+void findMaximaAffine(
+    const cv::Mat1d &img,  const cv::Mat1d &scale_map,
+    const cv::Mat1d &ii,  const cv::Mat1f &depth_map,
+    double base_scale,
+    double thresh,
+    std::vector< KeyPoint3D >& kp );
+
 void findMaximaMipMap( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,

@@ -85,6 +85,101 @@ void findMaxima( const cv::Mat1d &img,
 }
 
 
+void findMaximaAffine(
+    const cv::Mat1d &img,  const cv::Mat1d &scale_map,
+    const cv::Mat1d &ii,  const cv::Mat1f &depth_map,
+    double base_scale,
+    double thresh,
+    std::vector< KeyPoint3D >& kp )
+{
+  //find maxima in sxs neighbourhood
+  for ( int y = 3; y < img.rows-3; y++ )
+  {
+    for ( int x = 3; x < img.cols-3; ++x )
+    {
+      float val = img[y][x];
+
+      if ( val < thresh || isnan(val) )
+      {
+        continue;
+      }
+
+      double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
+
+      if ( x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
+      {
+        continue;
+      }
+
+      if (isnan( img[y-1][x-1] ) ||
+          isnan( img[y-1][x  ] ) ||
+          isnan( img[y-1][x+1] ) ||
+          isnan( img[y  ][x-1] ) ||
+          isnan( img[y  ][x+1] ) ||
+          isnan( img[y+1][x-1] ) ||
+          isnan( img[y+1][x  ] ) ||
+          isnan( img[y+1][x+1] ))
+      {
+        continue;
+      }
+
+      // compute ellipse parameters
+      float angle, major, minor;
+      Point3f normal;
+      bool ok = getAffine(ii, depth_map,
+          x, y, s, base_scale,
+          angle, major, minor, normal);
+      // break if gradient can not be computed
+      if(!ok) {
+        continue;
+      }
+
+      float A, B, C;
+      ellipseParameters(angle, major, minor, A, B, C);
+
+      // break if ellipse is too small or thin
+      if(major < 1.0f || minor < 1.0f) {
+        continue;
+      }
+
+      // Round scale, substract the one extra pixel we have in the center
+      int window = s;// static_cast<int>(s + 0.5); // ... doesn't hurt to make it bigger
+      if ( window < 1 ) window = 1;
+
+//      if((y*img.rows + x) % 100 == 0) {
+//        std::cout << window << " " << angle << " " << major << " " << minor << " " << A << " " << B << " " << C << std::endl;
+//      }
+
+      bool is_max = true;
+      for ( int v = -window; is_max && v <= window; v++ )
+      {
+        for ( int u = -window; is_max && u <= window; u++ )
+        {
+          if (u==0 && v==0) {
+            continue;
+          }
+          // check if point is in ellipse
+          if(!ellipseContains(u, v, A, B, C)) {
+//        if(!ellipseContains(u, v, 1.0f/(s*s), 0.0f, 1.0f/(s*s))) { // circle
+            // only check points in ellipse
+            continue;
+          }
+          // check if other maximum found
+          if(img[y+v][x+u] >= val) {
+            // not a maximum -> search finished
+            is_max = false;
+          }
+        }
+      }
+
+      if(is_max) {
+        // is a maximum -> add keypoint
+        kp.push_back( cv::KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+      }
+    }
+  }
+}
+
 
 
 // Helper struct + comparison

@@ -191,6 +191,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::MAX_WINDOW:
       findMaxima( response_map, scale_map, scale, params_.det_threshold_, kp );
       break;
+    case DetectorParams::MAX_WINDOW_AFFINE:
+      findMaximaAffine( response_map, scale_map, ii, depth_map, scale, params_.det_threshold_, kp );
+      break;
     case DetectorParams::MAX_FAST:
       findMaximaMipMap( response_map, scale_map, scale, params_.det_threshold_, kp );
       break;
@@ -234,6 +237,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
         getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
             kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
             kp[k].normal );
+        // keypoint shall cover outer and inner and wants size not radius
+        kp[k].affine_minor *= 4.0f;
+        kp[k].affine_major *= 4.0f;
         kp2.push_back(kp_curr);
       }
 
@@ -244,7 +250,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
       s.str("");
-      s << "Detector type=" << params_.det_type_ << " scale = " << scale << " affine = " << params_.affine_;
+      s << "Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
       cv::imshow( s.str(), display_image );
 
       /*
@@ -281,16 +287,25 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
   float f_inv = 1.0 / f;
   float cx = K(0,2);
   float cy = K(1,2);
+  vector<KeyPoint3D> kp2;
+  kp2.reserve(kp.size());
   for ( unsigned k=0; k<kp.size(); k++ )
   {
     int kp_x = kp[k].pt.x;
     int kp_y = kp[k].pt.y;
     getPt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
 
-    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
-        kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
-        kp[k].normal );
+    if(getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
+            kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
+            kp[k].normal)
+    ) {
+      // keypoint shall cover outer and inner and wants size not radius
+      kp[k].affine_minor *= 4.0f;
+      kp[k].affine_major *= 4.0f;
+      kp2.push_back(kp[k]);
+    }
   }
+  kp = kp2;
 
 #if 0
   cv::Mat display_image;
