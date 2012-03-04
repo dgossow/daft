@@ -78,15 +78,16 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.base_scale_ = 0.025;
   p1.scale_levels_ = 1;
 
-  p1.det_type_ = p1.DET_DOG;
+  p1.det_type_ = p1.DET_LAPLACE;
   p1.affine_ = false;
   p1.max_px_scale_ = 1000;
   p1.pf_type_ = p1.PF_NONE;
+  p1.max_search_algo_ = p1.MAX_WINDOW_AFFINE;
   //p1.pf_threshold_ = 0.001;
   //p1.max_search_algo_ = p1.MAX_FAST;
 
   p2 = p1;
-  p2.det_type_ = p2.DET_DOB;
+  p2.max_search_algo_ = p1.MAX_WINDOW;
 
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;
@@ -152,11 +153,11 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   // draw
   cv::Mat intensity_image1,intensity_image2;
 
-//  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image1, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image1, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image1, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image1, keypoints1, intensity_image1, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-//  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image2, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image2, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image2, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
   std::ostringstream s;
   s << p1.det_type_;
