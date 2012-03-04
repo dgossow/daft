@@ -57,5 +57,5 @@ for f=1:2
     legend(det_suffix);
 end
 
-print(figure(1),'-dsvg',sprintf('%s%s_repeatability.svg',base_path, dataset_name))
-print(figure(2),'-dsvg',sprintf('%s%s_num_correspondences.svg',base_path, dataset_name))
+print(figure(1),'-dpdf',sprintf('%s%s_repeatability.pdf',base_path, dataset_name))
+print(figure(2),'-dpdf',sprintf('%s%s_num_correspondences.pdf',base_path, dataset_name))

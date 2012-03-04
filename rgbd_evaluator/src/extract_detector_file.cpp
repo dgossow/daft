@@ -228,7 +228,7 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
 
         float ratio = float(daft_kp.size()) / float(num_kp);
 
-        t *= 1.0 + 2.5 * (ratio-1.0);
+        t *= 1.0 + 0.5 * (ratio-1.0);
         std::cout << "ratio " << ratio << " t " << t << " p.pf_threshold_ " << p.pf_threshold_ << std::endl;
         std::cout << " p.det_threshold_ " << p.det_threshold_ << std::endl;
       }
@@ -251,6 +251,7 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
     count++;
 
     storeKeypoints(daft_kp, s.str(), name );
+    storeKeypoints(cv::makeKeyPoints(daft_kp), s.str(), name+" circular" );
 
 #if 0
     std::cout << "Press any Key to continue!" << std::endl;
@@ -275,12 +276,12 @@ void ExtractDetectorFile::extractKeypoints()
   p.scale_levels_ = 5;
   p.affine_=false;
   p.pf_threshold_ = 0.0001;
-  extractDaftKeypoints( p, "DAFT" );
+  //extractDaftKeypoints( p, "DAFT" );
 
 
   cv::DAFT::DetectorParams p_affine=p;
   p_affine.affine_=true;
-  extractDaftKeypoints( p_affine, "DAFT affine" );
+  //extractDaftKeypoints( p_affine, "DAFT affine" );
 
   cv::DAFT::DetectorParams p_laplace=p;
   p_laplace.det_type_ = p.DET_LAPLACE;
@@ -289,6 +290,8 @@ void ExtractDetectorFile::extractKeypoints()
   p_laplace.pf_threshold_ = 10;
 
   extractDaftKeypoints( p_laplace, "DAFT Laplace" );
+
+  return;
 
   cv::SIFT sift;
   cv::SURF surf;

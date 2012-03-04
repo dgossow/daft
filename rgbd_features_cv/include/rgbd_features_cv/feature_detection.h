@@ -14,6 +14,7 @@
 #include <fstream>
 
 #include "keypoint3d.h"
+#include "math_stuff.h"
 
 namespace cv
 {
@@ -191,6 +192,44 @@ void convolveAffine( const cv::Mat1d &ii,
   }
 }
 
+template <float (*F)(const Mat1d &ii, int x, int y, float major, float minor, float angle)>
+void convolveAffine2( const cv::Mat1d &ii,
+    const cv::Mat1f &scale_map,
+    const cv::Mat1f &depth_map,
+    const cv::Matx33f& camera_matrix,
+    float base_scale,
+    float min_px_scale,
+    float max_px_scale,
+    cv::Mat1f &img_out )
+{
+  img_out.create( ii.rows-1, ii.cols-1 );
+  float nan = std::numeric_limits<float>::quiet_NaN();
+  for ( int y = 0; y < ii.rows-1; y++ )
+  {
+    for ( int x = 0; x < ii.cols-1; ++x )
+    {
+      float s = scale_map[y][x] * base_scale;
+      if ( s < min_px_scale || s > max_px_scale )
+      {
+        img_out(y,x) = nan;
+        continue;
+      }
+
+      float angle, major, minor;
+      Point3f normal;
+      bool ok = getAffine(ii, depth_map,
+          x, y, s, base_scale,
+          angle, major, minor, normal);
+      // break if gradient can not be computed
+      // or minor axis too small
+      if(!ok || minor < min_px_scale) {
+        continue;
+      }
+
+      img_out(y,x) = F( ii, x, y, major, minor, angle );
+    }
+  }
+}
 template <float (*F)(const Mat1d&, int, int, int)>
 void filterKpKernel( const cv::Mat1d& ii,
     double thresh,

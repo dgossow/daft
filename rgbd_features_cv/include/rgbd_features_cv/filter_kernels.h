@@ -136,11 +136,20 @@ inline float dob( const Mat1d &ii, int x, int y, int s )
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-
-inline float laplaceAffine( const Mat1d &ii, const Mat1f &depth_map,
-    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-	return 0.5f;
+  unsigned int a = std::max(int(major*0.5f), 1);
+
+  float values[9][9];
+  for(int i=0; i<9; i++) {
+      for(int j=0; j<9; j++) {
+          values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
+      }
+  }
+
+  float response = sLaplaceKernelCache.convolve(values,major/minor, angle) / float(a*a);
+
+  return std::abs(response);
 }
 
 inline float laplace( const Mat1d &ii, int x, int y, int s )
@@ -152,10 +161,6 @@ inline float laplace( const Mat1d &ii, int x, int y, int s )
         for(int j=0; j<9; j++) {
             values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
         }
-    }
-
-    if(x == 300 && y == 300) {
-      showBig( 128, 3.0f*sLaplaceKernel.asCvImage() + 0.5f, "laplace" );
     }
 
     float response = sLaplaceKernel.convolve(values) / float(a*a);
@@ -176,9 +181,37 @@ inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
 
     float n = 1.0 / float(a*a);
 
-    float dxx = sDxxKernel.convolve(values) * n;
-    float dyy = sDyyKernel.convolve(values) * n;
-    float dxy = sDxyKernel.convolve(values) * n;
+    float dxx = sDxxKernelCache.convolve(values) * n;
+    float dyy = sDyyKernelCache.convolve(values) * n;
+    float dxy = sDxyKernelCache.convolve(values) * n;
+
+    float trace = dxx+dyy;
+    float det = dxx*dyy - (dxy*dxy);
+
+    if ( det <= 0 )
+    {
+      return std::numeric_limits<float>::max();
+    }
+
+    return trace*trace/det;
+}
+
+inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
+{
+    unsigned int a = std::max(int(major*0.5f), 1);
+
+    float values[9][9];
+    for(int i=0; i<9; i++) {
+        for(int j=0; j<9; j++) {
+            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
+        }
+    }
+
+    float n = 1.0 / float(a*a);
+
+    float dxx = sDxxKernelCache.convolve(values,major/minor, angle) * n;
+    float dyy = sDyyKernelCache.convolve(values,major/minor, angle) * n;
+    float dxy = sDxyKernelCache.convolve(values,major/minor, angle) * n;
 
     float trace = dxx+dyy;
     float det = dxx*dyy - (dxy*dxy);

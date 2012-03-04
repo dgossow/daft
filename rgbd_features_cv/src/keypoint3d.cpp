@@ -90,7 +90,9 @@ std::vector<KeyPoint> makeKeyPoints( vector<KeyPoint3D> kp )
 
   for( std::vector<KeyPoint3D>::iterator it=kp.begin(); it!=kp.end(); ++it )
   {
-    kp_out.push_back( *it );
+    KeyPoint k = *it;
+    k.size = sqrt( it->affine_major * it->affine_minor );
+    kp_out.push_back( k );
   }
   return kp_out;
 }

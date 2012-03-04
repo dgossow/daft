@@ -78,6 +78,40 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
 
   const float f = K(0,0);
 
+  /*
+  cv::Mat1d ii_depth_map( depth_map.rows+1, depth_map.cols+1 );
+  cv::Mat<uint64_t> ii_depth_count( depth_map.rows+1, depth_map.cols+1 );
+
+  for ( int y=0; y<depth_map.rows+1; y++ )
+  {
+    double row_sum = 0;
+    double row_count = 0;
+    for ( int x=0; x<depth_map.cols+1; x++ )
+    {
+      if ( x==0 || y==0 )
+      {
+        ii_depth_map[y][x] = 0;
+        ii_depth_count[y][x] = 0;
+      }
+      else
+      {
+        float depth = depth_map[y-1][x-1];
+        if ( isnan(depth) )
+        {
+          ii_depth_map[y][x] = row_sum + ii_depth_map[y-1][x];
+          ii_depth_count[y][x] = row_sum + ii_depth_map[y-1][x];
+        }
+        else
+        {
+          row_sum += depth;
+          row_count += 1;
+        }
+
+      }
+    }
+  }
+  */
+
 
   // Compute scale map from depth map
 
@@ -171,11 +205,12 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_LAPLACE:
       if ( params_.affine_ )
       {
-        convolveAffine<laplaceAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
+        convolveAffine2<laplaceAffine>( ii, scale_map, depth_map, K, (float)scale, (float)params_.min_px_scale_, (float)max_px_scale, response_map );
       }
       else
       {
     	convolve<laplace>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
+        showBig( 128, 3.0f*sLaplaceKernel.asCvImage() + 0.5f, "laplace" );
       }
       break;
     default:
