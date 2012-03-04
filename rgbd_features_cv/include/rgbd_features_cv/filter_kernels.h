@@ -151,16 +151,7 @@ inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float mi
     float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
     return std::abs(response);
   }
-
-<<<<<<< HEAD
-  float response = sLaplaceKernelCache.convolve(values, minor/major, angle) / float(a*a);
-  //float response = sLaplaceKernelCache.convolve(values, 1, 0) / float(a*a);
-  //float response = sLaplaceKernel.convolve(values) / float(a*a);
-
-  return std::abs(response);
-=======
   return std::numeric_limits<float>::quiet_NaN();
->>>>>>> 94ab3de5908fb6aab26baefcb0987f2fd159abbd
 }
 
 inline float laplace( const Mat1d &ii, int x, int y, int s )
