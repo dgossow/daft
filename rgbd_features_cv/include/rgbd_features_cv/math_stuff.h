@@ -143,8 +143,8 @@ inline bool getAffine(
   Vec2f grad_norm = grad * fastInverseSqrt( grad_len_2 );
 
   // compute the minor axis length
-  minor = 2 * sp * fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
-  major = 2 * sp;
+  minor = 4 * sp * fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
+  major = 4 * sp;
   angle = atan2( grad_norm[0], -grad_norm[1] );
 
   normal.x = grad[0] / sw;

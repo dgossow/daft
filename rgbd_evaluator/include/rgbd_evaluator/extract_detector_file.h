@@ -31,24 +31,27 @@ namespace rgbd_evaluator
 class ExtractDetectorFile
 {
 public:
-  ExtractDetectorFile(std::string file_path);
+  ExtractDetectorFile(std::string file_path, bool reverse_order);
   virtual ~ExtractDetectorFile();
 
 private:
   void readBagFile();
   void extractKeypoints();
-  void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, uint32_t count);
+
+  void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension );
+  void storeKeypoints(std::vector<cv::KeyPoint> keypoints, std::string img_name, std::string extension );
+
   void splitFileName(const std::string& str);
 
   rosbag::Bag bag_;
-  cv::DAFT daft_;
   cv::Matx33f K_;
-  std::vector<cv::KeyPoint3D> keypoints_;
 
   std::string file_path_;
   std::string file_name_;
   std::string file_folder_;
   std::string file_created_folder_;
+
+  bool reverse_order_;
 
   struct ImageData
   {

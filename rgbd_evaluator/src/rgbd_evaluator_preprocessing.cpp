@@ -62,6 +62,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
   // Image topics to load
   std::vector<std::string> topics;
   topics.push_back("rgb_img");
+  topics.push_back("depth_img");
   topics.push_back("center_transform");
   topics.push_back("cam_info");
 
@@ -89,38 +90,40 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       sensor_msgs::Image::ConstPtr p_rgb_img = m.instantiate<sensor_msgs::Image>();
 
       //check if rgb_img message arrived
-      if (p_rgb_img != NULL)
+      if (p_rgb_img != NULL && p_rgb_img->encoding == "bgr8" )
       {
-
-        if ( image_store_.back().image )
+        if ( image_store_.back().rgb_image )
         {
-          std::cout << "There is an image already for the current dataset! Bagfile invalid." << std::endl;
+          std::cout << "There is already an rgb image for the current dataset! Bagfile invalid." << std::endl;
           return;
         }
-
-        std::string fileName;
-
-        // convert integer to string
-        std::stringstream ss;
-        ss << count;
-
-        fileName.append(file_created_folder_);
-        fileName.append("/");
-        fileName.append("img");
-        fileName.append(ss.str());
-        fileName.append(".ppm");
-
-        std::cout << "Writing to "<< fileName << std::endl;
 
         // transform bag image to cvimage
         cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_rgb_img);
 
         // store data in vectorImageData
-        image_store_.back().image = ptr;
+        image_store_.back().rgb_image = ptr;
+      }
 
-        // write data to file
-        cv::imwrite(std::string(fileName),ptr->image );
+      /**********************************************************************************************************************/
 
+      // load depth image
+      sensor_msgs::Image::ConstPtr p_depth_img = m.instantiate<sensor_msgs::Image>();
+
+      //check if depth_img message arrived
+      if (p_depth_img != NULL && p_depth_img->encoding == "32FC1" )
+      {
+        if ( image_store_.back().depth_image )
+        {
+          std::cout << "There is already an depth image for the current dataset! Bagfile invalid." << std::endl;
+          return;
+        }
+
+        // transform bag image to cvimage
+        cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_depth_img);
+
+        // store data in vectorImageData
+        image_store_.back().depth_image = ptr;
       }
 
       /**********************************************************************************************************************/
@@ -166,7 +169,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
 void RgbdEvaluatorPreprocessing::calculateHomography()
 {
-  uint32_t count = 2;
+  uint32_t count = 1;
   bool first_image = true;
 
   std::vector< ImageData >::iterator it;
@@ -181,6 +184,14 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   cv::Mat image_grayscale;
 
   cv::Matx33f homography_complete;
+
+  std::vector<float> scalings;
+  std::vector<float> rotations;
+  std::vector<float> angles;
+
+  float angle_orig;
+  float dist_orig;
+  float rotation_orig;
 
   int it_step;
   std::vector< ImageData >::iterator it_end,it_begin;
@@ -198,16 +209,79 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   }
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
-  for (it = it_begin; it != it_end; it+=it_step)
+  for (it = it_begin; it != it_end; it+=it_step, count++)
   {
+    // write data to file
+    std::string fileName;
+
+    // convert integer to string
+    std::stringstream ss;
+    ss << count;
+    std::string count_str = ss.str();
+
+    fileName.append(file_created_folder_);
+    fileName.append("/");
+    fileName.append("img");
+    fileName.append(count_str);
+
+    std::cout << "Writing to "<< fileName << std::endl;
+
+    cv::imwrite(std::string(fileName+".ppm"), it->rgb_image->image );
+
+#if 0
+    // Convert 8-Bit to Float image
+    cv::Mat1w depth_img;
+    it->depth_image->image.convertTo( depth_img, CV_16U, 1000.0, 0.0 );
+
+    std::ofstream fs( (fileName+"_depth.pgm").c_str() );
+
+    fs << "P2" << std::endl;
+    fs << depth_img.cols << " " << depth_img.rows << std::endl;
+    fs << 65535 << std::endl;
+
+    for ( int y=0; y<depth_img.rows; y++ )
+    {
+      for ( int x=0; x<depth_img.cols; x++ )
+      {
+        fs << depth_img[y][x] << " ";
+      }
+      fs << std::endl;
+    }
+
+    std::ofstream mfs( (fileName+"_pose").c_str() );
+
+    btMatrix3x3 basis = it->approx_transform->getBasis();
+    btVector3 origin = it->approx_transform->getOrigin();
+    for ( int y=0; y<3; y++ )
+    {
+      for ( int x=0; x<3; x++ )
+      {
+        mfs << basis[y][x] << " ";
+      }
+      mfs << std::endl;
+    }
+
+    mfs << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
+#endif
 
     // store first transforms and images
     if(first_image)
     {
       // get original image
       transform_original = *( it->approx_transform.get() );
-      image_original = it->image.get()->image;
+      image_original = it->rgb_image.get()->image;
       first_image = false;
+
+      btVector3 zvec = transform_original.inverse().getBasis() * btVector3(0,0,1);
+      btVector3 xvec = transform_original.inverse().getBasis() * btVector3(1,0,0);
+
+      angle_orig = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
+      dist_orig = transform_original.getOrigin().length();
+      rotation_orig = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
+
+      std::cout << "angle_orig " << angle_orig << std::endl;
+      std::cout << "dist_orig " << dist_orig << std::endl;
+      std::cout << "rotation_orig " << rotation_orig << std::endl;
 
       // convert image to grayscale
       cv::cvtColor( image_original, image_grayscale, CV_RGB2GRAY );
@@ -216,11 +290,10 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       cv::KeyPoint::convert( feature_vector_original, keypoint_vector_original );
 #if 0
-
       cv::drawKeypoints( image_original, keypoint_vector_original, image_original );
 
        //store original corner points
-      cv::imshow("Original Image", image_original);
+      cv::imshow("Keypoints", image_original);
       cv::waitKey(30);
 #endif
       continue;
@@ -233,9 +306,32 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // calculate transform from camera position x to original position
     transform_camx_to_original = transform_original * transform_camx.inverse();
 
+    btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(0,0,1);
+    btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
+
+    float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
+    float dist_abs = transform_camx.getOrigin().length();
+    float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
+
+    std::cout << "angle " << angle_abs << std::endl;
+    std::cout << "dist " << dist_abs << std::endl;
+    std::cout << "rotation " << rotation_abs << std::endl;
+
+    float scaling = dist_orig / dist_abs;
+    float rotation = std::abs( rotation_abs - rotation_orig );
+    float angle = std::abs( angle_abs - angle_orig );
+
+    std::cout << "angle_rel " << angle << std::endl;
+    std::cout << "scaling " << scaling << std::endl;
+    std::cout << "rotation_rel " << rotation << std::endl;
+
+    angles.push_back( angle );
+    rotations.push_back( rotation );
+    scalings.push_back( scaling );
+
     cv::Matx33f homography_init = calculateInitialHomography( transform_camx_to_original, transform_camx );
 
-    cv::Mat image_camx = it->image.get()->image;
+    cv::Mat image_camx = it->rgb_image.get()->image;
     cv::Mat image_warped;
 
     // perspective warping
@@ -246,10 +342,12 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     cv::warpPerspective( image_original, tmp1, cv::Mat(homography_init.inv()), cv::Size(image_original.cols,image_original.rows) );
     cv::warpPerspective( tmp1, image_orig_rewarped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
 
+#if 0
     cv::imshow( "Original Image (Re-Warped)", image_orig_rewarped );
     cv::waitKey(30);
     cv::imshow( "Warped Image", image_warped );
     cv::waitKey(30);
+#endif
 
     /**************************** calculate precise homography **************************************************************/
 
@@ -264,7 +362,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       if((i % 10) == 0)
       {
-        std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
+        //std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
       }
 
       if( calculateNCC( image_warped, image_orig_rewarped, keypoint_vector_original.at(i), keypointNCC) >= 0 )
@@ -317,37 +415,42 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       cv::line( image_original_clone, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
     }
 
+    //cv::imshow("Error Lines", image_original_clone );
+
     /*************************************************************************************************************************/
 
-    cv::Mat image_orig_rewarped_precise;
-
     // store homography
-    writeHomographyToFile( homography_complete, count++ );
+    writeHomographyToFile( homography_complete.inv(), count );
 
 #if 0
+
+    cv::Mat image_orig_rewarped_precise;
     cv::warpPerspective( image_original, tmp1, cv::Mat(homography_complete.inv()), cv::Size(image_original.cols,image_original.rows) );
     cv::warpPerspective( tmp1, image_orig_rewarped_precise, cv::Mat(homography_complete), cv::Size(image_original.cols,image_original.rows) );
-
-
-
-    // show images
-    cv::imshow("Current Image", image_camx);
-    cv::waitKey(30);
-    cv::imshow("Warped Image", image_warped);
-    cv::waitKey(30);
-
-    cv::imshow( "Precise warped Image", image_orig_rewarped_precise );
+    cv::imshow( "image_orig_rewarped_precise", image_orig_rewarped_precise );
 
     cv::Mat diff_img;
     cv::absdiff( image_orig_rewarped_precise, image_warped_precise, diff_img );
-    cv::imshow( "Image Difference", diff_img );
+    cv::imshow( "diff_img", diff_img );
+    cv::waitKey(30);
+#endif
+
+#if 1
+    // show images
+    cv::imshow("Current Image", image_camx);
+    cv::imshow("Precise Warped Image", image_warped_precise);
     cv::waitKey(30);
 
+    cv::imwrite( file_created_folder_ + "/" + "warped" + count_str + ".ppm", image_warped_precise );
+
     std::cout << "Press any key to continue" << std::endl;
-    getchar();
+    //getchar();
 #endif
   }
 
+  writeVectorToFile( rotations, "rotation" );
+  writeVectorToFile( scalings, "scaling" );
+  writeVectorToFile( angles, "viewpoint angle" );
 }
 
 cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_camx)
@@ -390,7 +493,7 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
       ( x_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.cols ||
       ( y_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.rows )
   {
-    std::cout << "nccSlidingWindow: keypoint( " << x_pos << ", " << y_pos << " ) out of range" << std::endl;
+    //std::cout << "nccSlidingWindow: keypoint( " << x_pos << ", " << y_pos << " ) out of range" << std::endl;
     return -1;
   }
 
@@ -405,8 +508,8 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
   cv::Mat templ( image_cam_x, batch );
   cv::Mat searchWin( image_original, searchRect );
 
-  cv::imshow("Batch Image", templ);
-  cv::waitKey(30);
+  //cv::imshow("Batch Image", templ);
+  //cv::waitKey(30);
 
   cv::matchTemplate( searchWin, templ, correlation_img, CV_TM_CCORR_NORMED );
 
@@ -418,9 +521,12 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
 
   keypointNCC = keypoint.pt + cv::Point2f(maxloc.x,maxloc.y) -
       cv::Point2f( (SEARCH_WINDOW_SIZE - SLIDING_WINDOW_SIZE) / 2, (SEARCH_WINDOW_SIZE - SLIDING_WINDOW_SIZE) / 2 );
+
+#if 0
   std::cout << "slidingWindow Matrix( " << correlation_img.rows << ", " << correlation_img.cols << " )" << " ... Channels: " << correlation_img.channels()<< std::endl;
   std::cout << "Minval: " << minval << " Maxval: " << maxval << std::endl;
   std::cout << "MinLoc: " << minloc.x <<  "  " << minloc.y <<  " MaxLoc: " << maxloc.x <<  "  " << maxloc.y  << std::endl;
+#endif
 
   if ( maxval < 0.98 )
   {
@@ -472,6 +578,26 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   file.close();
 }
 
+void RgbdEvaluatorPreprocessing::writeVectorToFile( std::vector<float> vec, std::string filename )
+{
+  uint32_t i,j;
+  std::fstream file;
+
+  // create filepath
+  std::string homographyName;
+  homographyName.append(file_created_folder_);
+  homographyName.append("/");
+  homographyName.append(filename);
+
+  file.open(homographyName.c_str(), std::ios::out);
+
+  for(i=0; i<vec.size(); i++)
+  {
+    file << vec[i] << "\t";
+  }
+
+  file.close();
+}
 void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
 {
   std::cout << std::setprecision( 3 ) << std::right << std::fixed;

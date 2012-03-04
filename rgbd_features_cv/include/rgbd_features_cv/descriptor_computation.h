@@ -257,7 +257,7 @@ inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx3
 
   int s_ceil = std::ceil( s );
 
-  int win_size = std::ceil( kp.size * 0.5 * float(PatchSize) * relative_scale );
+  int win_size = std::ceil( kp.size * 0.25 * float(PatchSize) * relative_scale );
 
   int step_size = std::ceil( kp.affine_minor * relative_scale );
 
@@ -341,13 +341,13 @@ inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx3
   }
 
   float kp_ori = dominantOri( gradients );
-//  kp_ori = 0;
+  kp_ori = 0;
 
   Point2f kp_ori_vec( cos(kp_ori), sin(kp_ori) );
 
   cv::Matx22f kp_ori_rot(
-      kp_ori_vec.y, - kp_ori_vec.x,
-      kp_ori_vec.x,   kp_ori_vec.y );
+      -kp_ori_vec.x,  -kp_ori_vec.y,
+      kp_ori_vec.y, - kp_ori_vec.x );
 
   cv::Mat1f dximg( PatchSize, PatchSize, 0.5f );
   cv::Mat1f dyimg( PatchSize, PatchSize, 0.5f );
@@ -363,9 +363,10 @@ inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx3
     {
       for ( int x = -0; x<=0; x++ )
       {
-        patch( pt3d_rot.y + y, pt3d_rot.x + x ) = pts[p].intensity;// * pts[p].weight;
-        dximg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.x * pts[p].weight );
-        dyimg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.y * pts[p].weight );
+        float w = 1;//pts[p].weight
+        patch( pt3d_rot.y + y, pt3d_rot.x + x ) = pts[p].intensity * w;
+        dximg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.x * w );
+        dyimg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.y * w );
       }
     }
   }

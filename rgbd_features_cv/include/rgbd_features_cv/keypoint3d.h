@@ -8,6 +8,8 @@
 
 #include <opencv2/features2d/features2d.hpp>
 
+#include <iostream>
+
 namespace cv
 {
 
@@ -20,7 +22,10 @@ struct KeyPoint3D: public cv::KeyPoint
       float _angle=-1,
       float _response=0, int _octave=0, int _class_id=-1)
       : KeyPoint( x ,y, _size, _angle, _response, _octave, _class_id),
-        world_size(_world_size), affine_angle(0), affine_major(0), affine_minor(0) {}
+        world_size(_world_size), affine_angle(0), affine_major(_size), affine_minor(_size) {}
+
+  KeyPoint3D( const KeyPoint& kp ): KeyPoint( kp ),
+        world_size(0), affine_angle(0), affine_major(kp.size), affine_minor(kp.size) {}
 
   float world_size; //!< diameter (in meters) of the meaningful keypoint neighborhood
 
@@ -38,6 +43,24 @@ void drawKeypoints3D( const Mat& image, const vector<KeyPoint3D>& keypoints, Mat
 
 // convert 3d-keypoints into regular ones
 vector<KeyPoint> makeKeyPoints( vector<KeyPoint3D> kp );
+
+template<class KeyPointT >
+bool compareResponse( const KeyPointT& kp1, const KeyPointT& kp2 )
+{
+  return kp1.response < kp2.response;
+}
+
+template<class KeyPointT>
+vector<KeyPointT> getStrongest( size_t number, vector<KeyPointT> kp_in )
+{
+  std::sort( kp_in.begin( ), kp_in.end( ), compareResponse<KeyPointT> );
+  if ( kp_in.size() > number )
+  {
+    kp_in.erase( kp_in.begin() + number, kp_in.end() );
+  }
+  //for (unsigned i=0; i<kp_in.size(); i++ ) std::cout << kp_in[i].response << std::endl;
+  return kp_in;
+}
 
 }
 

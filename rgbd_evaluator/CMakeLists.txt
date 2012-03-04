@@ -7,7 +7,7 @@ set (ROS_BUILD_TYPE RelWithDebInfo)
 rosbuild_init ()
 #rosbuild_add_boost_directories ()
 #add_definitions (-Wall -O3 -Winvalid-pch -pipe -funroll-loops -fPIC)
-#rosbuild_check_for_sse ()
+rosbuild_check_for_sse ()
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
@@ -22,24 +22,24 @@ gencfg()
 
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
-rosbuild_add_library (rgbd_evaluator
-src/rgbd_evaluator.cpp
-src/extract_rgbd_features.cpp
-)
+#rosbuild_add_library (rgbd_evaluator
+#src/rgbd_evaluator.cpp
+#src/extract_rgbd_features.cpp
+#)
 
 # Make evaluator nodelet
-rosbuild_add_library (rgbd_evaluator_nodelet 
-src/rgbd_evaluator_nodelet.cpp
-)
-target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
-target_link_libraries(rgbd_evaluator_nodelet rgbd_evaluator)
+#rosbuild_add_library (rgbd_evaluator_nodelet 
+#src/rgbd_evaluator_nodelet.cpp
+#)
+#target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+#target_link_libraries(rgbd_evaluator_nodelet rgbd_evaluator)
 
 # Make evaluator node
-rosbuild_add_executable (rgbd_evaluator_node 
-src/rgbd_evaluator_node.cpp
-)
-target_link_libraries(rgbd_evaluator_node ${OpenCV_LIBS})
-target_link_libraries(rgbd_evaluator_node rgbd_evaluator)
+#rosbuild_add_executable (rgbd_evaluator_node 
+#src/rgbd_evaluator_node.cpp
+#)
+#target_link_libraries(rgbd_evaluator_node ${OpenCV_LIBS})
+#target_link_libraries(rgbd_evaluator_node rgbd_evaluator)
 
 # Make OpenCV test node
 rosbuild_add_executable (test_rgbd_cv
@@ -47,16 +47,16 @@ src/test_rgbd_cv_node.cpp
 )
 target_link_libraries(test_rgbd_cv ${OpenCV_LIBS})
 
-# Make proprocessing app
+# Make preprocessing app
 rosbuild_add_executable (rgbd_preprocessing 
 src/rgbd_evaluator_preprocessing.cpp
 )
-target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
-target_link_libraries(rgbd_preprocessing rgbd_evaluator)
+#target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+#target_link_libraries(rgbd_preprocessing rgbd_evaluator)
 
 # Make extract_detector_file app
 rosbuild_add_executable (extract_detector 
 src/extract_detector_file.cpp
 )
-target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
-target_link_libraries(extract_detector rgbd_evaluator)
+#target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
+#target_link_libraries(extract_detector rgbd_evaluator)

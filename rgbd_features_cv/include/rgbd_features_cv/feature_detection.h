@@ -199,13 +199,14 @@ void filterKpKernel( const cv::Mat1d& ii,
     int x = kp_in[k].pt.x;
     int y = kp_in[k].pt.y;
 
-    double s = kp_in[k].size / 2.0;
+    double s = kp_in[k].size / 4.0;
 
     float t = s - floor(s);
     double response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
 
     if ( response > thresh )
     {
+      kp_in[k].response = response;
       kp.push_back( kp_in[k] );
     }
   }

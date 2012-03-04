@@ -54,6 +54,8 @@ private:
 
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
 
+  void writeVectorToFile( std::vector<float> vec, std::string filename );
+
   void splitFileName (const std::string& str);
 
   std::string file_path_;
@@ -72,20 +74,21 @@ private:
   static const uint32_t BUFF_SIZE = 500;
   static const uint32_t MAX_CORRESPONDENCES_DIST_THRES = 10;
   static const uint32_t MIN_CORRESPONDENCES = 4;
-  static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 25;
-  static const uint32_t MAX_FEATURE_NUMBER = 60;
-  static const uint32_t SLIDING_WINDOW_SIZE = 40;
-  static const uint32_t SEARCH_WINDOW_SIZE = 80;
+  static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 10;
+  static const uint32_t MAX_FEATURE_NUMBER = 200;
+  static const uint32_t SLIDING_WINDOW_SIZE = 20;
+  static const uint32_t SEARCH_WINDOW_SIZE = 100;
 
   struct ImageData
   {
-    boost::shared_ptr<cv_bridge::CvImage> image;
+    boost::shared_ptr<cv_bridge::CvImage> rgb_image;
+    boost::shared_ptr<cv_bridge::CvImage> depth_image;
     boost::shared_ptr<btTransform> approx_transform;
     //...
 
     bool isComplete()
     {
-      return image.get() && approx_transform.get();
+      return rgb_image.get() && approx_transform.get();
     }
   };
 
