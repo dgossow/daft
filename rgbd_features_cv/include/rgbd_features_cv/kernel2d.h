@@ -8,58 +8,51 @@ namespace cv
 inline void showBig( int size, cv::Mat img, std::string name )
 {
   cv::Mat1f img_big;
-  cv::resize( img, img_big, cv::Size(size,size), 0, 0, INTER_NEAREST );
+  if(size > 0) {
+    cv::resize( img, img_big, cv::Size(size,size), 0, 0, INTER_NEAREST );
+  }
+  else {
+    cv::resize( img, img_big, cv::Size(0,0), 4, 4, INTER_NEAREST );
+  }
   cv::imshow( name, img_big );
   cv::waitKey(100);
 }
 
-struct Kernel2D
+namespace detail
 {
-  static inline float Gaussian2(float sigma, float d2) {
+  inline float Gaussian2(float sigma, float d2) {
     return 0.39894228f / sigma * std::exp(-0.5f * d2 / (sigma * sigma));
   }
 
-  float convolve(float values[9][9]) const {
-    float sum = 0.0f;
-    for(int i=0; i<9; i++) {
-      for(int j=0; j<9; j++) {
-        sum += kernel[i][j] * values[i][j];
-      }
-    }
-    return sum;
-  }
-
-  cv::Mat1f asCvImage() const {
-    cv::Mat1f img(9,9);
-    for(int i=0; i<9; i++) {
-      for(int j=0; j<9; j++) {
-        img[i][j] = kernel[i][j];
-      }
-    }
-    return img;
-  }
-
-  float kernel[9][9];
-};
-
-struct LaplaceKernel: public Kernel2D
-{
-  static inline float LoG2(float sigma, float d2) {
+  inline float LoG2(float sigma, float x, float y) {
     float s2 = sigma * sigma;
     float s4 = s2 * s2;
-    float arg = 0.5f * d2 / s2;
+    float arg = 0.5f * (x*x + y*y) / s2;
     return (arg - 1.0f) / (3.1415f * s4) * std::exp(-arg);
   }
 
-  LaplaceKernel() {
-    for(int i=0; i<9; i++) {
-      for(int j=0; j<9; j++) {
-        float d2 = (float(i)-4)*(float(i)-4) + (float(j)-4)*(float(j)-4);
-        kernel[i][j] = LoG2(1.2f, d2);
-      }
-    }
+  inline float DxxKernel(float sigma, float x, float y) {
+    const float sigma2 = sigma*sigma;
+    const float sigma4 = sigma2*sigma2;
+    return Gaussian2(sigma, x*x + y*y) * ( x*x/sigma4 - 1/sigma2 );
   }
 
+  inline float DyyKernel(float sigma, float x, float y) {
+    const float sigma2 = sigma*sigma;
+    const float sigma4 = sigma2*sigma2;
+    return Gaussian2(sigma, x*x + y*y) * ( y*y/sigma4 - 1/sigma2 );
+  }
+
+  inline float DxyKernel(float sigma, float x, float y) {
+    const float sigma2 = sigma*sigma;
+    const float sigma4 = sigma2*sigma2;
+    return Gaussian2(sigma, x*x + y*y) * ( x*y/sigma4 );
+  }
+
+}
+
+struct Kernel2D
+{
   float convolve(float values[9][9]) const {
     float sum = 0.0f;
     for(int i=0; i<9; i++) {
@@ -80,65 +73,148 @@ struct LaplaceKernel: public Kernel2D
     return img;
   }
 
+  template <float (*F)(float,float,float)>
+  void create(float sigma) {
+    for(int i=0; i<9; i++) {
+      float y = float(i-4);
+      for(int j=0; j<9; j++) {
+        float x = float(j-4);
+        kernel[i][j] = F(sigma, x, y);
+      }
+    }
+  }
+
+  template <float (*F)(float,float,float)>
+  void create(const Matx22f& rotation, float ratio, float sigma) {
+    for(int i=0; i<9; i++) {
+      float y = float(i-4);
+      for(int j=0; j<9; j++) {
+        float x = float(j-4);
+        Point2f q = rotation * Point2f(x,y);
+        q.y /= ratio;
+        q = rotation.t() * q;
+        kernel[i][j] = F(sigma, q.x, q.y);
+      }
+    }
+  }
+
+  template <float (*F)(float,float,float)>
+  static Kernel2D Create(float sigma) {
+    Kernel2D q;
+    q.create<F>(sigma);
+    return q;
+  }
+
+  template <float (*F)(float,float,float)>
+  static Kernel2D Create(const Matx22f& rotation, float ratio, float sigma) {
+    Kernel2D q;
+    q.create<F>(rotation, ratio, sigma);
+    return q;
+  }
+
   float kernel[9][9];
 };
 
-static LaplaceKernel sLaplaceKernel;
+static Kernel2D sLaplaceKernel = Kernel2D::Create<detail::LoG2>(1.2f);
+static Kernel2D sDxxKernel = Kernel2D::Create<detail::DxxKernel>(1.2f);
+static Kernel2D sDyyKernel = Kernel2D::Create<detail::DyyKernel>(1.2f);
+static Kernel2D sDxyKernel = Kernel2D::Create<detail::DxyKernel>(1.2f);
 
 
-struct DxxKernel: public Kernel2D
+struct Kernel2DCache
 {
-  DxxKernel() {
-    for(int i=0; i<9; i++) {
-      const int i2 = i-4;
-      for(int j=0; j<9; j++) {
-        const int j2 = j-4;
-        float d2 = (float(i2))*(float(i2)) + (float(j2))*(float(j2));
-        static const float sigma = 1.2f;
-        static const float sigma2 = sigma*sigma;
-        static const float sigma4 = sigma2*sigma2;
-        kernel[i][j] = Gaussian2(1.2f, d2) * ( j2*j2/sigma4 - 1/sigma2 );
+  static const float cRatioMin = 0.0f;
+  static const float cRatioMax = 1.0f;
+  static const int cRatioSteps = 20;
+  static const float cAngleMin = 0.0f;
+  static const float cAngleMax = 3.1415f;
+  static const int cAngleSteps = 30;
+
+  float convolve(float values[9][9], float ratio, float angle) const {
+    int ox, oy;
+    findPos(ratio, angle, ox, oy);
+    return convolve_impl(values, ox, oy);
+  }
+
+  template <float (*F)(float,float,float)>
+  static Kernel2DCache Create(float sigma, const char* name) {
+    Kernel2DCache q;
+    q.create<F>(sigma, name);
+    return q;
+  }
+
+private:
+  template <float (*F)(float,float,float)>
+  void create(float sigma, const char* name) {
+    kernel_cache_ = Mat1f(9*(cAngleSteps+1), 9*(cRatioSteps+1));
+    for(int i=0; i<cAngleSteps+1; i++) {
+      for(int j=0; j<cRatioSteps+1; j++) {
+        float angle = cAngleMin + float(i) / float(cAngleSteps) * (cAngleMax - cAngleMin);
+        float ratio = cRatioMin + float(j) / float(cRatioSteps) * (cRatioMax - cRatioMin);
+        std::cout << angle << " " << ratio << std::endl;
+        float ca = std::cos(angle);
+        float sa = std::sin(angle);
+        Matx22f rotation;
+        rotation(0,0) = ca;
+        rotation(0,1) = sa;
+        rotation(1,0) = -sa;
+        rotation(1,1) = ca;
+        rotation = rotation.t();
+        std::cout << rotation(0,0) << " " << rotation(0,1) << " " << rotation(1,0) << " " << rotation(1,1) << " " << std::endl;
+        Kernel2D k2 = Kernel2D::Create<F>(rotation, ratio, sigma);
+        for(int i2=0; i2<9; i2++) {
+          for(int j2=0; j2<9; j2++) {
+            kernel_cache_[9*i + i2][9*j + j2] = k2.kernel[i2][j2];
+          }
+        }
       }
     }
+    showBig(0, kernel_cache_ + 0.5f, name);
   }
-};
-struct DyyKernel: public Kernel2D
-{
-  DyyKernel() {
+
+  int findRatioPos(float ratio) const {
+    float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps);
+    int pi = static_cast<int>(p + 0.5f); // round
+    if(pi == cRatioSteps + 1) {
+      pi --;
+    }
+    return pi;
+  }
+
+  int findAnglePos(float angle) const {
+    float p = (angle - cAngleMin) / (cAngleMax - cAngleMin) * float(cAngleSteps);
+    int pi = static_cast<int>(p + 0.5f); // round
+    if(pi == cAngleSteps + 1) {
+      pi --;
+    }
+    return pi;
+  }
+
+  void findPos(float ratio, float angle, int& x, int& y) const {
+    x = findRatioPos(ratio);
+    y = findAnglePos(angle);
+  }
+
+  float convolve_impl(float values[9][9], int ox, int oy) const {
+    float sum = 0.0f;
     for(int i=0; i<9; i++) {
-      const int i2 = i-4;
       for(int j=0; j<9; j++) {
-        const int j2 = j-4;
-        float d2 = (float(i2))*(float(i2)) + (float(j2))*(float(j2));
-        static const float sigma = 1.2f;
-        static const float sigma2 = sigma*sigma;
-        static const float sigma4 = sigma2*sigma2;
-        kernel[i][j] = Gaussian2(1.2f, d2) * ( i2*i2/sigma4 - 1/sigma2 );
+        sum += kernel_cache_[oy+i][ox+j] * values[i][j];
       }
     }
+    return sum;
   }
-};
-struct DxyKernel: public Kernel2D
-{
-  DxyKernel() {
-    for(int i=0; i<9; i++) {
-      const int i2 = i-4;
-      for(int j=0; j<9; j++) {
-        const int j2 = j-4;
-        float d2 = (float(i2))*(float(i2)) + (float(j2))*(float(j2));
-        static const float sigma = 1.2f;
-        static const float sigma2 = sigma*sigma;
-        static const float sigma4 = sigma2*sigma2;
-        kernel[i][j] = Gaussian2(1.2f, d2) * ( i2*j2/sigma4 );
-      }
-    }
-  }
+
+private:
+  Mat1f kernel_cache_;
+
 };
 
-static DxxKernel sDxxKernel;
-static DyyKernel sDyyKernel;
-static DxyKernel sDxyKernel;
 
+static Kernel2DCache sLaplaceKernelCache = Kernel2DCache::Create<detail::LoG2>(1.2f, "LoG2");
+static Kernel2DCache sDxxKernelCache = Kernel2DCache::Create<detail::DxxKernel>(1.2f, "DxxKernel");
+static Kernel2DCache sDyyKernelCache = Kernel2DCache::Create<detail::DyyKernel>(1.2f, "DyyKernel");
+static Kernel2DCache sDxyKernelCache = Kernel2DCache::Create<detail::DxyKernel>(1.2f, "DxyKernel");
 
 }
 
