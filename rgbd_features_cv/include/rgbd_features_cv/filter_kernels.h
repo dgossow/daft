@@ -102,7 +102,7 @@ inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
-inline float dogAffine( const Mat1d &ii, const Mat1f &depth_map,
+inline float laplaceAffine( const Mat1d &ii, const Mat1f &depth_map,
     const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
 {
 	return 0.5f;
@@ -188,7 +188,7 @@ struct LaplaceKernel
 
 static LaplaceKernel sLaplaceKernel;
 
-inline float dog( const Mat1d &ii, int x, int y, int s )
+inline float laplace( const Mat1d &ii, int x, int y, int s )
 {
 	unsigned int a = std::max(s / 2, 1);
 

@@ -168,14 +168,14 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
         convolve<dob>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
       }
       break;
-    case DetectorParams::DET_DOG:
+    case DetectorParams::DET_LAPLACE:
       if ( params_.affine_ )
       {
-        convolveAffine<dogAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
+        convolveAffine<laplaceAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
       }
       else
       {
-    	convolve<dog>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
+    	convolve<laplace>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
       }
       break;
     default:
