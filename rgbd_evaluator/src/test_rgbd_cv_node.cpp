@@ -25,6 +25,8 @@ cv_bridge::CvImageConstPtr orig_intensity_image;
 cv_bridge::CvImageConstPtr orig_depth_image;
 cv::Mat depth_image, intensity_image;
 
+//#define TRANSPOSE_IMAGE
+
 void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
           const sensor_msgs::Image::ConstPtr ros_depth_image,
           const sensor_msgs::CameraInfo::ConstPtr ros_camera_info )
@@ -61,10 +63,16 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   //assert( depth_image.cols == intensity_image.cols && depth_image.rows == intensity_image.rows );
 
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
+  camera_matrix(1,2) /= 2;
+
+#ifdef TRANSPOSE_IMAGE
+  cv::Matx33d camera_matrix2 = camera_matrix;
+  camera_matrix(0,2) = camera_matrix2(1,2);
+  camera_matrix(1,2) = camera_matrix2(0,2);
+#endif
 
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
 
-  camera_matrix(1,2) /= 2;
 
   cv::DAFT::DetectorParams p1,p2,p3;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
@@ -112,6 +120,11 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p3.max_search_algo_ = p2.MAX_EVAL;
 
   cv::DAFT rgbd_features1(p1), rgbd_features2(p2), rgbd_features3(p3);
+
+#ifdef TRANSPOSE_IMAGE
+  intensity_image = intensity_image.t();
+  depth_image_filtered2 = depth_image_filtered2.t();
+#endif
 
 #if 0
   // compare speeds
