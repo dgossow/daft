@@ -222,7 +222,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       return;
     }
 
-#if 1
+#if 0
     {
       static int i=0;
       cv::Mat display_image;
@@ -277,7 +277,21 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
   case DetectorParams::PF_NEIGHBOURS:
     filterKpNeighbours( response_map, params_.pf_threshold_, kp );
     break;
-  default:
+  case DetectorParams::PF_PRINC_CURV_RATIO:
+  {
+    float r = params_.pf_threshold_;
+    float r_thresh = (r+1)*(r+1) / r;
+
+    filterKpKernel<princCurvRatio>( ii, r_thresh, kp );
+
+    showBig( 128, 3.0f*sDxxKernel.asCvImage() + 0.5f, "dxx" );
+    showBig( 128, 3.0f*sDyyKernel.asCvImage() + 0.5f, "dyy" );
+    showBig( 128, 3.0f*sDxyKernel.asCvImage() + 0.5f, "dxy" );
+
+    break;
+  }
+
+    default:
     return;
   }
 

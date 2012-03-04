@@ -82,6 +82,15 @@ fprintf(1,'Projecting 1 to 2...');
 fprintf(1,'and 2 to 1...\n');
 [feat2 feat2t scales2]=project_regions(feat2',H);
 
+fprintf(1,'size_x %f %f\n',feat1(1,8), feat1t(1,8));
+fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
+
+%find((feat1t(:,6)<4))
+
+%ind_small=find(feat1(:,6)<12)
+%feat1(ind_small,6:7)
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if common_part==1
 fprintf(1,'Removing features from outside of the common image part...\n');
@@ -93,7 +102,10 @@ im1x=im1x(2);
 im2x=size(im2);
 im2y=im2x(1);
 im2x=im2x(2);
+
 ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+%ind=find( (feat2t(:,7)>12) & (feat2t(:,7)>12) & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
 ind=find((feat1t(:,1)+feat1t(:,8))<im2x & (feat1t(:,1)-feat1t(:,8))>0 & (feat1t(:,2)+feat1t(:,9))<im2y & (feat1t(:,2)-feat1t(:,9))>0);
@@ -212,7 +224,7 @@ featp(c1,2)=l1_2(2);
 BMB=inv(Aff*inv(Mi1)*Aff');
 [v1 e1]=eig(BMB);
 featp(c1,6)=(1/sqrt(e1(1)));
-featp(c1,7)=(1/sqrt(e1(4))); 
+featp(c1,7)=(1/sqrt(e1(4)));
 featp(c1,3:5)=[BMB(1) BMB(2) BMB(4)];
 %bounding box in image 2
 featp(c1,8) = sqrt(featp(c1,5)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));

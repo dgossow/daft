@@ -81,13 +81,20 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.det_type_ = p1.DET_LAPLACE;
   p1.affine_ = false;
   p1.max_px_scale_ = 1000;
-  p1.pf_type_ = p1.PF_NONE;
   p1.max_search_algo_ = p1.MAX_WINDOW_AFFINE;
+
+  p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
+  p1.pf_threshold_ = 10;
+
   //p1.pf_threshold_ = 0.001;
   //p1.max_search_algo_ = p1.MAX_FAST;
 
+  //p1.max_search_algo_ = p1.MAX_FAST;
+
   p2 = p1;
-  p2.max_search_algo_ = p1.MAX_WINDOW;
+  p2.pf_type_ = p1.PF_NONE;
+  //p2.max_search_algo_ = p1.MAX_WINDOW;
+  //p2.det_type_ = p2.DET_DOB;
 
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;

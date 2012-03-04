@@ -191,7 +191,7 @@ void convolveAffine( const cv::Mat1d &ii,
   }
 }
 
-template <double (*F)(const Mat1d&, int, int, int)>
+template <float (*F)(const Mat1d&, int, int, int)>
 void filterKpKernel( const cv::Mat1d& ii,
     double thresh,
     std::vector< KeyPoint3D >& kp )
@@ -209,9 +209,9 @@ void filterKpKernel( const cv::Mat1d& ii,
     double s = kp_in[k].size / 4.0;
 
     float t = s - floor(s);
-    double response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
+    float response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
 
-    if ( response > thresh )
+    if ( response < thresh )
     {
       kp_in[k].response = response;
       kp.push_back( kp_in[k] );

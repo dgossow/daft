@@ -36,7 +36,10 @@ public:
 
 private:
   void readBagFile();
+
   void extractKeypoints();
+
+  void extractDaftKeypoints( cv::DAFT::DetectorParams p, std::string name );
 
   void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension );
   void storeKeypoints(std::vector<cv::KeyPoint> keypoints, std::string img_name, std::string extension );
