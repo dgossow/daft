@@ -170,8 +170,8 @@ struct Kernel2DCache
   static const int cAngleSteps = 30;
 
   float convolve(float values[9][9], float ratio, float angle) const {
-    int ox, oy;
-    findPos(ratio, angle, ox, oy);
+    int ox = findRatioPos(ratio);
+    int oy = findAnglePos(angle);
     return convolve_impl(values, ox, oy);
   }
 
@@ -190,7 +190,7 @@ private:
       for(int j=0; j<cRatioSteps+1; j++) {
         float angle = cAngleMin + float(i) / float(cAngleSteps) * (cAngleMax - cAngleMin);
         float ratio = cRatioMin + float(j) / float(cRatioSteps) * (cRatioMax - cRatioMin);
-        std::cout << angle << " " << ratio << std::endl;
+//        std::cout << angle << " " << ratio << std::endl;
         float ca = std::cos(angle);
         float sa = std::sin(angle);
         Matx22f rotation;
@@ -199,7 +199,7 @@ private:
         rotation(1,0) = -sa;
         rotation(1,1) = ca;
         rotation = rotation.t();
-        std::cout << rotation(0,0) << " " << rotation(0,1) << " " << rotation(1,0) << " " << rotation(1,1) << " " << std::endl;
+//        std::cout << rotation(0,0) << " " << rotation(0,1) << " " << rotation(1,0) << " " << rotation(1,1) << " " << std::endl;
         Kernel2D k2 = Kernel2D::Create<F,AxisAligned,Samples>(rotation, ratio, sigma);
         for(int i2=0; i2<9; i2++) {
           for(int j2=0; j2<9; j2++) {
@@ -212,7 +212,7 @@ private:
   }
 
   int findRatioPos(float ratio) const {
-    float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps);
+    float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps + 1);
     int pi = static_cast<int>(p + 0.5f); // round
     if(pi < 0) {
       p = 0;
@@ -227,7 +227,7 @@ private:
     while(angle < 0.0f) angle += M_2_PI;
     while(angle > M_2_PI) angle -= M_2_PI;
     if(angle > M_PI) angle -= M_PI;
-    float p = (angle - cAngleMin) / (cAngleMax - cAngleMin) * float(cAngleSteps);
+    float p = (angle - cAngleMin) / (cAngleMax - cAngleMin) * float(cAngleSteps + 1);
     int pi = static_cast<int>(p + 0.5f); // round
     if(pi == cAngleSteps + 1) {
       pi --;
@@ -235,16 +235,11 @@ private:
     return pi;
   }
 
-  void findPos(float ratio, float angle, int& x, int& y) const {
-    x = findRatioPos(ratio);
-    y = findAnglePos(angle);
-  }
-
   float convolve_impl(float values[9][9], int ox, int oy) const {
     float sum = 0.0f;
     for(int i=0; i<9; i++) {
       for(int j=0; j<9; j++) {
-        sum += kernel_cache_[oy+i][ox+j] * values[i][j];
+        sum += kernel_cache_[9*oy+i][9*ox+j] * values[i][j];
       }
     }
     return sum;
