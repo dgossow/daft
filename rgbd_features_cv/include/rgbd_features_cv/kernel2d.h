@@ -175,9 +175,9 @@ static Kernel2D sDxyKernel = Kernel2D::Create<detail::DxyKernel,1>(1.2f);
 
 struct Kernel2DCache
 {
-  static const float cRatioMin = 0.05f;
+  static const float cRatioMin = 0.25f;
   static const float cRatioMax = 1.0f;
-  static const int cRatioSteps = 19;
+  static const int cRatioSteps = 20;
   static const float cAngleMin = 0.0f;
   static const float cAngleMax = 3.1415f;
   static const int cAngleSteps = 30;
@@ -222,14 +222,14 @@ private:
         }
       }
     }
-    showBig(0, kernel_cache_ + 0.5f, name);
+//    showBig(0, kernel_cache_ + 0.5f, name);
   }
 
   int findRatioPos(float ratio) const {
     float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps + 1);
     int pi = static_cast<int>(p + 0.5f); // round
     if(pi < 0) {
-      p = 0;
+      pi = 0;
     }
     if(pi >= cRatioSteps + 1) {
       pi = cRatioSteps;
