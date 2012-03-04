@@ -147,7 +147,7 @@ inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float mi
       }
   }
 
-  float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
+  float response = sLaplaceKernelCache.convolve(values, minor/major, angle) / float(a*a);
   //float response = sLaplaceKernelCache.convolve(values, 1, 0) / float(a*a);
   //float response = sLaplaceKernel.convolve(values) / float(a*a);
 
