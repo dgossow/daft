@@ -83,11 +83,11 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.max_px_scale_ = 1000;
   p1.max_search_algo_ = p1.MAX_WINDOW_AFFINE;
 
-  p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
+  p1.pf_type_ = p1.PF_NONE;//PF_PRINC_CURV_RATIO;
   p1.pf_threshold_ = 10;
 
   p2 = p1;
-  p1.affine_ = true;
+  p2.affine_ = true;
 
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;

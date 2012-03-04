@@ -147,7 +147,9 @@ inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float mi
       }
   }
 
-  float response = sLaplaceKernelCache.convolve(values,major/minor, angle) / float(a*a);
+  //float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
+  //float response = sLaplaceKernelCache.convolve(values,1, 0) / float(a*a);
+  float response = sLaplaceKernel.convolve(values) / float(a*a);
 
   return std::abs(response);
 }
@@ -209,9 +211,9 @@ inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, f
 
     float n = 1.0 / float(a*a);
 
-    float dxx = sDxxKernelCache.convolve(values,major/minor, angle) * n;
-    float dyy = sDyyKernelCache.convolve(values,major/minor, angle) * n;
-    float dxy = sDxyKernelCache.convolve(values,major/minor, angle) * n;
+    float dxx = sDxxKernelCache.convolve(values,minor/major, angle) * n;
+    float dyy = sDyyKernelCache.convolve(values,minor/major, angle) * n;
+    float dxy = sDxyKernelCache.convolve(values,minor/major, angle) * n;
 
     float trace = dxx+dyy;
     float det = dxx*dyy - (dxy*dxy);

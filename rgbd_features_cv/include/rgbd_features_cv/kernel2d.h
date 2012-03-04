@@ -208,7 +208,7 @@ private:
         }
       }
     }
-    showBig(0, kernel_cache_ + 0.5f, name);
+    //showBig(0, kernel_cache_ + 0.5f, name);
   }
 
   int findRatioPos(float ratio) const {
