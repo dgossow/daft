@@ -316,13 +316,18 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
   {
     float r = params_.pf_threshold_;
     float r_thresh = (r+1)*(r+1) / r;
+    if ( params_.affine_ )
+    {
+      filterKpKernelAffine<princCurvRatioAffine>( ii, r_thresh, kp );
+    }
+    else
+    {
+      filterKpKernel<princCurvRatio>( ii, r_thresh, kp );
 
-    filterKpKernel<princCurvRatio>( ii, r_thresh, kp );
-
-    showBig( 128, 3.0f*sDxxKernel.asCvImage() + 0.5f, "dxx" );
-    showBig( 128, 3.0f*sDyyKernel.asCvImage() + 0.5f, "dyy" );
-    showBig( 128, 3.0f*sDxyKernel.asCvImage() + 0.5f, "dxy" );
-
+      showBig( 128, 3.0f*sDxxKernel.asCvImage() + 0.5f, "dxx" );
+      showBig( 128, 3.0f*sDyyKernel.asCvImage() + 0.5f, "dyy" );
+      showBig( 128, 3.0f*sDxyKernel.asCvImage() + 0.5f, "dxy" );
+    }
     break;
   }
 

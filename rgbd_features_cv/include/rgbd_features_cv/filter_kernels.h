@@ -181,9 +181,9 @@ inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
 
     float n = 1.0 / float(a*a);
 
-    float dxx = sDxxKernelCache.convolve(values) * n;
-    float dyy = sDyyKernelCache.convolve(values) * n;
-    float dxy = sDxyKernelCache.convolve(values) * n;
+    float dxx = sDxxKernel.convolve(values) * n;
+    float dyy = sDyyKernel.convolve(values) * n;
+    float dxy = sDxyKernel.convolve(values) * n;
 
     float trace = dxx+dyy;
     float det = dxx*dyy - (dxy*dxy);
