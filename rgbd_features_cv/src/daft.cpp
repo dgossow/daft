@@ -47,10 +47,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
   }
 
   // Convert 8-Bit to Float image
-  Mat gray_image = gray_image_orig;
-  if ( gray_image.type() != CV_64F )
+  cv::Mat1d gray_image;
+  if ( gray_image_orig.type() != CV_64F )
   {
     gray_image_orig.convertTo( gray_image, CV_64F, 1.0/255.0, 0.0 );
+  }
+  else {
+	  gray_image = gray_image_orig;
   }
 
   // Convert depth map to floating point
@@ -158,13 +161,21 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_DOB:
       if ( params_.affine_ )
       {
-        convolveAffine<dobAffine>( ii, scale_map, depth_map, K,
-            scale, params_.min_px_scale_, max_px_scale, response_map );
+        convolveAffine<dobAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
       }
       else
       {
-        convolve<dob>( ii, scale_map, scale*0.886,
-            params_.min_px_scale_, max_px_scale, response_map );
+        convolve<dob>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
+      }
+      break;
+    case DetectorParams::DET_DOG:
+      if ( params_.affine_ )
+      {
+        convolveAffine<dogAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
+      }
+      else
+      {
+    	convolve<dog>( ii, scale_map, scale*0.886, params_.min_px_scale_, max_px_scale, response_map );
       }
       break;
     default:
@@ -208,7 +219,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       return;
     }
 
-#if 0
+#if 1
     {
       static int i=0;
       cv::Mat display_image;

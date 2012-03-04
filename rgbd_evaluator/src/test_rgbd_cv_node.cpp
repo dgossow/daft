@@ -74,16 +74,20 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   //p1.scale_step_ = 2.0;
   //p1.det_threshold_ = 0;
-  //p1.base_scale_ = 0.05;
-  //p1.scale_levels_ = 1;
+
+  p1.base_scale_ = 0.025;
+  p1.scale_levels_ = 1;
+
+  p1.det_type_ = p1.DET_DOG;
   p1.affine_ = false;
-  //p1.max_px_scale_ = 1000;
-  //p1.scale_levels_ = 1;
-  p1.pf_type_ = p1.PF_HARRIS;
-  p1.pf_threshold_ = 0.001;
+  p1.max_px_scale_ = 1000;
+  p1.pf_type_ = p1.PF_NONE;
+  //p1.pf_threshold_ = 0.001;
   //p1.max_search_algo_ = p1.MAX_FAST;
 
   p2 = p1;
+  p2.det_type_ = p2.DET_DOB;
+
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;
   p2.det_threshold_ = 0.1;
@@ -139,7 +143,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
 #else
   rgbd_features1.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints1);
-  //rgbd_features2.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints2);
+  rgbd_features2.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints2);
 #endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
@@ -152,7 +156,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image1, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
 //  cv::drawKeypoints3D( intensity_image, keypoints1, intensity_image2, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-  //cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( intensity_image, keypoints2, intensity_image2, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
   std::ostringstream s;
   s << p1.det_type_;
@@ -169,9 +173,10 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   s.str("");
   s << p2.det_type_;
-  //cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
+  cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
 #endif
 
+#if 0
   cv::SURF surf;
   std::vector< cv::KeyPoint > surf_kp;
   cv::Mat mask;
@@ -184,7 +189,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::drawKeypoints3D( intensity_image, keypoints1, surf_img, cv::Scalar(0,255,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
   cv::drawKeypoints(surf_img, surf_kp, surf_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
   cv::imshow("SURF Keypoints", surf_img);
-
+#endif
   cv::waitKey(10);
 }
 

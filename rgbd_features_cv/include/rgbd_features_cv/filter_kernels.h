@@ -3,8 +3,10 @@
 */
 
 #include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 
 #include <iostream>
+#include <opencv2/highgui/highgui.hpp>
 
 #include "math_stuff.h"
 
@@ -100,6 +102,12 @@ inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
+inline float dogAffine( const Mat1d &ii, const Mat1f &depth_map,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+{
+	return 0.5f;
+}
+
 /* Compute simple Laplacian (Difference Of Boxes)
  * Kernel size: 4s x 4s
  * Value range: 0..1
@@ -131,6 +139,76 @@ inline float dob( const Mat1d &ii, int x, int y, int s )
   }
 
   return std::numeric_limits<float>::quiet_NaN();
+}
+
+struct LaplaceKernel
+{
+	static inline float Gaussian2(float sigma, float d2) {
+		return 0.39894228f / sigma * std::exp(-0.5f * d2 / (sigma * sigma));
+	}
+
+	static inline float LoG2(float sigma, float d2) {
+		float s2 = sigma * sigma;
+		float s4 = s2 * s2;
+		float arg = 0.5f * d2 / s2;
+		return (arg - 1.0f) / (3.1415f * s4) * std::exp(-arg);
+	}
+
+	LaplaceKernel() {
+		for(int i=0; i<9; i++) {
+			for(int j=0; j<9; j++) {
+				float d2 = (float(i)-4)*(float(i)-4) + (float(j)-4)*(float(j)-4);
+				kernel[i][j] = LoG2(1.2f, d2);
+			}
+		}
+	}
+
+	float convolve(float values[9][9]) const {
+		float sum = 0.0f;
+		for(int i=0; i<9; i++) {
+			for(int j=0; j<9; j++) {
+				sum += kernel[i][j] * values[i][j];
+			}
+		}
+		return sum;
+	}
+
+	cv::Mat1f asCvImage() const {
+		cv::Mat1f img(9,9);
+		for(int i=0; i<9; i++) {
+			for(int j=0; j<9; j++) {
+				img[i][j] = kernel[i][j];
+			}
+		}
+		return img;
+	}
+
+	float kernel[9][9];
+};
+
+static LaplaceKernel sLaplaceKernel;
+
+inline float dog( const Mat1d &ii, int x, int y, int s )
+{
+	unsigned int a = std::max(s / 2, 1);
+
+	float values[9][9];
+	for(int i=0; i<9; i++) {
+		for(int j=0; j<9; j++) {
+			values[i][j] = integrate(ii, x + a*j, x + a*(j+1), y + a*i, y + a*(i+1));
+		}
+	}
+
+	if(x == 300 && y == 300) {
+		cv::Mat1f kernel_big;
+		cv::resize( 3.0f*sLaplaceKernel.asCvImage() + 0.5f, kernel_big, cv::Size(128,128), 0, 0, INTER_NEAREST );
+		cv::imshow( "kernel", kernel_big );
+		cv::waitKey(100);
+	}
+
+	float response = sLaplaceKernel.convolve(values);
+
+	return std::abs(response);
 }
 
 /*

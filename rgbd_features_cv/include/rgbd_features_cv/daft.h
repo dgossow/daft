@@ -22,7 +22,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0 };
+    enum { DET_DOB=0, DET_DOG=1 };
     enum { PF_NONE=0, PF_HARRIS=1, PF_NEIGHBOURS=2 };
     enum { MAX_WINDOW=0, MAX_FAST=1, MAX_EVAL=3 };
     enum { AUTO=-1 };
@@ -51,7 +51,7 @@ public:
         int postfilter_type = DEFAULT_PF_TYPE,
         float pf_threshold = DEFAULT_PF_THRESHOLD,
         int max_search_algo = DEFAULT_MAX_ALGO,
-        bool affine = DEFAULT_AFFINE ):
+        bool affine = DEFAULT_AFFINE):
           base_scale_(base_scale),
           scale_step_(scale_factor),
           scale_levels_(scale_levels),
