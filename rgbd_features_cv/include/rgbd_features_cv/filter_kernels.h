@@ -30,7 +30,7 @@ inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
     // depth gradient between (x+sp) and (x-sp)
     Vec2f grad;
 
-    if ( !computeGradient( depth_map, x, y, sp, sw, grad ) )
+    if ( !computeGradient( depth_map, x, y, 2.0f*sp, grad ) ) // compute gradient on whole window (inner and outer)
       return std::numeric_limits<float>::quiet_NaN();
 
     Point2f major_axis( -grad[1], grad[0] );

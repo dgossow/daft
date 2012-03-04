@@ -231,7 +231,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
         KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
-        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size / 2, kp[k].world_size/2,
+        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
             kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
             kp[k].normal );
         kp2.push_back(kp_curr);
@@ -287,7 +287,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     int kp_y = kp[k].pt.y;
     getPt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
 
-    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size * 0.25, kp[k].world_size/2,
+    getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
         kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
         kp[k].normal );
   }

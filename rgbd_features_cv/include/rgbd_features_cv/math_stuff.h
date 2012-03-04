@@ -75,16 +75,17 @@ inline float fastInverseLen( const Point3f& p )
   return fastInverseSqrt( p.x*p.x + p.y*p.y + p.z*p.z );
 }
 
-// compute depth gradient
-inline bool computeGradient( const Mat1f &depth_map,
-    int x, int y, float sp, float sw, Vec2f& grad )
+// compute depth gradient as meter per pixel
+inline bool computeGradient(
+    const Mat1f &depth_map,
+    int x, int y, float sp, Vec2f& grad )
 {
   // get depth values from image
   float d_center = depth_map(y,x);
-  float d_xp = depth_map(y,x+sp*2);
-  float d_yp = depth_map(y+sp*2,x);
-  float d_xn = depth_map(y,x-sp*2);
-  float d_yn = depth_map(y-sp*2,x);
+  float d_xp = depth_map(y,x+sp);
+  float d_yp = depth_map(y+sp,x);
+  float d_xn = depth_map(y,x-sp);
+  float d_yn = depth_map(y-sp,x);
 
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
@@ -94,15 +95,17 @@ inline bool computeGradient( const Mat1f &depth_map,
   float dxx = d_xp - 2*d_center + d_xn;
   float dyy = d_yp - 2*d_center + d_yn;
 
+  const float cMaxCurvature = 2.0f;
   // test for local planarity
-  if ( dxx*dxx + dyy*dyy > sw*sw*10 )
+  // TODO note: this does not check for the case of a saddle
+  if ( std::abs(dxx + dyy) > 2.0f*cMaxCurvature )
   {
     return false;
   }
 
 // depth gradient between (x+sp) and (x-sp)
-  grad[0] = (d_xp - d_xn)*0.25;
-  grad[1] = (d_yp - d_yn)*0.25;
+  grad[0] = (d_xp - d_xn)*0.5;
+  grad[1] = (d_yp - d_yn)*0.5;
   return true;
 }
 
@@ -120,8 +123,8 @@ inline bool getAffine(
   // the depth gradient
   Vec2f grad;
 
-  if ( !checkBounds( ii, x, y, sp*2 )  ||
-       !computeGradient( depth_map, x, y, sp, sw, grad ) )
+  if ( !checkBounds( ii, x, y, sp )  ||
+       !computeGradient( depth_map, x, y, sp, grad ) )
   {
     major = minor = sp;
     angle = 0;
@@ -139,18 +142,19 @@ inline bool getAffine(
   // gradient, normalized to length=1
 
   // len(grad)^2
-  float grad_len_2 = grad[0]*grad[0]+grad[1]*grad[1];
+  float grad_len_2 = grad[0]*grad[0] + grad[1]*grad[1];
   Vec2f grad_norm = grad * fastInverseSqrt( grad_len_2 );
 
   // compute the minor axis length
-  minor = 4 * sp * fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
-  major = 4 * sp;
-  angle = atan2( grad_norm[0], -grad_norm[1] );
+  float normal_length_inv = fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
+  minor = sp * normal_length_inv;
+  major = sp;
+  angle = std::atan2( grad_norm[0], -grad_norm[1] );
 
   normal.x = grad[0] / sw;
   normal.y = grad[1] / sw;
   normal.z = -1.0f;
-  normal = normal * (1.0 / cv::norm( normal ));
+  normal = normal * normal_length_inv;
 
   return true;
 }
