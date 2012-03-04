@@ -73,13 +73,26 @@ struct Kernel2D
     return img;
   }
 
-  template <float (*F)(float,float,float)>
+  template <float (*F)(float,float,float), int Samples>
   void create(float sigma) {
     for(int i=0; i<9; i++) {
       float y = float(i-4);
       for(int j=0; j<9; j++) {
         float x = float(j-4);
-        kernel[i][j] = F(sigma, x, y);
+        float v;
+        if(Samples > 0) {
+          v = 0.0f;
+          for(int i=-Samples; i<=+Samples; i++) {
+            for(int j=-Samples; j<=+Samples; j++) {
+              v += F(sigma, x + float(j)*float(Samples)/float(2*Samples+1) , y + float(i)*float(Samples)/float(2*Samples+1));
+            }
+          }
+          v /= float((2*Samples + 1)*(2*Samples + 1));
+        }
+        else {
+          v = F(sigma, x, y);
+        }
+        kernel[i][j] = v;
       }
     }
   }
@@ -137,10 +150,10 @@ struct Kernel2D
 //    }
   }
 
-  template <float (*F)(float,float,float)>
+  template <float (*F)(float,float,float), int Samples>
   static Kernel2D Create(float sigma) {
     Kernel2D q;
-    q.create<F>(sigma);
+    q.create<F,Samples>(sigma);
     return q;
   }
 
@@ -154,10 +167,10 @@ struct Kernel2D
   float kernel[9][9];
 };
 
-static Kernel2D sLaplaceKernel = Kernel2D::Create<detail::LoG2>(1.2f);
-static Kernel2D sDxxKernel = Kernel2D::Create<detail::DxxKernel>(1.2f);
-static Kernel2D sDyyKernel = Kernel2D::Create<detail::DyyKernel>(1.2f);
-static Kernel2D sDxyKernel = Kernel2D::Create<detail::DxyKernel>(1.2f);
+static Kernel2D sLaplaceKernel = Kernel2D::Create<detail::LoG2,1>(1.2f);
+static Kernel2D sDxxKernel = Kernel2D::Create<detail::DxxKernel,1>(1.2f);
+static Kernel2D sDyyKernel = Kernel2D::Create<detail::DyyKernel,1>(1.2f);
+static Kernel2D sDxyKernel = Kernel2D::Create<detail::DxyKernel,1>(1.2f);
 
 
 struct Kernel2DCache
@@ -201,6 +214,7 @@ private:
         rotation = rotation.t();
 //        std::cout << rotation(0,0) << " " << rotation(0,1) << " " << rotation(1,0) << " " << rotation(1,1) << " " << std::endl;
         Kernel2D k2 = Kernel2D::Create<F,AxisAligned,Samples>(rotation, ratio, sigma);
+//        Kernel2D k2 = Kernel2D::Create<F,Samples>(sigma);
         for(int i2=0; i2<9; i2++) {
           for(int j2=0; j2<9; j2++) {
             kernel_cache_[9*i + i2][9*j + j2] = k2.kernel[i2][j2];
@@ -208,7 +222,7 @@ private:
         }
       }
     }
-    //showBig(0, kernel_cache_ + 0.5f, name);
+    showBig(0, kernel_cache_ + 0.5f, name);
   }
 
   int findRatioPos(float ratio) const {
