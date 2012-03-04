@@ -139,25 +139,27 @@ inline float dob( const Mat1d &ii, int x, int y, int s )
 inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
   unsigned int a = std::max(int(major*0.5f), 1);
+  if ( checkBounds( ii, x, y, 5*a ) )
+  {
+    float values[9][9];
+    for(int i=0; i<9; i++) {
+        for(int j=0; j<9; j++) {
+            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
+        }
+    }
 
-  float values[9][9];
-  for(int i=0; i<9; i++) {
-      for(int j=0; j<9; j++) {
-          values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
-      }
+    float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
+    return std::abs(response);
   }
 
-  float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
-  //float response = sLaplaceKernelCache.convolve(values, 1, 0) / float(a*a);
-  //float response = sLaplaceKernel.convolve(values) / float(a*a);
-
-  return std::abs(response);
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 inline float laplace( const Mat1d &ii, int x, int y, int s )
 {
-    unsigned int a = std::max(s / 2, 1);
-
+  unsigned int a = std::max(int(s*0.5f), 1);
+  if ( checkBounds( ii, x, y, 5*a ) )
+  {
     float values[9][9];
     for(int i=0; i<9; i++) {
         for(int j=0; j<9; j++) {
@@ -168,10 +170,17 @@ inline float laplace( const Mat1d &ii, int x, int y, int s )
     float response = sLaplaceKernel.convolve(values) / float(a*a);
 
     return std::abs(response);
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
 {
+  unsigned int a = std::max(int(s*0.5f), 1);
+
+  if ( checkBounds( ii, x, y, 5*a ) )
+  {
     unsigned int a = std::max(s / 2, 1);
 
     float values[9][9];
@@ -196,11 +205,17 @@ inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
     }
 
     return trace*trace/det;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-    unsigned int a = std::max(int(major*0.5f), 1);
+  unsigned int a = std::max(int(major*0.5f), 1);
+
+  if ( checkBounds( ii, x, y, 5*a ) )
+  {
 
     float values[9][9];
     for(int i=0; i<9; i++) {
@@ -224,6 +239,9 @@ inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, f
     }
 
     return trace*trace/det;
+    }
+
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 /*

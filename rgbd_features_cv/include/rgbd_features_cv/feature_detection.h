@@ -211,7 +211,7 @@ void convolveAffine2( const cv::Mat1d &ii,
     cv::Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
-  float nan = std::numeric_limits<float>::quiet_NaN();
+  static const float nan = std::numeric_limits<float>::quiet_NaN();
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
