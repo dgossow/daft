@@ -231,6 +231,7 @@ void convolveAffine2( const cv::Mat1d &ii,
       // break if gradient can not be computed
       // or minor axis too small
       if(!ok || minor < min_px_scale) {
+        img_out(y,x) = nan;
         continue;
       }
 

@@ -213,15 +213,12 @@ private:
 
   int findRatioPos(float ratio) const {
     float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps);
-    if(p < 0.0f) {
-      p = 0.0f;
-    }
-    if(p > 1.0f) {
-      p = 1.0f;
-    }
     int pi = static_cast<int>(p + 0.5f); // round
-    if(pi == cRatioSteps + 1) {
-      pi --;
+    if(pi < 0) {
+      p = 0;
+    }
+    if(pi >= cRatioSteps + 1) {
+      pi = cRatioSteps;
     }
     return pi;
   }
