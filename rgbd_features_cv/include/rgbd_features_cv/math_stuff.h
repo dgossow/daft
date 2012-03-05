@@ -90,6 +90,42 @@ inline float meanDepth(const Mat1d &ii_depth_map,
   return integrate( ii_depth_map, x-sp_int, x+sp_int, y-sp_int, y+sp_int ) / nump;
 }
 
+template<typename K>
+inline float LocalFiniteDifferencesKinect(K v0, K v1, K v2, K v3, K v4)
+{
+  if(isnan(v0) && isnan(v4) && !isnan(v1) && !isnan(v3)) {
+    return float(v3 - v1);
+  }
+
+  bool left_invalid = (isnan(v0) || isnan(v1));
+  bool right_invalid = (isnan(v3) || isnan(v4));
+  if(left_invalid && right_invalid) {
+    return 0.0f;
+  }
+  else if(left_invalid) {
+    return float(v4 - v2);
+  }
+  else if(right_invalid) {
+    return float(v2 - v0);
+  }
+  else {
+    float a = static_cast<float>(std::abs(v2 + v0 - static_cast<K>(2)*v1));
+    float b = static_cast<float>(std::abs(v4 + v2 - static_cast<K>(2)*v3));
+    float p, q;
+    if(a + b == 0.0f) {
+      p = q = 0.5f;
+    }
+    else {
+      p = a / (a + b);
+      q = b / (a + b);
+    }
+    return q * static_cast<float>(v2 - v0) + p * static_cast<float>(v4 - v2);
+  }
+}
+
+/** compute depth gradient
+ * @param sp step width in projected pixel
+ */
 inline bool computeGradient(
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     int x, int y, float sp, Vec2f& grad
@@ -165,15 +201,13 @@ inline bool getAffine(
 
   // gradient, normalized to length=1
 
-  // len(grad)^2
-  float grad_len_2 = grad[0]*grad[0] + grad[1]*grad[1];
-  Vec2f grad_norm = grad * fastInverseSqrt( grad_len_2 );
-
   // compute the minor axis length
-  float normal_length_inv = fastInverseSqrt( grad_len_2 / (sw*sw) + 1.0f );
+  float normal_length_inv = fastInverseSqrt( (grad[0]*grad[0] + grad[1]*grad[1]) / (sw*sw) + 1.0f );
   minor = sp * normal_length_inv;
+  // major axis is easy
   major = sp;
-  angle = std::atan2( grad_norm[0], -grad_norm[1] );
+  // compute angle
+  angle = std::atan2( grad[0], -grad[1] );
 
   normal.x = grad[0] / sw;
   normal.y = grad[1] / sw;
