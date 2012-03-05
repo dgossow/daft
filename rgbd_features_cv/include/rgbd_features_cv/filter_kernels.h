@@ -183,40 +183,36 @@ inline float dob( const Mat1d &ii, int x, int y, int s )
 
 inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-  unsigned int a = std::max(int(major*0.5f), 1);
-  if ( checkBounds( ii, x, y, 5*a ) )
-  {
-    float values[9][9];
-    for(int i=0; i<9; i++) {
-        for(int j=0; j<9; j++) {
-            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
-        }
-    }
-
-    float response = sLaplaceKernelCache.convolve(values,minor/major, angle) / float(a*a);
-    return std::abs(response);
+  // 4.5 cells together have the size of major (=scale)
+  int a = std::max(int(major/2.25f), 1);
+  // check for boundary effects
+  if ( !checkBounds( ii, x, y, 5*a ) ) {
+    return std::numeric_limits<float>::quiet_NaN();
   }
-  return std::numeric_limits<float>::quiet_NaN();
+  // read mean intensities for 9x9 grid
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+  // convolve with ansisotrope laplace filter
+  float response = sLaplaceKernelCache.convolve(values, minor/major, angle);
+  // return normalized absolute response
+  return std::abs(response) / float(a*a);
 }
 
 inline float laplace( const Mat1d &ii, int x, int y, int s )
 {
-  unsigned int a = std::max(int(s*0.5f), 1);
-  if ( checkBounds( ii, x, y, 5*a ) )
-  {
-    float values[9][9];
-    for(int i=0; i<9; i++) {
-        for(int j=0; j<9; j++) {
-            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
-        }
-    }
-
-    float response = sLaplaceKernel.convolve(values) / float(a*a);
-
-    return std::abs(response);
+  // 4.5 cells together have the size of major (=scale)
+  int a = std::max(int(s/2.25f), 1);
+  // check for boundary effects
+  if ( checkBounds( ii, x, y, 5*a ) ) {
+    return std::numeric_limits<float>::quiet_NaN();
   }
-
-  return std::numeric_limits<float>::quiet_NaN();
+  // read mean intensities for 9x9 grid
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+  // convolve with isotrope laplace filter
+  float response = sLaplaceKernel.convolve(values);
+  // return normalized absolute response
+  return std::abs(response) / float(a*a);
 }
 
 inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )

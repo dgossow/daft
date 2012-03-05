@@ -21,7 +21,35 @@ inline float integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, 
   assert( start_y>=0 );
   assert( end_y>start_y );
   assert( end_y<ii.rows );
-  return ii(end_y,end_x) + ii(start_y,start_x) - ii(end_y,start_x) - ii(start_y,end_x);
+  return ii(start_y,start_x) + ii(end_y,end_x) - ii(end_y,start_x) - ii(start_y,end_x);
+}
+
+/** Gets integration value of boxes in a grid */
+template<typename T, int N>
+inline void integrateGridCentered( const Mat_<T> &ii, int start_x, int start_y, int step, float* values) {
+  const int M = N/2; // 9 -> 4
+//  for(int i=0; i<N; i++) {
+//    for(int j=0; j<N; j++) {
+//      int x = start_x + step*(j-M);
+//      int y = start_y + step*(i-M);
+//      values[i*N + j] = integrate(ii, x, x + step, y, y + step);
+//    }
+//  }
+  // look up values in integral image
+  float lookup[N+1][N+1];
+  for(int i=0; i<N+1; i++) {
+    for(int j=0; j<N+1; j++) {
+      int x = start_x + step*(j-M);
+      int y = start_y + step*(i-M);
+      lookup[i][j] = ii(y, x);
+    }
+  }
+  // compute cell integrals
+  for(int i=0; i<N; i++) {
+    for(int j=0; j<N; j++) {
+      values[i*N + j] = lookup[i][j] + lookup[i+1][j+1] - lookup[i+1][j] - lookup[i][j+1];
+    }
+  }
 }
 
 // compute the area of the given rect
