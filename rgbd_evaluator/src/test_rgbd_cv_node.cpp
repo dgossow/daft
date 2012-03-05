@@ -91,11 +91,15 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.max_px_scale_ = 1000;
   p1.max_search_algo_ = p1.MAX_WINDOW;
 
-  p1.pf_type_ = p1.PF_NONE;//PF_PRINC_CURV_RATIO;
+  p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
   p1.pf_threshold_ = 10;
 
   p2 = p1;
+<<<<<<< HEAD
   p2.affine_ = false;
+=======
+  p2.pf_type_ = p1.PF_NONE;
+>>>>>>> d60dc3fdc81e8d83024c9e8e9b0af5bbb0628610
 
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;
@@ -174,7 +178,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   std::ostringstream s;
   s << p1.det_type_;
-  //cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
+  cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
 
   static int f=0;
   s.str("");
@@ -187,7 +191,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   s.str("");
   s << p2.det_type_;
-  //cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
+  cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
 #endif
 
 #if 0

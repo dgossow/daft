@@ -35,8 +35,8 @@ public:
     static const int DEFAULT_MAX_PX_SCALE = AUTO;
     static const int DEFAULT_DET = DET_DOB;
     static const float DEFAULT_DET_THRESHOLD = 0.02;
-    static const int DEFAULT_PF_TYPE = PF_HARRIS;
-    static const float DEFAULT_PF_THRESHOLD = 0.0;
+    static const int DEFAULT_PF_TYPE = PF_PRINC_CURV_RATIO;
+    static const float DEFAULT_PF_THRESHOLD = 10.0;
     static const int DEFAULT_MAX_ALGO = MAX_FAST;
     static const bool DEFAULT_AFFINE = true;
 

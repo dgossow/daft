@@ -4,6 +4,7 @@ include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (ROS_BUILD_TYPE RelWithDebInfo)
 #set (ROS_BUILD_TYPE Debug)
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
 rosbuild_init ()
 rosbuild_add_boost_directories ()
@@ -18,7 +19,6 @@ include_directories (${PROJECT_SOURCE_DIR}/include/rgbd_features_cv/)
 find_package(OpenCV REQUIRED)
 include_directories (${OpenCV_INCLUDE_DIR})
 
-#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
 # Make shared library
 rosbuild_add_library (rgbd_features_cv
