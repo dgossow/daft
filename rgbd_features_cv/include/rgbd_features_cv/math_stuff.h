@@ -10,10 +10,18 @@
 namespace cv
 {
 
+/** Interpolates linerarly between v1 and v2 given a percentage t */
+template<typename T>
+inline T interpolateLinear(T t, T v1, T v2)
+{
+  return (static_cast<T>(1) - t) * v1 + t * v2;
+}
+
+
 // Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
 // using the given integral image
 template<typename T>
-inline float integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, int end_y )
+inline T integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, int end_y )
 {
   assert( start_x>=0 );
   assert( end_x>start_x );
@@ -27,7 +35,6 @@ inline float integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, 
 /** Gets integration value of NxN cells of size step x step in a grid starting with point (start_x,start_y)*/
 template<typename T, int N>
 inline void integrateGridCentered( const Mat_<T> &ii, int start_x, int start_y, int step, float* values) {
-  const int M = N/2; // 9 -> 4
 //  for(int i=0; i<N; i++) {
 //    for(int j=0; j<N; j++) {
 //      int x = start_x + step*(j-M);
@@ -39,8 +46,8 @@ inline void integrateGridCentered( const Mat_<T> &ii, int start_x, int start_y, 
   float lookup[N+1][N+1];
   for(int i=0; i<N+1; i++) {
     for(int j=0; j<N+1; j++) {
-      int x = start_x + step*(j-M);
-      int y = start_y + step*(i-M);
+      int x = start_x + step*j - (step*N)/2;
+      int y = start_y + step*i - (step*N)/2;
       lookup[i][j] = ii(y, x);
     }
   }
