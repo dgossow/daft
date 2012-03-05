@@ -142,13 +142,14 @@ inline float dobAffine( const Mat1d &ii,
     float area2 = sx2*sy2*8;
 
     float val_norm = val / (area1+area2);
-    return std::abs(val_norm);
+    return std::abs(val_norm) * 0.73469f; // normalize to same value as the laplace filter
   }
 
   return std::numeric_limits<float>::quiet_NaN();
 }
 
 /* Compute simple Laplacian (Difference Of Boxes)
+ * integer as parameter
  * Kernel size: 4s x 4s
  * Value range: 0..1
  * Kernel (s=1):
@@ -161,135 +162,169 @@ inline float dobAffine( const Mat1d &ii,
  *  2    0 -1 -1 -1 -1  0
  *  3    0  0  0  0  0  0
 */
-inline float dob( const Mat1d &ii, int x, int y, int s )
+inline float dobImpl( const Mat1d &ii, int x, int y, unsigned int s )
 {
   //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
-  if ( checkBounds( ii, x, y, 2*s ) )
+  if (!checkBounds( ii, x, y, 2*s ) )
   {
-    float val = 4 * integrate ( ii, x - s,  x + s, y - s, y + s )
-                   - integrate ( ii, x - 2*s, x + 2*s, y - 2*s, y + 2*s );
-
-    float val_norm = val / float(12.0*s*s);
-    return std::abs(val_norm);
-    /*
-    if ( val_norm < 0.0 )
-      return std::abs(val_norm);
-    return 0;
-    */
+    return std::numeric_limits<float>::quiet_NaN();
   }
+  float val = 4 * integrate ( ii, x - s,  x + s, y - s, y + s )
+                 - integrate ( ii, x - 2*s, x + 2*s, y - 2*s, y + 2*s );
 
-  return std::numeric_limits<float>::quiet_NaN();
+  float val_norm = val / float(12*s*s);
+  return std::abs(val_norm);
 }
 
-inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
+/** float as parameter and interpolates */
+inline float dob( const Mat1d &ii, int x, int y, float s ) {
+  s *= 0.886f; // sqrt(pi)/2 to get a box which is a bit inside the circle
+  int si = int(s);
+  float t = s - float(si);
+  float v1 = dobImpl(ii, x, y, si);
+  float v2 = dobImpl(ii, x, y, si + 1);
+  return interpolateLinear(t, v1, v2) * 0.73469f; // normalize to same value as the laplace filter
+}
+
+/** integer as parameter */
+inline float laplaceAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )
 {
-  // 4.5 cells together have the size of major (=scale)
-  int a = std::max(int(major/2.25f), 1);
   // check for boundary effects
   if ( !checkBounds( ii, x, y, 6*a ) ) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   // read mean intensities for 9x9 grid
   float values[9][9];
-  integrateGridCentered<double,9>(ii, x - a/2, y - a/2, a, (float*)values);
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
   // convolve with ansisotrope laplace filter
-  float response = sLaplaceKernelCache.convolve(values, minor/major, angle);
+  float response = sLaplaceKernelCache.convolve(values, ratio, angle);
   // return normalized absolute response
   return std::abs(response) / float(a*a);
 }
 
-inline float laplace( const Mat1d &ii, int x, int y, int s )
+/** float as parameter and interpolates */
+inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-  // 4.5 cells together have the size of major (=scale)
-  int a = std::max(int(s/2.25f), 1);
+  float a = 0.5893f * major;
+  int ai = int(a);
+  float t = a - float(ai);
+  float ratio = minor / major;
+  float v1 = laplaceAffineImpl(ii, x, y, ai, ratio, angle);
+  float v2 = laplaceAffineImpl(ii, x, y, ai + 1, ratio, angle);
+  return interpolateLinear(t, v1, v2);
+}
+
+/** integer as parameter */
+inline float laplaceImpl( const Mat1d &ii, int x, int y, int a )
+{
   // check for boundary effects
   if ( !checkBounds( ii, x, y, 6*a ) ) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   // read mean intensities for 9x9 grid
   float values[9][9];
-  integrateGridCentered<double,9>(ii, x - a/2, y - a/2, a, (float*)values);
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
   // convolve with isotrope laplace filter
   float response = sLaplaceKernel.convolve(values);
   // return normalized absolute response
   return std::abs(response) / float(a*a);
 }
 
-inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
+/** float as parameter and interpolates */
+inline float laplace( const Mat1d &ii, int x, int y, float s )
 {
-  unsigned int a = std::max(int(s*0.5f), 1);
-
-  if ( checkBounds( ii, x, y, 5*a ) )
-  {
-    unsigned int a = std::max(s / 2, 1);
-
-    float values[9][9];
-    for(int i=0; i<9; i++) {
-        for(int j=0; j<9; j++) {
-            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
-        }
-    }
-
-    float n = 1.0 / float(a*a);
-
-    if ( x==300 && y==300 )
-    {
-      cv::Mat1f m1( 9,9, (float*)values[0] );
-      std::ostringstream s;
-      s << "s= " << s;
-      showBig( 128, m1*n, s.str() );
-    }
-
-    float dxx = sDxxKernel.convolve(values) * n;
-    float dyy = sDyyKernel.convolve(values) * n;
-    float dxy = sDxyKernel.convolve(values) * n;
-
-    float trace = dxx+dyy;
-    float det = dxx*dyy - (dxy*dxy);
-
-    if ( det <= 0 )
-    {
-      return std::numeric_limits<float>::max();
-    }
-
-    return trace*trace/det;
-  }
-
-  return std::numeric_limits<float>::quiet_NaN();
+  float a = 0.5893f * s;
+  int ai = int(a);
+  float t = a - float(ai);
+  float v1 = laplaceImpl(ii, x, y, ai);
+  float v2 = laplaceImpl(ii, x, y, ai + 1);
+  return interpolateLinear(t, v1, v2);
 }
 
+/** integer as parameter */
+inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )
+{
+  if (!checkBounds( ii, x, y, 6*a ) )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+
+//  if ( x==300 && y==300 )
+//  {
+//    cv::Mat1f m1( 9,9, (float*)values[0] );
+//    std::ostringstream s;
+//    s << "s= " << s;
+//    float n = 1.0 / float(a*a);
+//    showBig( 128, m1*n, s.str() );
+//  }
+
+  float dxx = sDxxKernel.convolve(values);
+  float dyy = sDyyKernel.convolve(values);
+  float dxy = sDxyKernel.convolve(values);
+
+  float trace = dxx + dyy;
+  float det = dxx*dyy - (dxy*dxy);
+
+  if ( det <= 0 )
+  {
+    return std::numeric_limits<float>::max();
+  }
+
+  return trace*trace/det;
+
+}
+
+/** float as parameter and interpolates */
+inline float princCurvRatio( const Mat1d &ii, int x, int y, float s )
+{
+  float a = 0.5893f * s;
+  int ai = int(a);
+  float t = a - float(ai);
+  float v1 = princCurvRatioImpl(ii, x, y, ai);
+  float v2 = princCurvRatioImpl(ii, x, y, ai + 1);
+  return interpolateLinear(t, v1, v2);
+}
+
+/** integer as parameter */
+inline float princCurvRatioAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )
+{
+  if (!checkBounds( ii, x, y, 6*a ) )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+
+  float dxx = sDxxKernelCache.convolve(values, ratio, angle);
+  float dyy = sDyyKernelCache.convolve(values, ratio, angle);
+  float dxy = sDxyKernelCache.convolve(values, ratio, angle);
+
+  float trace = dxx + dyy;
+  float det = dxx*dyy - (dxy*dxy);
+
+  if ( det <= 0 )
+  {
+    return std::numeric_limits<float>::max();
+  }
+
+  return trace*trace/det;
+
+}
+
+/** float as parameter and interpolates */
 inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-  unsigned int a = std::max(int(major*0.5f), 1);
-
-  if ( checkBounds( ii, x, y, 5*a ) )
-  {
-
-    float values[9][9];
-    for(int i=0; i<9; i++) {
-        for(int j=0; j<9; j++) {
-            values[i][j] = integrate(ii, x + a*(j-4), x + a*(j-3), y + a*(i-4), y + a*(i-3));
-        }
-    }
-
-    float n = 1.0 / float(a*a);
-
-    float dxx = sDxxKernelCache.convolve(values,minor/major, angle) * n;
-    float dyy = sDyyKernelCache.convolve(values,minor/major, angle) * n;
-    float dxy = sDxyKernelCache.convolve(values,minor/major, angle) * n;
-
-    float trace = dxx+dyy;
-    float det = dxx*dyy - (dxy*dxy);
-
-    if ( det <= 0 )
-    {
-      return std::numeric_limits<float>::max();
-    }
-
-    return trace*trace/det;
-    }
-
-  return std::numeric_limits<float>::quiet_NaN();
+  float a = 0.5893f * major;
+  int ai = int(a);
+  float t = a - float(ai);
+  float ratio = minor / major;
+  float v1 = princCurvRatioAffineImpl(ii, x, y, ai, ratio, angle);
+  float v2 = princCurvRatioAffineImpl(ii, x, y, ai + 1, ratio, angle);
+  return interpolateLinear(t, v1, v2);
 }
 
 /*
@@ -327,8 +362,10 @@ inline float iiDy( const Mat1d &ii, int x, int y, int s )
 /* Compute Harris corner measure h(x,y)
  * Value range: 0..1
 */
-inline float harris( const Mat1d &ii, int x, int y, int s )
+inline float harris( const Mat1d &ii, int x, int y, float s_real )
 {
+  int s = s_real;
+  // FIXME interpolate!!!
   if ( checkBounds( ii, x, y, 4*s ) )
   {
     double sum_dxdx=0;

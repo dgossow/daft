@@ -131,17 +131,8 @@ inline float interpolateKernel( const cv::Mat1d &ii,
   float t = s - s_floor;
   return (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
 }
-template <float (*F)(const Mat1d &ii, int x, int y, float major, float minor, float angle)>
-inline float interpolateKernelAffine( const cv::Mat1d &ii,
-    int x, int y, float major, float minor, float angle )
-{
-  int s_floor = major;
-  float t = major - s_floor;
-  return (1.0-t) * F( ii, x, y, s_floor, minor, angle ) + t * F( ii, x, y, s_floor+1, minor, angle );
-}
 
-
-template <float (*F)(const Mat1d&, int, int, int)>
+template <float (*F)(const Mat1d&, int, int, float)>
 void convolve( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
     float base_scale,
@@ -156,19 +147,14 @@ void convolve( const cv::Mat1d &ii,
     for ( int x = 0; x < ii.cols-1; ++x )
     {
       float s = scale_map[y][x] * base_scale;
+
       if ( s < min_px_scale || s > max_px_scale )
       {
         img_out(y,x) = nan;
         continue;
       }
 
-      // compute filter response with linear interpolation
-      img_out(y,x) = interpolateKernel<F>( ii, x, y, s );
-
-      /*
-      int s_round = int ( s + 0.5f );
-      img_out(y,x) = F( ii, x, y, s_round );
-      */
+      img_out(y,x) = F( ii, x, y, s );
     }
   }
 }
@@ -239,14 +225,13 @@ void convolveAffine2( const cv::Mat1d &ii,
         continue;
       }
 
-      img_out(y,x) = interpolateKernelAffine<F>( ii, x, y, major, minor, angle );
-      //img_out(y,x) = F( ii, x, y, major, minor, angle );
+      img_out(y,x) = F( ii, x, y, major, minor, angle );
     }
   }
 }
 
 
-template <float (*F)(const Mat1d&, int, int, int)>
+template <float (*F)(const Mat1d&, int, int, float)>
 void filterKpKernel( const cv::Mat1d& ii,
     double thresh,
     std::vector< KeyPoint3D >& kp )
@@ -258,13 +243,9 @@ void filterKpKernel( const cv::Mat1d& ii,
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
-    int x = kp_in[k].pt.x;
-    int y = kp_in[k].pt.y;
-
-    double s = kp_in[k].size / 4.0;
-
-    float t = s - floor(s);
-    float response = (1.0-t) * F( ii, x, y, int(s) ) + t * F( ii, x, y, int(s)+1 );
+    float response = F( ii,
+        kp_in[k].pt.x, kp_in[k].pt.y,
+        kp_in[k].size / 4.0f);
 
     if ( response < thresh )
     {
@@ -286,13 +267,9 @@ void filterKpKernelAffine( const cv::Mat1d& ii,
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
-    int x = kp_in[k].pt.x;
-    int y = kp_in[k].pt.y;
-
-    double major = kp_in[k].affine_major / 4.0;
-    double minor = kp_in[k].affine_minor / 4.0;
-
-    float response = interpolateKernelAffine<F>( ii, x, y, major, minor, kp_in[k].affine_angle );
+    float response = F( ii,
+        kp_in[k].pt.x, kp_in[k].pt.y,
+        kp_in[k].affine_major / 4.0, kp_in[k].affine_minor / 4.0, kp_in[k].affine_angle );
 
     if ( response < thresh )
     {
