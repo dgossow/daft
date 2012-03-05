@@ -195,7 +195,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_DOB:
       if ( params_.affine_ )
       {
-        //convolveAffine<dobAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
+        convolveAffine<dobAffine>( ii, scale_map, ii_depth_map, ii_depth_count, K, scale, params_.min_px_scale_, max_px_scale, response_map );
       }
       else
       {
