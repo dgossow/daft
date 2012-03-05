@@ -55,10 +55,10 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   //orig_depth_image->image
 
-  cv::Mat1f depth_image_filtered1,depth_image_filtered2;
-  improveDepthMap<30>( depth_image, depth_image_filtered1, 0.2f );
+  cv::Mat1f depth_image_closed,depth_image_smoothed;
+  improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
 
-  cv::GaussianBlur( depth_image_filtered1, depth_image_filtered2, cv::Size(), 2, 2 );
+  cv::GaussianBlur( depth_image_closed, depth_image_smoothed, cv::Size(), 2, 2 );
 
   //assert( depth_image.cols == intensity_image.cols && depth_image.rows == intensity_image.rows );
 
@@ -123,7 +123,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
 #ifdef TRANSPOSE_IMAGE
   intensity_image = intensity_image.t();
-  depth_image_filtered2 = depth_image_filtered2.t();
+  depth_image_smoothed = depth_image_smoothed.t();
 #endif
 
 #if 0
@@ -156,8 +156,8 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   }
 
 #else
-  rgbd_features1.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints1);
-  rgbd_features2.detect( intensity_image, depth_image_filtered2, camera_matrix, keypoints2);
+  rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
+  rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
 #endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
@@ -174,7 +174,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   std::ostringstream s;
   s << p1.det_type_;
-  cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
+  //cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
 
   static int f=0;
   s.str("");
@@ -187,7 +187,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   s.str("");
   s << p2.det_type_;
-  cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
+  //cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
 #endif
 
 #if 0

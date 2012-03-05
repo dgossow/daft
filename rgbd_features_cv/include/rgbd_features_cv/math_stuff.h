@@ -12,7 +12,8 @@ namespace cv
 
 // Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
 // using the given integral image
-inline float integrate( const Mat1d &ii, int start_x, int end_x, int start_y, int end_y )
+template<typename T>
+inline float integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, int end_y )
 {
   assert( start_x>=0 );
   assert( end_x>start_x );
@@ -30,7 +31,8 @@ inline double area(int start_x, int end_x, int start_y, int end_y)
 }
 
 // return false if the square at (x,y) with size s*2 intersect the image border
-inline bool checkBounds ( Mat1d ii, int x, int y, int s )
+template<typename T>
+inline bool checkBounds ( const Mat_<T> &ii, int x, int y, int s )
 {
   return ( (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
 }
@@ -75,19 +77,41 @@ inline float fastInverseLen( const Point3f& p )
   return fastInverseSqrt( p.x*p.x + p.y*p.y + p.z*p.z );
 }
 
-/** compute depth gradient
- * @param sp step width in projected pixel
- */
+
+inline float meanDepth(const Mat1d &ii_depth_map,
+    const cv::Mat_<uint64_t>& ii_depth_count,
+    int x, int y, int sp_int )
+{
+  float nump = float(integrate( ii_depth_count, x-sp_int, x+sp_int, y-sp_int, y+sp_int ));
+  if ( nump == 0 )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+  return integrate( ii_depth_map, x-sp_int, x+sp_int, y-sp_int, y+sp_int ) / nump;
+}
+
 inline bool computeGradient(
-    const Mat1f &depth_map,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     int x, int y, float sp, Vec2f& grad
 ) {
+  int sp_int = int(sp+0.5f);
+
+  if ( sp < 3 )
+  {
+    sp = 3;
+  }
+
+  if ( !checkBounds( ii_depth_count, x, y, sp_int*2 ) )
+  {
+    return false;
+  }
+
   // get depth values from image
-  float d_center = depth_map(y,x);
-  float d_xp = depth_map(y,x+sp);
-  float d_yp = depth_map(y+sp,x);
-  float d_xn = depth_map(y,x-sp);
-  float d_yn = depth_map(y-sp,x);
+  float d_center = meanDepth( ii_depth_map, ii_depth_count, x, y, sp_int);
+  float d_xp = meanDepth( ii_depth_map, ii_depth_count, x+sp_int, y, sp_int);
+  float d_yp = meanDepth( ii_depth_map, ii_depth_count, x, y+sp_int, sp_int);
+  float d_xn = meanDepth( ii_depth_map, ii_depth_count, x-sp_int, y, sp_int);
+  float d_yn = meanDepth( ii_depth_map, ii_depth_count, x, y-sp_int, sp_int);
 
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
@@ -106,17 +130,15 @@ inline bool computeGradient(
   }
 
 // depth gradient between (x+sp) and (x-sp)
-  grad[0] = (d_xp - d_xn)*0.5;
-  grad[1] = (d_yp - d_yn)*0.5;
+  grad[0] = (d_xp - d_xn)*0.5*sp/float(sp_int);
+  grad[1] = (d_yp - d_yn)*0.5*sp/float(sp_int);
   return true;
 }
-
 
 // sp : pixel scale
 // sw : world scale
 inline bool getAffine(
-    const Mat1d &ii,
-    const Mat1f &depth_map,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     int x, int y,
     float sp, float sw,
     float &angle, float &major, float &minor,
@@ -125,8 +147,8 @@ inline bool getAffine(
   // the depth gradient
   Vec2f grad;
 
-  if ( !checkBounds( ii, x, y, sp )  ||
-       !computeGradient( depth_map, x, y, sp, grad ) )
+  if ( !checkBounds( ii_depth_map, x, y, sp )  ||
+       !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
   {
     major = minor = sp;
     angle = 0;

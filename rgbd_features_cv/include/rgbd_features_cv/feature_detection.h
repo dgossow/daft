@@ -80,7 +80,8 @@ void findMaxima( const cv::Mat1d &img,
 
 void findMaximaAffine(
     const cv::Mat1d &img,  const cv::Mat1d &scale_map,
-    const cv::Mat1d &ii,  const cv::Mat1f &depth_map,
+    const Mat1d &ii_depth_map,
+    cv::Mat_<uint64_t> ii_depth_count,
     double base_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp );
@@ -172,10 +173,12 @@ void convolve( const cv::Mat1d &ii,
   }
 }
 
-template <float (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+template <float (*F)( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )>
 void convolveAffine( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
-    const cv::Mat1f &depth_map,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     const cv::Matx33f& camera_matrix,
     float base_scale,
     float min_px_scale,
@@ -195,7 +198,7 @@ void convolveAffine( const cv::Mat1d &ii,
         continue;
       }
 
-      img_out(y,x) = F( ii, depth_map, camera_matrix, x, y, s, base_scale );
+      img_out(y,x) = F( ii, ii_depth_map, ii_depth_count, camera_matrix, x, y, s, base_scale );
     }
   }
 }
@@ -203,7 +206,8 @@ void convolveAffine( const cv::Mat1d &ii,
 template <float (*F)(const Mat1d &ii, int x, int y, float major, float minor, float angle)>
 void convolveAffine2( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
-    const cv::Mat1f &depth_map,
+    const Mat1d &ii_depth_map,
+    cv::Mat_<uint64_t> ii_depth_count,
     const cv::Matx33f& camera_matrix,
     float base_scale,
     float min_px_scale,
@@ -225,7 +229,7 @@ void convolveAffine2( const cv::Mat1d &ii,
 
       float angle, major, minor;
       Point3f normal;
-      bool ok = getAffine(ii, depth_map,
+      bool ok = getAffine(ii_depth_map, ii_depth_count,
           x, y, s, base_scale,
           angle, major, minor, normal);
       // break if gradient can not be computed

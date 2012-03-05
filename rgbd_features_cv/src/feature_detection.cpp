@@ -87,7 +87,8 @@ void findMaxima( const cv::Mat1d &img,
 
 void findMaximaAffine(
     const cv::Mat1d &img,  const cv::Mat1d &scale_map,
-    const cv::Mat1d &ii,  const cv::Mat1f &depth_map,
+    const Mat1d &ii_depth_map,
+    cv::Mat_<uint64_t> ii_depth_count,
     double base_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp )
@@ -126,7 +127,7 @@ void findMaximaAffine(
       // compute ellipse parameters
       float angle, major, minor;
       Point3f normal;
-      bool ok = getAffine(ii, depth_map,
+      bool ok = getAffine(ii_depth_map, ii_depth_count,
           x, y, s, base_scale,
           angle, major, minor, normal);
       // break if gradient can not be computed

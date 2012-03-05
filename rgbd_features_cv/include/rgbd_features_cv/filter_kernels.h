@@ -17,9 +17,8 @@
 namespace cv
 {
 
-/* Compute approximate affine Laplacian using a difference of rectangular integrals
-*/
-inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
+inline float gradX( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
 {
   // sp : pixel scale
@@ -31,7 +30,53 @@ inline float dobAffine( const Mat1d &ii, const Mat1f &depth_map,
     // depth gradient between (x+sp) and (x-sp)
     Vec2f grad;
 
-    if ( !computeGradient( depth_map, x, y, 2.0f*sp, grad ) ) // compute gradient on whole window (inner and outer)
+    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
+      return std::numeric_limits<float>::quiet_NaN();
+
+    return grad[0] / sw;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+inline float gradY( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+{
+  // sp : pixel scale
+  // sw : world scale
+
+  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
+  if ( checkBounds( ii, x, y, 3*sp ) )
+  {
+    // depth gradient between (x+sp) and (x-sp)
+    Vec2f grad;
+
+    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
+      return std::numeric_limits<float>::quiet_NaN();
+
+    return grad[1] / sw;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+/* Compute approximate affine Laplacian using a difference of rectangular integrals
+*/
+inline float dobAffine( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+{
+  // sp : pixel scale
+  // sw : world scale
+
+  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
+  if ( checkBounds( ii, x, y, 3*sp ) )
+  {
+    // depth gradient between (x+sp) and (x-sp)
+    Vec2f grad;
+
+    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
       return std::numeric_limits<float>::quiet_NaN();
 
     Point2f major_axis( -grad[1], grad[0] );
@@ -190,6 +235,14 @@ inline float princCurvRatio( const Mat1d &ii, int x, int y, int s )
     }
 
     float n = 1.0 / float(a*a);
+
+    if ( x==300 && y==300 )
+    {
+      cv::Mat1f m1( 9,9, (float*)values[0] );
+      std::ostringstream s;
+      s << "s= " << s;
+      showBig( 128, m1*n, s.str() );
+    }
 
     float dxx = sDxxKernel.convolve(values) * n;
     float dyy = sDyyKernel.convolve(values) * n;

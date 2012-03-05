@@ -17,6 +17,45 @@
 //   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+/** compute depth gradient
+ * @param sp step width in projected pixel
+ */
+inline bool computeGradient(
+    const Mat1f &depth_map,
+    int x, int y, float sp, Vec2f& grad
+) {
+  // get depth values from image
+  float d_center = depth_map(y,x);
+  float d_xp = depth_map(y,x+sp);
+  float d_yp = depth_map(y+sp,x);
+  float d_xn = depth_map(y,x-sp);
+  float d_yn = depth_map(y-sp,x);
+
+  if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
+  {
+    grad[0]=0;
+    grad[1]=0;
+    return false;
+  }
+
+  float dxx = d_xp - 2*d_center + d_xn;
+  float dyy = d_yp - 2*d_center + d_yn;
+
+  const float cMaxCurvature = 2.0f;
+  // test for local planarity
+  // TODO note: this does not check for the case of a saddle
+  if ( std::abs(dxx + dyy) > 2.0f*cMaxCurvature )
+  {
+    grad[0]=0;
+    grad[1]=0;
+    return false;
+  }
+
+// depth gradient between (x+sp) and (x-sp)
+  grad[0] = (d_xp - d_xn)*0.5;
+  grad[1] = (d_yp - d_yn)*0.5;
+  return true;
+}
 
 
 // compute depth gradient

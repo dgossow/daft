@@ -78,9 +78,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
 
   const float f = K(0,0);
 
-  /*
   cv::Mat1d ii_depth_map( depth_map.rows+1, depth_map.cols+1 );
-  cv::Mat<uint64_t> ii_depth_count( depth_map.rows+1, depth_map.cols+1 );
+  cv::Mat_<uint64_t> ii_depth_count( depth_map.rows+1, depth_map.cols+1 );
 
   for ( int y=0; y<depth_map.rows+1; y++ )
   {
@@ -96,25 +95,18 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       else
       {
         float depth = depth_map[y-1][x-1];
-        if ( isnan(depth) )
-        {
-          ii_depth_map[y][x] = row_sum + ii_depth_map[y-1][x];
-          ii_depth_count[y][x] = row_sum + ii_depth_map[y-1][x];
-        }
-        else
+        if ( !isnan(depth) )
         {
           row_sum += depth;
           row_count += 1;
         }
-
+        ii_depth_map[y][x] = row_sum + ii_depth_map[y-1][x];
+        ii_depth_count[y][x] = row_count + ii_depth_count[y-1][x];
       }
     }
   }
-  */
-
 
   // Compute scale map from depth map
-
   Mat1f scale_map( gray_image_orig.rows, gray_image_orig.cols );
   Mat1f::iterator scale_it = scale_map.begin();
   Mat1f::iterator scale_map_end = scale_map.end();
@@ -183,6 +175,14 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
 
   double scale = base_scale;
 
+#if 1
+  cv::Mat1f grad_map_x( depth_map.size() );
+  cv::Mat1f grad_map_y( depth_map.size() );
+  convolveAffine<gradX>( ii, scale_map, ii_depth_map, ii_depth_count, K, scale, params_.min_px_scale_, max_px_scale, grad_map_x );
+  convolveAffine<gradY>( ii, scale_map, ii_depth_map, ii_depth_count, K, scale, params_.min_px_scale_, max_px_scale, grad_map_y );
+  cv::imshow( "grad_map_x", grad_map_x*0.2+0.5 );
+  cv::imshow( "grad_map_y", grad_map_y*0.2+0.5 );
+#endif
 
   // detect keypoints
   for( int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_ )
@@ -195,7 +195,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_DOB:
       if ( params_.affine_ )
       {
-        convolveAffine<dobAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
+        //convolveAffine<dobAffine>( ii, scale_map, depth_map, K, scale, params_.min_px_scale_, max_px_scale, response_map );
       }
       else
       {
@@ -205,7 +205,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     case DetectorParams::DET_LAPLACE:
       if ( params_.affine_ )
       {
-        convolveAffine2<laplaceAffine>( ii, scale_map, depth_map, K, (float)scale, (float)params_.min_px_scale_, (float)max_px_scale, response_map );
+        convolveAffine2<laplaceAffine>( ii, scale_map, ii_depth_map, ii_depth_count, K, (float)scale, (float)params_.min_px_scale_, (float)max_px_scale, response_map );
       }
       else
       {
@@ -227,7 +227,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
       findMaxima( response_map, scale_map, scale, params_.det_threshold_, kp );
       break;
     case DetectorParams::MAX_WINDOW_AFFINE:
-      findMaximaAffine( response_map, scale_map, ii, depth_map, scale, params_.det_threshold_, kp );
+      findMaximaAffine( response_map, scale_map, ii_depth_map, ii_depth_count, scale, params_.det_threshold_, kp );
       break;
     case DetectorParams::MAX_FAST:
       findMaximaMipMap( response_map, scale_map, scale, params_.det_threshold_, kp );
@@ -269,7 +269,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
         KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
-        getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
+        getAffine( ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
             kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
             kp[k].normal );
         // keypoint shall cover outer and inner and wants size not radius
@@ -349,7 +349,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
     int kp_y = kp[k].pt.y;
     getPt3d( f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d );
 
-    if(getAffine( ii, depth_map, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
+    if(getAffine( ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
             kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
             kp[k].normal)
     ) {
