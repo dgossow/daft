@@ -186,12 +186,12 @@ inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float mi
   // 4.5 cells together have the size of major (=scale)
   int a = std::max(int(major/2.25f), 1);
   // check for boundary effects
-  if ( !checkBounds( ii, x, y, 5*a ) ) {
+  if ( !checkBounds( ii, x, y, 6*a ) ) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   // read mean intensities for 9x9 grid
   float values[9][9];
-  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+  integrateGridCentered<double,9>(ii, x - a/2, y - a/2, a, (float*)values);
   // convolve with ansisotrope laplace filter
   float response = sLaplaceKernelCache.convolve(values, minor/major, angle);
   // return normalized absolute response
@@ -203,12 +203,12 @@ inline float laplace( const Mat1d &ii, int x, int y, int s )
   // 4.5 cells together have the size of major (=scale)
   int a = std::max(int(s/2.25f), 1);
   // check for boundary effects
-  if ( checkBounds( ii, x, y, 5*a ) ) {
+  if ( !checkBounds( ii, x, y, 6*a ) ) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   // read mean intensities for 9x9 grid
   float values[9][9];
-  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+  integrateGridCentered<double,9>(ii, x - a/2, y - a/2, a, (float*)values);
   // convolve with isotrope laplace filter
   float response = sLaplaceKernel.convolve(values);
   // return normalized absolute response
