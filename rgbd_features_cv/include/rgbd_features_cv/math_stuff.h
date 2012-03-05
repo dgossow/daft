@@ -24,7 +24,7 @@ inline float integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, 
   return ii(start_y,start_x) + ii(end_y,end_x) - ii(end_y,start_x) - ii(start_y,end_x);
 }
 
-/** Gets integration value of boxes in a grid */
+/** Gets integration value of NxN cells of size step x step in a grid starting with point (start_x,start_y)*/
 template<typename T, int N>
 inline void integrateGridCentered( const Mat_<T> &ii, int start_x, int start_y, int step, float* values) {
   const int M = N/2; // 9 -> 4
