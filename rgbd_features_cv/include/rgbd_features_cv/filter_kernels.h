@@ -205,7 +205,7 @@ inline float laplaceAffineImpl( const Mat1d &ii, int x, int y, int a, float rati
 /** float as parameter and interpolates */
 inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-  float a = 0.5893f * major;
+  float a = 0.5893f * major; // sqrt(2)/1.2/2
   int ai = int(a);
   float t = a - float(ai);
   float ratio = minor / major;
@@ -233,7 +233,7 @@ inline float laplaceImpl( const Mat1d &ii, int x, int y, int a )
 /** float as parameter and interpolates */
 inline float laplace( const Mat1d &ii, int x, int y, float s )
 {
-  float a = 0.5893f * s;
+  float a = 0.5893f * s; // sqrt(2)/1.2/2
   int ai = int(a);
   float t = a - float(ai);
   float v1 = laplaceImpl(ii, x, y, ai);
@@ -280,7 +280,7 @@ inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )
 /** float as parameter and interpolates */
 inline float princCurvRatio( const Mat1d &ii, int x, int y, float s )
 {
-  float a = 0.5893f * s;
+  float a = 0.5893f * s; // sqrt(2)/1.2/2
   int ai = int(a);
   float t = a - float(ai);
   float v1 = princCurvRatioImpl(ii, x, y, ai);
@@ -318,7 +318,7 @@ inline float princCurvRatioAffineImpl( const Mat1d &ii, int x, int y, int a, flo
 /** float as parameter and interpolates */
 inline float princCurvRatioAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
 {
-  float a = 0.5893f * major;
+  float a = 0.5893f * major; // sqrt(2)/1.2/2
   int ai = int(a);
   float t = a - float(ai);
   float ratio = minor / major;
