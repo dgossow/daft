@@ -58,7 +58,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig, cv::Matx3
 
   // Convert depth map to floating point
   cv::Mat1f depth_map;
-  if ( depth_map.type() == CV_16U )
+  if ( depth_map_orig.type() == CV_16U )
   {
     depth_map_orig.convertTo( depth_map, CV_32F, 0.001, 0.0 );
   }
