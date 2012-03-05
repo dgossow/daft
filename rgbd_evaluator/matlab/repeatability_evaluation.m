@@ -16,7 +16,7 @@ hold on;
 figure(2);clf;
 grid on;
 ylabel('nb of correspondences')
-xlabel('viewpoint angle');
+xlabel(x_val_file);
 hold on;
 
 mark=['-kx';'-rv';'-gs';'-m+';'-bp';'-kp';'-rx';'-gv';'-ms';'-b+';];

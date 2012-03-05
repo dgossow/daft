@@ -222,7 +222,7 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
     float det_t_init = p.det_threshold_;
     float det_pf_init = p.pf_threshold_;
 
-#if 0
+#if 1
     if ( it == it_begin )
     {
       // find optimal thresholds by newton iteration
@@ -237,6 +237,7 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
         daft_kp.clear();
         daft = cv::DAFT( p );
 
+        last_kp_size = daft_kp.size();
         daft.detect(gray_img, depth_img, K_, daft_kp);
 
         std::cout << name << " kp " << daft_kp.size() << std::endl;
@@ -257,10 +258,8 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
           last_t = t;
           t = zero_crossing;
         }
-        std::cout << "ratio " << ratio << " t " << t << " p.pf_threshold_ " << p.pf_threshold_ << std::endl;
-        std::cout << " p.det_threshold_ " << p.det_threshold_ << std::endl;
+        std::cout << " t " << t << " p.det_threshold_ " << p.det_threshold_ << std::endl;
 
-        last_kp_size = daft_kp.size();
       }
     }
 #endif
@@ -296,20 +295,20 @@ void ExtractDetectorFile::extractKeypoints()
   //p.min_px_scale_ = 3;
   //p.base_scale_ = 0.0125;
   //p.scale_levels_ = 5;
-  p.det_threshold_ = 0.115;
+  p.det_threshold_ = 0.1;//115;
   p.pf_threshold_ = 10;
   p.affine_=false;
   p.max_search_algo_ = p.MAX_WINDOW;
-  //extractDaftKeypoints( p, "DAFT" );
+  extractDaftKeypoints( p, "DAFT" );
 
   cv::DAFT::DetectorParams p_affine=p;
-  p_affine.det_threshold_ = 0.115;
+  //p_affine.det_threshold_ = 0.1;
   p_affine.affine_=true;
   p_affine.max_search_algo_ = p.MAX_WINDOW_AFFINE;
   extractDaftKeypoints( p_affine, "DAFT affine" );
 
   cv::DAFT::DetectorParams p_laplace=p;
-  p_laplace.det_threshold_ = 0.1;
+  //p_laplace.det_threshold_ = 0.1;
   p_laplace.det_type_ = p.DET_LAPLACE;
   p_laplace.max_search_algo_ = p_laplace.MAX_WINDOW;
   p_laplace.affine_ = false;
@@ -317,7 +316,7 @@ void ExtractDetectorFile::extractKeypoints()
   extractDaftKeypoints( p_laplace, "DAFT Laplace" );
 
   p_laplace.affine_ = true;
-  p_laplace.det_threshold_ = 0.1;
+  //p_laplace.det_threshold_ = 0.1;
   p_laplace.max_search_algo_ = p_laplace.MAX_WINDOW_AFFINE;
   extractDaftKeypoints( p_laplace, "DAFT Laplace affine" );
 
