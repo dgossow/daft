@@ -19,7 +19,7 @@ ylabel('nb of correspondences')
 xlabel('viewpoint angle');
 hold on;
 
-mark=['-kx';'-rv';'-gs';'-m+';'-bp'];
+mark=['-kx';'-rv';'-gs';'-m+';'-bp';'-kp';'-rx';'-gv';'-ms';'-b+';];
 
 num_det = size(det_suffix,1);
 
@@ -54,7 +54,7 @@ axis 'auto x'
 
 for f=1:2
     figure(f);
-    legend(det_suffix);
+    legend(det_suffix,'Location','SouthWest');
 end
 
 print(figure(1),'-dpdf',sprintf('%s%s_repeatability.pdf',base_path, dataset_name))
