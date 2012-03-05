@@ -12,7 +12,7 @@ inline void showBig( int size, cv::Mat img, std::string name )
     cv::resize( img, img_big, cv::Size(size,size), 0, 0, INTER_NEAREST );
   }
   else {
-    cv::resize( img, img_big, cv::Size(0,0), 4, 4, INTER_NEAREST );
+    cv::resize( img, img_big, cv::Size(0,0), 2, 2, INTER_NEAREST );
   }
   cv::imshow( name, img_big );
   cv::waitKey(100);
@@ -105,22 +105,23 @@ struct Kernel2D
       float y = float(i-4);
       for(int j=0; j<9; j++) {
         float x = float(j-4);
-        Point2f q = rotation * Point2f(x,y);
-        q.y /= ratio;
-        if(AxisAligned) {
-          q = rotation.t() * q;
-        }
+//        q.y /= ratio;
+//        if(AxisAligned) {
+//          q = rotation.t() * q;
+//        }
         float v;
         if(Samples > 0) {
           v = 0.0f;
           for(int i=-Samples; i<=+Samples; i++) {
             for(int j=-Samples; j<=+Samples; j++) {
-              v += F(sigma, q.x + float(j)*float(Samples)/float(2*Samples+1) , q.y + float(i)*float(Samples)/float(2*Samples+1));
+              Point2f q = rotation * Point2f(x + float(j)*float(Samples)/float(2*Samples+1), y + float(i)*float(Samples)/float(2*Samples+1));
+              v += F(sigma, q.x , q.y);
             }
           }
           v /= float((2*Samples + 1)*(2*Samples + 1));
         }
         else {
+          Point2f q = rotation * Point2f(x,y);
           v = F(sigma, q.x, q.y);
         }
         kernel[i][j] = v / ratio;
@@ -177,10 +178,10 @@ struct Kernel2DCache
 {
   static const float cRatioMin = 0.25f;
   static const float cRatioMax = 1.0f;
-  static const int cRatioSteps = 20;
+  static const int cRatioSteps = 25;
   static const float cAngleMin = 0.0f;
-  static const float cAngleMax = 3.1415f;
-  static const int cAngleSteps = 30;
+  static const float cAngleMax = M_PI;
+  static const int cAngleSteps = 50;
 
   float convolve(float values[9][9], float ratio, float angle) const {
     int ox = findRatioPos(ratio);
@@ -199,25 +200,25 @@ private:
   template <float (*F)(float,float,float), bool AxisAligned, int Samples>
   void create(float sigma, const char* name) {
     kernel_cache_ = Mat1f(9*(cAngleSteps+1), 9*(cRatioSteps+1));
-    for(int i=0; i<cAngleSteps+1; i++) {
-      for(int j=0; j<cRatioSteps+1; j++) {
-        float angle = cAngleMin + float(i) / float(cAngleSteps) * (cAngleMax - cAngleMin);
-        float ratio = cRatioMin + float(j) / float(cRatioSteps) * (cRatioMax - cRatioMin);
+    for(int oy=0; oy<cAngleSteps+1; oy++) {
+      for(int ox=0; ox<cRatioSteps+1; ox++) {
+        float angle = cAngleMin + float(oy) / float(cAngleSteps + 1) * (cAngleMax - cAngleMin);
+        float ratio = cRatioMin + float(ox) / float(cRatioSteps + 1) * (cRatioMax - cRatioMin);
 //        std::cout << angle << " " << ratio << std::endl;
         float ca = std::cos(angle);
         float sa = std::sin(angle);
         Matx22f rotation;
         rotation(0,0) = ca;
-        rotation(0,1) = sa;
-        rotation(1,0) = -sa;
-        rotation(1,1) = ca;
-        rotation = rotation.t();
+        rotation(1,0) = sa;
+        rotation(0,1) = -sa*ratio;
+        rotation(1,1) = ca*ratio;
+        rotation = rotation.inv();
 //        std::cout << rotation(0,0) << " " << rotation(0,1) << " " << rotation(1,0) << " " << rotation(1,1) << " " << std::endl;
         Kernel2D k2 = Kernel2D::Create<F,AxisAligned,Samples>(rotation, ratio, sigma);
 //        Kernel2D k2 = Kernel2D::Create<F,Samples>(sigma);
-        for(int i2=0; i2<9; i2++) {
-          for(int j2=0; j2<9; j2++) {
-            kernel_cache_[9*i + i2][9*j + j2] = k2.kernel[i2][j2];
+        for(int i=0; i<9; i++) {
+          for(int j=0; j<9; j++) {
+            kernel_cache_[9*oy+i][9*ox+j] = k2.kernel[i][j];
           }
         }
       }
@@ -238,8 +239,8 @@ private:
   }
 
   int findAnglePos(float angle) const {
-    while(angle < 0.0f) angle += M_2_PI;
-    while(angle > M_2_PI) angle -= M_2_PI;
+    while(angle < 0.0f) angle += 2.0f*M_PI;
+    while(angle > 2.0f*M_PI) angle -= 2.0f*M_PI;
     if(angle > M_PI) angle -= M_PI;
     float p = (angle - cAngleMin) / (cAngleMax - cAngleMin) * float(cAngleSteps + 1);
     int pi = static_cast<int>(p + 0.5f); // round
