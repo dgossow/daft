@@ -34,7 +34,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   Mat gray_image_orig = image;
 
-  // Convert RGB to Grey image
+  // Convert RGB to Gray image
   if (image.type() == CV_8UC3) {
     cvtColor(image, gray_image_orig, CV_BGR2GRAY);
   }
@@ -59,13 +59,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   double base_scale = params_.base_scale_;
   int scale_levels = params_.scale_levels_;
-
-  int max_px_scale =
-      params_.max_px_scale_ == params_.AUTO ?
-          std::min(image.rows, image.cols) / 16 : params_.max_px_scale_;
-
   const float f = K(0, 0);
 
+  int max_px_scale = params_.max_px_scale_;
+  if ( max_px_scale == params_.AUTO )
+  {
+    max_px_scale = std::min(image.rows, image.cols) / 16;
+  }
 
   // Integrate Depth + Depth count (#of valid pixels)
   cv::Mat1d ii_depth_map(depth_map.rows + 1, depth_map.cols + 1);
@@ -125,8 +125,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     double n_min = std::ceil(log(delta_n_min) / log(params_.scale_step_));
     double n_max = std::floor(log(delta_n_max) / log(params_.scale_step_));
 
-    base_scale = params_.base_scale_
-        * std::pow((double) params_.scale_step_, n_min);
+    base_scale = params_.base_scale_ * std::pow((double) params_.scale_step_, n_min);
     scale_levels = n_max - n_min + 1;
   }
   else
@@ -166,7 +165,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   // detect keypoints
   for (int scale_level = 0; scale_level < scale_levels; scale_level++, scale *=
       params_.scale_step_) {
-    //float mean_response;
 
     // compute filter response for all pixels
     switch (params_.det_type_) {

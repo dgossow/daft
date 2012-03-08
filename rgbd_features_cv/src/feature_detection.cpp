@@ -62,12 +62,10 @@ void findMaxima( const cv::Mat1d &img,
       bool isMax = true;
       for ( int v = 0; isMax && v <= window; v++ )
       {
-        for ( int u = 0; isMax && u <= window; u++ )
+        // w = width of circle at that y coordinate
+        int w=cos(asin(double(v)/double(window+0.5))) * (double)window + 0.5;
+        for ( int u = w; isMax && u <= w; u++ )
         {
-          if ( u*u+v*v > window_sqr )
-          {
-            break;
-          }
           if (u==0 && v==0)
           {
             continue;
@@ -81,6 +79,7 @@ void findMaxima( const cv::Mat1d &img,
           }
         }
       }
+      std::cout << std::endl << std::endl;
 
       if ( isMax )
       {

@@ -348,15 +348,15 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
-  p.max_search_algo_ = p.MAX_FAST;
+  p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = false;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
   p.det_type_ = p.DET_LAPLACE;
-  p.max_search_algo_ = p.MAX_FAST;
+  p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
   p.affine_ = true;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
