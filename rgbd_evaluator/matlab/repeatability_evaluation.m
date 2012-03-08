@@ -1,4 +1,4 @@
-function repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file, num_img )
+function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file, num_img )
 
 data_path = [base_path, dataset_name, '/'];
 
@@ -7,19 +7,23 @@ fprintf(1,'It may take a while, i.e. 30min \n');
 
 %det_suffix=['haraff';'hesaff';'mseraf';'ibraff';'ebraff'];
 
-
 figure(1);clf;
+set(gca,'FontSize',17)
 grid on;
 ylabel('repeatability %')
 xlabel(x_val_file);
 hold on;
 figure(2);clf;
+set(gca,'FontSize',17)
 grid on;
 ylabel('nb of correspondences')
 xlabel(x_val_file);
 hold on;
 
-mark=['-kx';'-rv';'-gs';'-m+';'-bp';'-kp';'-rx';'-gv';'-ms';'-b+';];
+mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
+
+%set(0,'DefaultAxesColorOrder',[0 0 0; 0.9 0 0; 0 0.7 0; 0 0 1; 0.5 0.5 0; 0 0.5 0.5; 0.5 0 0.5]);
+%set(0,'DefaultAxesLineStyleOrder','--x|-.x|:x');
 
 num_det = size(det_suffix,1);
 
@@ -43,19 +47,28 @@ for d=1:num_det
         seqcorresp=[seqcorresp corresp(4)];
     end
     
-    figure(1);  plot(x_vals,seqrepeat,mark(d,:));
-    figure(2);  plot(x_vals,seqcorresp,mark(d,:));
+    mark{d}
+    figure(1);  plot(x_vals,seqrepeat,mark{d});
+    figure(2);  plot(x_vals,seqcorresp,mark{d});
 
 end
 
 figure(1)
-axis([10 70 0 100]);
-axis 'auto x'
+axis([x_vals(1) x_vals(size(x_vals,2)) 30 100]);
+%axis 'auto x'
+
+figure(2)
+axis([x_vals(1) x_vals(size(x_vals,2)) 0 750]);
 
 for f=1:2
     figure(f);
-    legend(det_suffix,'Location','SouthWest');
+    %legend(det_suffix,'Location','NorthOutside');
 end
 
 print(figure(1),'-dpdf',sprintf('%s%s_repeatability.pdf',base_path, dataset_name))
 print(figure(2),'-dpdf',sprintf('%s%s_num_correspondences.pdf',base_path, dataset_name))
+
+figure(1)
+legend(det_suffix,'Location','SouthWest');
+print(figure(1),'-dpdf',sprintf('%s%s_legend.pdf',base_path, dataset_name))
+

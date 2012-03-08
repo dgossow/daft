@@ -99,6 +99,12 @@ inline float dobAffine( const Mat1d &ii,
     float intersect_x = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
     float intersect_y = norm1 * fastInverseSqrt( sw2 + grad[1]*grad[1] );
 
+
+    intersect_x += 0.5;
+    intersect_y += 0.5;
+    major_axis.x += 0.5;
+    major_axis.y += 0.5;
+
     // sizes of the four integral rectangles
     // sx1,sy1: top-left and bottom-right quadrant
     // sx2,sy2: top-right and bottom-left quadrant
@@ -114,17 +120,17 @@ inline float dobAffine( const Mat1d &ii,
     }
     else
     {
-      // major axis is in the top-left or bottom-right quadrant
       sx1 = intersect_x;
+      // major axis is in the top-left or bottom-right quadrant
       sy1 = intersect_y;
       sx2 = std::max( intersect_x, -major_axis.x );
       sy2 = std::max( intersect_y, major_axis.y );
     }
 
-    if ( sx1 < 2 ) sx1=2;
-    if ( sy1 < 2 ) sy1=2;
-    if ( sx2 < 2 ) sx2=2;
-    if ( sy2 < 2 ) sy2=2;
+    if ( sx1 < 3 || sy1 < 3 || sx2 < 3 || sy2 < 3 )
+    {
+      return std::numeric_limits<float>::quiet_NaN();
+    }
 
     float i1 = integrate ( ii, x-sx1  , x, y-sy1  , y );
     float i2 = integrate ( ii, x, x+sx2  , y-sy2  , y );
@@ -138,8 +144,8 @@ inline float dobAffine( const Mat1d &ii,
 
     float val = 4 * (i1+i2+i3+i4) - o1-o2-o3-o4;
 
-    float area1 = sx1*sy1*8;
-    float area2 = sx2*sy2*8;
+    float area1 = sx1*sy1*6;
+    float area2 = sx2*sy2*6;
 
     float val_norm = val / (area1+area2);
     return std::abs(val_norm) * 0.73469f; // normalize to same value as the laplace filter

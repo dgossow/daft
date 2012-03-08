@@ -52,10 +52,12 @@ void convolve( const cv::Mat1d &ii,
  * @param max_px_scale  Maximal scale in pixels
  * @param img_out       The output image
  */
-template <float (*F)(const Mat1d&, const cv::Mat1f&, const cv::Matx33f&, int, int, float, float)>
+template <float (*F)( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )>
 void convolveAffine( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
-    const cv::Mat1f &depth_map,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
     const cv::Matx33f& camera_matrix,
     float base_scale,
     float min_px_scale,
@@ -183,6 +185,20 @@ void convolveAffine( const cv::Mat1d &ii,
         img_out(y,x) = nan;
         continue;
       }
+
+      /*
+      float angle, major, minor;
+      Point3f normal;
+      bool ok = getAffine(ii_depth_map, ii_depth_count,
+          x, y, s, base_scale,
+          angle, major, minor, normal);
+      // break if gradient can not be computed
+      // or minor axis too small
+      if(!ok || minor < min_px_scale) {
+        img_out(y,x) = nan;
+        continue;
+      }
+      */
 
       img_out(y,x) = F( ii, ii_depth_map, ii_depth_count, camera_matrix, x, y, s, base_scale );
     }

@@ -55,6 +55,8 @@ void findMaxima( const cv::Mat1d &img,
       int window = s; //(s+0.5) / 2.0 - 0.5;
       if ( window < 1 ) window = 1;
 
+      const int window_sqr = window*window + 1;
+
       //static const int window = 1;
 
       bool isMax = true;
@@ -62,6 +64,10 @@ void findMaxima( const cv::Mat1d &img,
       {
         for ( int u = 0; isMax && u <= window; u++ )
         {
+          if ( u*u+v*v > window_sqr )
+          {
+            break;
+          }
           if (u==0 && v==0)
           {
             continue;

@@ -211,65 +211,19 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = it_begin; it != it_end; it+=it_step, count++)
   {
-    // write data to file
-    std::string fileName;
-
     // convert integer to string
     std::stringstream ss;
     ss << count;
     std::string count_str = ss.str();
 
-    fileName.append(file_created_folder_);
-    fileName.append("/");
-    fileName.append("img");
-    fileName.append(count_str);
-
-    std::cout << "Writing to "<< fileName << std::endl;
-
-    cv::imwrite(std::string(fileName+".ppm"), it->rgb_image->image );
-
-#if 0
-    // Convert 8-Bit to Float image
-    cv::Mat1w depth_img;
-    it->depth_image->image.convertTo( depth_img, CV_16U, 1000.0, 0.0 );
-
-    std::ofstream fs( (fileName+"_depth.pgm").c_str() );
-
-    fs << "P2" << std::endl;
-    fs << depth_img.cols << " " << depth_img.rows << std::endl;
-    fs << 65535 << std::endl;
-
-    for ( int y=0; y<depth_img.rows; y++ )
-    {
-      for ( int x=0; x<depth_img.cols; x++ )
-      {
-        fs << depth_img[y][x] << " ";
-      }
-      fs << std::endl;
-    }
-
-    std::ofstream mfs( (fileName+"_pose").c_str() );
-
-    btMatrix3x3 basis = it->approx_transform->getBasis();
-    btVector3 origin = it->approx_transform->getOrigin();
-    for ( int y=0; y<3; y++ )
-    {
-      for ( int x=0; x<3; x++ )
-      {
-        mfs << basis[y][x] << " ";
-      }
-      mfs << std::endl;
-    }
-
-    mfs << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
-#endif
+    cv::Mat image_camx = it->rgb_image.get()->image;
 
     // store first transforms and images
     if(first_image)
     {
       // get original image
       transform_original = *( it->approx_transform.get() );
-      image_original = it->rgb_image.get()->image;
+      image_original = image_camx;
       first_image = false;
 
       btVector3 zvec = transform_original.inverse().getBasis() * btVector3(0,0,1);
@@ -289,6 +243,9 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
                                MIN_FEATURE_NEIGHBOUR_DIST, cv::noArray(), 3, true );
 
       cv::KeyPoint::convert( feature_vector_original, keypoint_vector_original );
+
+      cv::imwrite( file_created_folder_ + "/" + "img" + count_str + ".ppm", image_original );
+
 #if 0
       cv::drawKeypoints( image_original, keypoint_vector_original, image_original );
 
@@ -296,152 +253,206 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       cv::imshow("Keypoints", image_original);
       cv::waitKey(30);
 #endif
-      continue;
     }
-
-    /**************************** calculate initial homography ***************************************************************/
-
-    transform_camx = *(it->approx_transform.get());
-
-    // calculate transform from camera position x to original position
-    transform_camx_to_original = transform_original * transform_camx.inverse();
-
-    btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(0,0,1);
-    btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
-
-    float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
-    float dist_abs = transform_camx.getOrigin().length();
-    float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
-
-    std::cout << "angle " << angle_abs << std::endl;
-    std::cout << "dist " << dist_abs << std::endl;
-    std::cout << "rotation " << rotation_abs << std::endl;
-
-    float scaling = dist_orig / dist_abs;
-    float rotation = std::abs( rotation_abs - rotation_orig );
-    float angle = std::abs( angle_abs - angle_orig );
-
-    std::cout << "angle_rel " << angle << std::endl;
-    std::cout << "scaling " << scaling << std::endl;
-    std::cout << "rotation_rel " << rotation << std::endl;
-
-    angles.push_back( angle );
-    rotations.push_back( rotation );
-    scalings.push_back( scaling );
-
-    cv::Matx33f homography_init = calculateInitialHomography( transform_camx_to_original, transform_camx );
-
-    cv::Mat image_camx = it->rgb_image.get()->image;
-    cv::Mat image_warped;
-
-    // perspective warping
-    cv::warpPerspective( image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
-
-
-    cv::Mat tmp1,image_orig_rewarped;
-    cv::warpPerspective( image_original, tmp1, cv::Mat(homography_init.inv()), cv::Size(image_original.cols,image_original.rows) );
-    cv::warpPerspective( tmp1, image_orig_rewarped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
-
-#if 0
-    cv::imshow( "Original Image (Re-Warped)", image_orig_rewarped );
-    cv::waitKey(30);
-    cv::imshow( "Warped Image", image_warped );
-    cv::waitKey(30);
-#endif
-
-    /**************************** calculate precise homography **************************************************************/
-
-    std::vector<cv::Point2f> keypoints_camx;
-    std::vector<cv::Point2f> keypoints_original;
-
-    for(uint32_t i = 0; i < keypoint_vector_original.size(); i++)
+    else
     {
-      // ncc part
-      cv::Mat result;
-      cv::Point2f keypointNCC;
+      /**************************** calculate initial homography ***************************************************************/
 
-      if((i % 10) == 0)
+      transform_camx = *(it->approx_transform.get());
+
+      // calculate transform from camera position x to original position
+      transform_camx_to_original = transform_original * transform_camx.inverse();
+
+      btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(0,0,1);
+      btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
+
+      float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
+      float dist_abs = transform_camx.getOrigin().length();
+      float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
+
+      std::cout << "angle " << angle_abs << std::endl;
+      std::cout << "dist " << dist_abs << std::endl;
+      std::cout << "rotation " << rotation_abs << std::endl;
+
+      float scaling = dist_orig / dist_abs;
+      float rotation = std::abs( rotation_abs - rotation_orig );
+      float angle = std::abs( angle_abs - angle_orig );
+
+      std::cout << "angle_rel " << angle << std::endl;
+      std::cout << "scaling " << scaling << std::endl;
+      std::cout << "rotation_rel " << rotation << std::endl;
+
+      angles.push_back( angle );
+      rotations.push_back( rotation );
+      scalings.push_back( scaling );
+
+      cv::Matx33f homography_init = calculateInitialHomography( transform_camx_to_original, transform_camx );
+
+      cv::Mat image_warped;
+
+      // perspective warping
+      cv::warpPerspective( image_camx, image_warped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
+
+
+      cv::Mat tmp1,image_orig_rewarped;
+      cv::warpPerspective( image_original, tmp1, cv::Mat(homography_init.inv()), cv::Size(image_original.cols,image_original.rows) );
+      cv::warpPerspective( tmp1, image_orig_rewarped, cv::Mat(homography_init), cv::Size(image_original.cols,image_original.rows) );
+
+  #if 0
+      cv::imshow( "Original Image (Re-Warped)", image_orig_rewarped );
+      cv::waitKey(30);
+      cv::imshow( "Warped Image", image_warped );
+      cv::waitKey(30);
+  #endif
+
+      /**************************** calculate precise homography **************************************************************/
+
+      std::vector<cv::Point2f> keypoints_camx;
+      std::vector<cv::Point2f> keypoints_original;
+
+      for(uint32_t i = 0; i < keypoint_vector_original.size(); i++)
       {
-        //std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
+        // ncc part
+        cv::Mat result;
+        cv::Point2f keypointNCC;
+
+        if((i % 10) == 0)
+        {
+          //std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
+        }
+
+        if( calculateNCC( image_warped, image_orig_rewarped, keypoint_vector_original.at(i), keypointNCC) >= 0 )
+        {
+          keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(i).pt.x,
+                                                 keypoint_vector_original.at(i).pt.y ) );
+
+          keypoints_camx.push_back( keypointNCC );
+        }
       }
 
-      if( calculateNCC( image_warped, image_orig_rewarped, keypoint_vector_original.at(i), keypointNCC) >= 0 )
+      printf("Finished...Found correspondences: %d\n\r", (uint32_t)keypoints_camx.size() );
+
+      if(keypoints_camx.size() < MIN_CORRESPONDENCES || keypoints_original.size() < MIN_CORRESPONDENCES )
       {
-        keypoints_original.push_back( cv::Point2f( keypoint_vector_original.at(i).pt.x,
-                                               keypoint_vector_original.at(i).pt.y ) );
-
-        keypoints_camx.push_back( keypointNCC );
+        std::cout << "Not enough correspondences found! Exiting..." << std::endl;
+        return;
       }
+
+      cv::Matx33f homography_precise;
+  //    homography_precise = cv::findHomography( keypoints_camx, keypoints_original , CV_LMEDS, 2 );
+      homography_precise = cv::findHomography( keypoints_camx, keypoints_original, CV_RANSAC, 2 );
+
+      homography_complete = homography_precise * homography_init;
+
+      printMat( cv::Matx33f( homography_complete) );
+
+      cv::Mat image_warped_precise;
+
+      // perspective warping precise
+      cv::warpPerspective( image_camx, image_warped_precise, cv::Mat(homography_complete), cv::Size(image_warped.cols,image_warped.rows) );
+
+      // normalize lightness
+      cv::Scalar mean_image_orig_rewarped = cv::mean( image_orig_rewarped );
+      cv::Scalar mean_image_warped_precise = cv::mean( image_warped_precise );
+
+      float l_image_orig_rewarped = (mean_image_orig_rewarped[0] + mean_image_orig_rewarped[1] + mean_image_orig_rewarped[2]) / 3.0;
+      float l_image_warped_precise = (mean_image_warped_precise[0] + mean_image_warped_precise[1] + mean_image_warped_precise[2]) / 3.0;
+
+      cv::imshow( "image_camx", image_camx );
+
+      image_camx *= l_image_orig_rewarped / l_image_warped_precise;
+      image_warped_precise *= l_image_orig_rewarped / l_image_warped_precise;
+
+      cv::imshow( "image_norm", image_camx );
+
+      //transform keypoints from warped image into precise warped image
+      for ( uint32_t i=0; i < keypoints_camx.size(); i++ )
+      {
+        cv::Matx31f kp_xyw( keypoints_camx[i].x, keypoints_camx[i].y, 1);
+
+        kp_xyw = homography_precise * kp_xyw;
+        //corner_vector_src;
+        keypoints_camx[i].x = kp_xyw.val[0] / kp_xyw.val[2];
+        keypoints_camx[i].y = kp_xyw.val[1] / kp_xyw.val[2];
+      }
+
+      cv::Mat image_original_clone( image_original.clone() );
+
+      // show error via lines
+      for ( uint32_t i=0; i<keypoints_camx.size(); i++ )
+      {
+        cv::line( image_warped_precise, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
+        cv::line( image_original_clone, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
+      }
+
+      //cv::imshow("Error Lines", image_original_clone );
+
+      /*************************************************************************************************************************/
+
+      // store homography
+      writeHomographyToFile( homography_complete.inv(), count );
+
+  #if 0
+
+      cv::Mat image_orig_rewarped_precise;
+      cv::warpPerspective( image_original, tmp1, cv::Mat(homography_complete.inv()), cv::Size(image_original.cols,image_original.rows) );
+      cv::warpPerspective( tmp1, image_orig_rewarped_precise, cv::Mat(homography_complete), cv::Size(image_original.cols,image_original.rows) );
+      cv::imshow( "image_orig_rewarped_precise", image_orig_rewarped_precise );
+
+      cv::Mat diff_img;
+      cv::absdiff( image_orig_rewarped_precise, image_warped_precise, diff_img );
+      cv::imshow( "diff_img", diff_img );
+      cv::waitKey(30);
+  #endif
+
+  #if 1
+      // show images
+      cv::imshow("Current Image", image_camx);
+      cv::imshow("Precise Warped Image", image_warped_precise);
+      cv::waitKey(30);
+
+      cv::imwrite( file_created_folder_ + "/" + "warped" + count_str + ".ppm", image_warped_precise );
     }
 
-    printf("Finished...Found correspondences: %d\n\r", (uint32_t)keypoints_camx.size() );
+    cv::imwrite( file_created_folder_ + "/" + "img" + count_str + ".ppm", image_camx );
 
-    if(keypoints_camx.size() < MIN_CORRESPONDENCES || keypoints_original.size() < MIN_CORRESPONDENCES )
+
+    // write depth map
+    // Convert float to 16-bit int
+    cv::Mat1w depth_img;
+    it->depth_image->image.convertTo( depth_img, CV_16U, 1000.0, 0.0 );
+
+    std::ofstream fs( (file_created_folder_ + "/" + "depth" + count_str + ".pgm").c_str() );
+
+    fs << "P2" << std::endl;
+    fs << depth_img.cols << " " << depth_img.rows << std::endl;
+    fs << 65535 << std::endl;
+
+    for ( int y=0; y<depth_img.rows; y++ )
     {
-      std::cout << "Not enough correspondences found! Exiting..." << std::endl;
-      return;
+      for ( int x=0; x<depth_img.cols; x++ )
+      {
+        fs << depth_img[y][x] << " ";
+      }
+      fs << std::endl;
     }
-
-    cv::Matx33f homography_precise;
-//    homography_precise = cv::findHomography( keypoints_camx, keypoints_original , CV_LMEDS, 2 );
-    homography_precise = cv::findHomography( keypoints_camx, keypoints_original, CV_RANSAC, 2 );
-
-    homography_complete = homography_precise * homography_init;
-
-    printMat( cv::Matx33f( homography_complete) );
-
-    cv::Mat image_warped_precise;
-
-    // perspective warping precise
-    cv::warpPerspective( image_camx, image_warped_precise, cv::Mat(homography_complete), cv::Size(image_warped.cols,image_warped.rows) );
-
-    //transform keypoints from warped image into precise warped image
-    for ( uint32_t i=0; i < keypoints_camx.size(); i++ )
-    {
-      cv::Matx31f kp_xyw( keypoints_camx[i].x, keypoints_camx[i].y, 1);
-
-      kp_xyw = homography_precise * kp_xyw;
-      //corner_vector_src;
-      keypoints_camx[i].x = kp_xyw.val[0] / kp_xyw.val[2];
-      keypoints_camx[i].y = kp_xyw.val[1] / kp_xyw.val[2];
-    }
-
-    cv::Mat image_original_clone( image_original.clone() );
-
-    // show error via lines
-    for ( uint32_t i=0; i<keypoints_camx.size(); i++ )
-    {
-      cv::line( image_warped_precise, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
-      cv::line( image_original_clone, keypoints_camx[i], keypoints_original[i], cv::Scalar(0,0,255), 1 );
-    }
-
-    //cv::imshow("Error Lines", image_original_clone );
-
-    /*************************************************************************************************************************/
-
-    // store homography
-    writeHomographyToFile( homography_complete.inv(), count );
 
 #if 0
+    std::ofstream mfs( (fileName+"_pose").c_str() );
 
-    cv::Mat image_orig_rewarped_precise;
-    cv::warpPerspective( image_original, tmp1, cv::Mat(homography_complete.inv()), cv::Size(image_original.cols,image_original.rows) );
-    cv::warpPerspective( tmp1, image_orig_rewarped_precise, cv::Mat(homography_complete), cv::Size(image_original.cols,image_original.rows) );
-    cv::imshow( "image_orig_rewarped_precise", image_orig_rewarped_precise );
+    btMatrix3x3 basis = it->approx_transform->getBasis();
+    btVector3 origin = it->approx_transform->getOrigin();
+    for ( int y=0; y<3; y++ )
+    {
+      for ( int x=0; x<3; x++ )
+      {
+        mfs << basis[y][x] << " ";
+      }
+      mfs << std::endl;
+    }
 
-    cv::Mat diff_img;
-    cv::absdiff( image_orig_rewarped_precise, image_warped_precise, diff_img );
-    cv::imshow( "diff_img", diff_img );
-    cv::waitKey(30);
+    mfs << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
 #endif
-
-#if 1
-    // show images
-    cv::imshow("Current Image", image_camx);
-    cv::imshow("Precise Warped Image", image_warped_precise);
-    cv::waitKey(30);
-
-    cv::imwrite( file_created_folder_ + "/" + "warped" + count_str + ".ppm", image_warped_precise );
 
     std::cout << "Press any key to continue" << std::endl;
     //getchar();

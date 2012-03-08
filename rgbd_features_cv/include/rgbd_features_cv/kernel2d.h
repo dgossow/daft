@@ -176,7 +176,7 @@ static Kernel2D sDxyKernel = Kernel2D::Create<detail::DxyKernel,1>(1.2f);
 
 struct Kernel2DCache
 {
-  static const float cRatioMin = 0.25f;
+  static const float cRatioMin = 0.2f;
   static const float cRatioMax = 1.0f;
   static const int cRatioSteps = 25;
   static const float cAngleMin = 0.0f;

@@ -84,22 +84,20 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   //p1.det_threshold_ = 0;
 
   p1.base_scale_ = 0.025;
-  p1.scale_levels_ = 5;
-
-  p1.det_type_ = p1.DET_LAPLACE;
-  p1.affine_ = true;
+  p1.scale_levels_ = 1;
   p1.max_px_scale_ = 1000;
-  p1.max_search_algo_ = p1.MAX_WINDOW;
+
+  p1.det_type_=p1.DET_DOB;
+  p1.affine_=true;
+  p1.max_search_algo_ = p1.MAX_FAST;
 
   p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
   p1.pf_threshold_ = 10;
 
   p2 = p1;
-<<<<<<< HEAD
+  //p1.det_type_=p1.DET_LAPLACE;
   p2.affine_ = false;
-=======
   p2.pf_type_ = p1.PF_NONE;
->>>>>>> d60dc3fdc81e8d83024c9e8e9b0af5bbb0628610
 
 /*  p2.affine_ = true;
   p2.base_scale_ = 0.05;
@@ -130,7 +128,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   depth_image_smoothed = depth_image_smoothed.t();
 #endif
 
-#if 1
+#if 0
   // compare speeds
   for ( int i=0; i<10; i++ )
   {

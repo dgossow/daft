@@ -37,12 +37,13 @@ public:
 private:
   void readBagFile();
 
-  void extractKeypoints();
+  void extractAllKeypoints();
 
-  void extractDaftKeypoints( cv::DAFT::DetectorParams p, std::string name );
+  typedef boost::function< std::vector<cv::KeyPoint3D> ( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t ) > GetKpFunc;
+
+  void extractKeypoints( GetKpFunc getKp, std::string name );
 
   void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img );
-  void storeKeypoints(std::vector<cv::KeyPoint> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img );
 
   void splitFileName(const std::string& str);
 

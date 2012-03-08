@@ -235,7 +235,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       return;
     }
 
-#if 1
+#if 0
     {
       static int i=0;
       cv::Mat display_image;

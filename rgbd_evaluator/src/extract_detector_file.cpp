@@ -18,6 +18,8 @@
 namespace rgbd_evaluator
 {
 
+const int num_kp = 750;
+
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_order)
 {
   std::cout << "Starting extract_detector_file..." << std::endl;
@@ -51,7 +53,7 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_ord
 
   readBagFile();
 
-  extractKeypoints();
+  extractAllKeypoints();
 }
 
 ExtractDetectorFile::~ExtractDetectorFile()
@@ -150,13 +152,54 @@ void ExtractDetectorFile::readBagFile()
 }
 
 
-void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std::string name )
+std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp )
+{
+  std::vector<cv::KeyPoint3D> kp_3d;
+  kp_3d.reserve( kp.size() );
+  for ( size_t i=0; i < kp.size(); i++ )
+  {
+    kp_3d.push_back( kp[i] );
+  }
+  return kp_3d;
+}
+
+// these helper function compute the number of keypoints
+// for a given threshold
+std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+{
+  cv::SURF surf( t * 100.0 );
+  cv::Mat mask;
+  std::vector<cv::KeyPoint> kp;
+  surf( gray_img, mask, kp );
+  return makeKp3d( kp );
+}
+std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+{
+  cv::SIFT::CommonParams cp;
+  cv::SIFT::DetectorParams detp;
+  cv::SIFT::DescriptorParams descp;
+  detp.threshold = detp.GET_DEFAULT_THRESHOLD() * t;
+  //detp.edgeThreshold = detp.GET_DEFAULT_EDGE_THRESHOLD() * t;
+  cv::SIFT sift = cv::SIFT( cp, detp, descp );
+  std::vector<cv::KeyPoint> kp;
+  cv::Mat mask;
+  sift( gray_img, mask, kp );
+  return makeKp3d( kp );
+}
+std::vector<cv::KeyPoint3D> getDaftKp( cv::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+{
+  std::vector<cv::KeyPoint3D> kp;
+  p.det_threshold_ *= t;
+  cv::DAFT daft( p );
+  daft.detect( gray_img, depth_img, K, kp );
+  return kp;
+}
+
+void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 {
   uint32_t count = 1;
 
   std::vector< ImageData >::iterator it;
-
-  cv::DAFT daft( p );
 
   int it_step;
   std::vector< ImageData >::iterator it_end,it_begin;
@@ -173,16 +216,17 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
     it_end = image_store_.end();
   }
 
+  float t=1;
+
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = it_begin; it != it_end; it+=it_step)
+  //it = it_begin;
   {
-    std::vector<cv::KeyPoint3D> daft_kp;
-
     cv::Mat bag_rgb_img = it->rgb_image.get()->image;
     cv::Mat bag_depth_img = it->depth_image.get()->image;
 
-    cv::Mat rgb_img;
-    cv::Mat depth_img;
+    cv::Mat rgb_img = bag_rgb_img;
+    cv::Mat depth_img = bag_depth_img;
 
     int scale_fac = bag_rgb_img.cols / bag_depth_img.cols;
 
@@ -199,12 +243,10 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
     cv::resize( tmp1, rgb_img, cvSize(depth_img.cols, depth_img.rows) );
 #endif
 
-    cv::GaussianBlur( depth_img, depth_img, cv::Size(), 2, 2 );
-
+#if 0
     double minval,maxval;
     cv::minMaxIdx( depth_img, &minval, &maxval );
 
-#if 0
     cv::Mat tmp = depth_img.clone();
     tmp -= minval;
     tmp *= 1.0/(maxval-minval);
@@ -217,273 +259,109 @@ void ExtractDetectorFile::extractDaftKeypoints( cv::DAFT::DetectorParams p, std:
 
     cv::Mat mask;
 
-    const int num_kp = 750;
+    std::cout << name << std::endl;
 
-    float det_t_init = p.det_threshold_;
-    float det_pf_init = p.pf_threshold_;
-
-#if 1
     if ( it == it_begin )
     {
-      // find optimal thresholds by newton iteration
-      float t=1;
+      // find optimal thresholds by secant method
       float last_t=1;
       int last_kp_size = 0;
-      while ( daft_kp.size() == 0 || std::abs(int(daft_kp.size()) - num_kp ) > 10 )
+      int its=0;
+      int kp_size = 0;
+
+      while ( ( kp_size == 0 ) || ( std::abs(kp_size - num_kp) > 10 ) )
       {
-        p.det_threshold_ = det_t_init * t;
-        //p.pf_threshold_ = det_pf_init * t;
-        //p.pf_threshold_ = 0.001 * t;
-        daft_kp.clear();
-        daft = cv::DAFT( p );
+        last_kp_size = kp_size;
+        kp_size = getKp( gray_img, depth_img, K_, t ).size();
 
-        last_kp_size = daft_kp.size();
-        daft.detect(gray_img, depth_img, K_, daft_kp);
-
-        std::cout << name << " kp " << daft_kp.size() << std::endl;
+        std::cout << " t_" << its-1 << " = " << last_t << " f(t_n-1) " << last_kp_size << std::endl;
+        std::cout << " t_" << its << " = " << t << " f(t_n)=" << kp_size << std::endl;
 
         // first iteration: guess step width
-        if ( last_kp_size == 0 )
+        if ( its == 0 )
         {
-          float ratio = float(daft_kp.size()) / float(num_kp);
+          float ratio = float(kp_size) / float(num_kp);
           last_t = t;
           t *= 1.0 + 0.5 * (ratio-1.0);
         }
         else
         {
-          // compute zero crossing of secant f(x)=ax+b
-          float a = (daft_kp.size() - last_kp_size) / ( t - last_t );
-          float b = (last_kp_size - num_kp) - a * ( last_t );
-          float zero_crossing = -b / a;
+          // compute zero crossing of secant
+          float t_next = t - ( float(t-last_t) / float(kp_size-last_kp_size) * float(kp_size-num_kp) );
           last_t = t;
-          t = zero_crossing;
+          t = t_next;
         }
-        std::cout << " t " << t << " p.det_threshold_ " << p.det_threshold_ << std::endl;
+        std::cout << " t_" << its+1 << " = " << t << std::endl;
 
+        its++;
+        std::cout << std::endl;
       }
     }
-#endif
 
     std::stringstream s;
     s << "img" << count;
     count++;
 
-    daft.detect(gray_img, depth_img, K_, daft_kp);
-    std::cout << name << " " << s.str() << " #kp = " << daft_kp.size() << std::endl;
+#if 0
+    for ( int i=0; i<3; i++ )
+    {
+      daft.detect(gray_img, depth_img, K_, kp);
+    }
+    {
+      boost::timer timer;
+      timer.restart();
+      for ( int i=0; i<10; i++ )
+      {
+        daft.detect(gray_img, depth_img, K_, kp);
+      }
+      std::cout << name << " execution time [ms]: " << timer.elapsed()*100 << std::endl;
+    }
+#else
+    std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
+    std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
 
-    storeKeypoints(daft_kp, s.str(), name, rgb_img );
-    //storeKeypoints(cv::makeKeyPoints(daft_kp), s.str(), name+" circular" );
+    storeKeypoints(kp, s.str(), name, rgb_img );
+#endif
 
 #if 0
     std::cout << "Press any Key to continue!" << std::endl;
     getchar();
 #endif
   }
-
 }
 
-
-
-void ExtractDetectorFile::extractKeypoints()
+void ExtractDetectorFile::extractAllKeypoints()
 {
-  uint32_t count = 1;
-
-  std::vector< ImageData >::iterator it;
-
   cv::DAFT::DetectorParams p;
   p.max_px_scale_ = 500;
-  //p.min_px_scale_ = 3;
-  //p.base_scale_ = 0.0125;
-  //p.scale_levels_ = 5;
+  p.min_px_scale_ = 3;
+//  p.base_scale_ = 0.0125;
+//  p.scale_levels_ = 5;
   p.det_threshold_ = 0.1;//115;
   p.pf_threshold_ = 10;
+
+  p.det_type_=p.DET_DOB;
   p.affine_=false;
-  p.max_search_algo_ = p.MAX_WINDOW;
-  extractDaftKeypoints( p, "DAFT" );
+  p.max_search_algo_ = p.MAX_FAST;
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
 
-  cv::DAFT::DetectorParams p_affine=p;
-  //p_affine.det_threshold_ = 0.1;
-  p_affine.affine_=true;
-  p_affine.max_search_algo_ = p.MAX_WINDOW_AFFINE;
-  extractDaftKeypoints( p_affine, "DAFT affine" );
+  p.det_type_=p.DET_DOB;
+  p.affine_=true;
+  p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
-  cv::DAFT::DetectorParams p_laplace=p;
-  //p_laplace.det_threshold_ = 0.1;
-  p_laplace.det_type_ = p.DET_LAPLACE;
-  p_laplace.max_search_algo_ = p_laplace.MAX_WINDOW;
-  p_laplace.affine_ = false;
+  p.det_type_ = p.DET_LAPLACE;
+  p.max_search_algo_ = p.MAX_FAST;
+  p.affine_ = false;
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
-  extractDaftKeypoints( p_laplace, "DAFT Laplace" );
+  p.det_type_ = p.DET_LAPLACE;
+  p.max_search_algo_ = p.MAX_FAST;
+  p.affine_ = true;
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  p_laplace.affine_ = true;
-  //p_laplace.det_threshold_ = 0.1;
-  p_laplace.max_search_algo_ = p_laplace.MAX_WINDOW_AFFINE;
-  extractDaftKeypoints( p_laplace, "DAFT Laplace affine" );
-
-  cv::SIFT sift;
-  cv::SURF surf;
-
-  int it_step;
-  std::vector< ImageData >::iterator it_end,it_begin;
-  if ( reverse_order_ )
-  {
-    it_step = -1;
-    it_begin = image_store_.end()-1;
-    it_end = image_store_.begin()-1;
-  }
-  else
-  {
-    it_step = 1;
-    it_begin = image_store_.begin();
-    it_end = image_store_.end();
-  }
-
-  // !!! -1 because of the initial push_back in createTestFiles() ... !!!
-  for (it = it_begin; it != it_end; it+=it_step)
-  {
-    std::vector<cv::KeyPoint> sift_kp,surf_kp;
-
-    cv::Mat bag_rgb_img = it->rgb_image.get()->image;
-    cv::Mat bag_depth_img = it->depth_image.get()->image;
-
-    cv::Mat rgb_img;
-    cv::Mat depth_img;
-
-    int scale_fac = bag_rgb_img.cols / bag_depth_img.cols;
-
-#if 1
-    // Resize depth to have the same width as rgb
-    cv::resize( bag_depth_img, depth_img, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
-
-    // Crop rgb so it has the same size as depth
-    rgb_img = cv::Mat( bag_rgb_img, cv::Rect( 0,0, depth_img.cols, depth_img.rows ) );
-#else
-    depth_img = bag_depth_img;
-    // make intensity image smaller to have the same aspect ratio and size as depth
-    cv::Mat tmp1 = cv::Mat( bag_rgb_img, cv::Rect( 0,0, depth_img.cols*scale_fac, depth_img.rows*scale_fac ) );
-    cv::resize( tmp1, rgb_img, cvSize(depth_img.cols, depth_img.rows) );
-#endif
-
-    cv::GaussianBlur( depth_img, depth_img, cv::Size(), 2, 2 );
-
-    double minval,maxval;
-    cv::minMaxIdx( depth_img, &minval, &maxval );
-
-#if 0
-    cv::Mat tmp = depth_img.clone();
-    tmp -= minval;
-    tmp *= 1.0/(maxval-minval);
-    cv::imshow( "Depth", tmp );
-    cv::waitKey(100);
-#endif
-
-    cv::Mat gray_img;
-    cv::cvtColor( rgb_img, gray_img, CV_BGR2GRAY );
-
-    cv::Mat mask;
-
-    const int num_kp = 750;
-
-    if ( it == it_begin )
-    {
-      double t=1;
-      while ( sift_kp.size() == 0 || std::abs(sift_kp.size() - num_kp ) > 10 )
-      {
-        sift_kp.clear();
-        cv::SIFT::CommonParams cp;
-        cv::SIFT::DetectorParams detp;
-        cv::SIFT::DescriptorParams descp;
-        detp.threshold = detp.GET_DEFAULT_THRESHOLD() * t;
-        sift = cv::SIFT( cp, detp, descp );
-
-        std::cout << "edge_t " << detp.edgeThreshold << std::endl;
-
-        sift( gray_img, mask, sift_kp );
-        std::cout << "sift_kp " << sift_kp.size() << std::endl;
-
-        float ratio = float(sift_kp.size()) / float(num_kp);
-
-        t *= 1.0 + 0.5 * (ratio-1.0);
-        std::cout << "ratio " << ratio << " t " << t << std::endl;
-      }
-      t=1;
-      while ( surf_kp.size() == 0 || std::abs(surf_kp.size() - num_kp ) > 10 )
-      {
-        surf_kp.clear();
-        surf = cv::SURF( t * 100.0 );
-
-        surf( gray_img, mask, surf_kp );
-        std::cout << "surf_kp " << surf_kp.size() << std::endl;
-
-        float ratio = float(surf_kp.size()) / float(num_kp);
-
-        t *= 1.0 + 0.5 * (ratio-1.0);
-        std::cout << "ratio " << ratio << " t " << t << std::endl;
-      }
-      t=1;
-#if 0
-      // compare speeds
-      for ( int i=0; i<3; i++ )
-      {
-        surf( gray_img, mask, surf_kp );
-      }
-      {
-        boost::timer timer;
-        timer.restart();
-        for ( int i=0; i<10; i++ )
-        {
-          surf( gray_img, mask, surf_kp );
-        }
-        std::cout << "surf execution time [ms]: " << timer.elapsed()*100 << std::endl;
-      }
-      for ( int i=0; i<3; i++ )
-      {
-        sift( gray_img, mask, sift_kp );
-      }
-      {
-        boost::timer timer;
-        timer.restart();
-        for ( int i=0; i<10; i++ )
-        {
-          sift( gray_img, mask, sift_kp );
-        }
-        std::cout << "sift execution time [ms]: " << timer.elapsed()*100 << std::endl;
-      }
-#endif
-    }
-    sift( gray_img, mask, sift_kp );
-    std::cout << "sift_kp " << sift_kp.size() << std::endl;
-    surf( gray_img, mask, surf_kp );
-    std::cout << "surf_kp " << surf_kp.size() << std::endl;
-
-
-    // draw keypoints
-    cv::Mat sift_img,surf_img;
-
-    std::stringstream s;
-    s << "img" << count;
-    count++;
-
-    storeKeypoints(sift_kp, s.str(), "SIFT", rgb_img );
-    storeKeypoints(surf_kp, s.str(), "SURF", rgb_img );
-
-#if 0
-    std::cout << "Press any Key to continue!" << std::endl;
-    getchar();
-#endif
-  }
-
-}
-
-void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
-{
-  std::vector<cv::KeyPoint3D> keypoints_3d;
-  keypoints_3d.reserve( keypoints.size() );
-  for ( size_t i=0; i < keypoints.size(); i++ )
-  {
-    keypoints_3d.push_back( keypoints[i] );
-  }
-  storeKeypoints( keypoints_3d, img_name, extension, rgb_img );
+  //extractKeypoints( &getSurfKp, "SURF" );
+  //extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
@@ -537,8 +415,11 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
   cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-  //cv::imshow(name, kp_img);
-  //cv::waitKey(100);
+  cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
+  cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
+
+  cv::imshow(extension, kp_img);
+  cv::waitKey(100);
 
   cv::imwrite( extra_folder_ + "/" + extension + " " + img_name + ".ppm", kp_img);
 }

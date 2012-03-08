@@ -256,6 +256,7 @@ fydy=h22/(h31*x + h32*y +h33) - (h21*x + h22*y +h23)*h32/(h31*x + h32*y +h33)^2;
 
 
 function [feat nb dim]=loadFeatures(file)
+file
 fid = fopen(file, 'r');
 dim=fscanf(fid, '%f',1);
 if dim==1
