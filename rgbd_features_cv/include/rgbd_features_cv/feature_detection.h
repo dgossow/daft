@@ -54,11 +54,10 @@ void convolve( const cv::Mat1d &ii,
  */
 template <float (*F)( const Mat1d &ii,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )>
+    int x, int y, float sp, float sw, float min_sp )>
 void convolveAffine( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    const cv::Matx33f& camera_matrix,
     float base_scale,
     float min_px_scale,
     float max_px_scale,
@@ -163,11 +162,10 @@ void convolve( const cv::Mat1d &ii,
 
 template <float (*F)( const Mat1d &ii,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )>
+    int x, int y, float sp, float sw, float min_sp )>
 void convolveAffine( const cv::Mat1d &ii,
     const cv::Mat1f &scale_map,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    const cv::Matx33f& camera_matrix,
     float base_scale,
     float min_px_scale,
     float max_px_scale,
@@ -200,52 +198,10 @@ void convolveAffine( const cv::Mat1d &ii,
       }
       */
 
-      img_out(y,x) = F( ii, ii_depth_map, ii_depth_count, camera_matrix, x, y, s, base_scale );
+      img_out(y,x) = F( ii, ii_depth_map, ii_depth_count, x, y, s, base_scale, min_px_scale );
     }
   }
 }
-
-template <float (*F)(const Mat1d &ii, int x, int y, float major, float minor, float angle)>
-void convolveAffine2( const cv::Mat1d &ii,
-    const cv::Mat1f &scale_map,
-    const Mat1d &ii_depth_map,
-    cv::Mat_<uint64_t> ii_depth_count,
-    const cv::Matx33f& camera_matrix,
-    float base_scale,
-    float min_px_scale,
-    float max_px_scale,
-    cv::Mat1f &img_out )
-{
-  img_out.create( ii.rows-1, ii.cols-1 );
-  static const float nan = std::numeric_limits<float>::quiet_NaN();
-  for ( int y = 0; y < ii.rows-1; y++ )
-  {
-    for ( int x = 0; x < ii.cols-1; ++x )
-    {
-      float s = scale_map[y][x] * base_scale;
-      if ( s < min_px_scale || s > max_px_scale )
-      {
-        img_out(y,x) = nan;
-        continue;
-      }
-
-      float angle, major, minor;
-      Point3f normal;
-      bool ok = getAffine(ii_depth_map, ii_depth_count,
-          x, y, s, base_scale,
-          angle, major, minor, normal);
-      // break if gradient can not be computed
-      // or minor axis too small
-      if(!ok || minor < min_px_scale) {
-        img_out(y,x) = nan;
-        continue;
-      }
-
-      img_out(y,x) = F( ii, x, y, major, minor, angle );
-    }
-  }
-}
-
 
 template <float (*F)(const Mat1d&, int, int, float)>
 void filterKpKernel( const cv::Mat1d& ii,
