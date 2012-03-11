@@ -16,7 +16,7 @@ namespace cv
 /*!
   Extracts keypoints from an image based on intensity and depth data
 */
-class DAFT
+class DAFT2
 {
 public:
 
@@ -101,9 +101,9 @@ public:
   /** Constructor
    * @param detector_params parameters to use
    */
-  DAFT(const DetectorParams & detector_params = DetectorParams());
+  DAFT2(const DetectorParams & detector_params = DetectorParams());
 
-  ~DAFT();
+  ~DAFT2();
 
   /** Detect salient keypoints on a rectified depth+intensity image
    * @param image the image to compute the features and descriptors on

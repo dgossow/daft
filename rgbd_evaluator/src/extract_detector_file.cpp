@@ -186,6 +186,8 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
   sift( gray_img, mask, kp );
   return makeKp3d( kp );
 }
+
+/*
 std::vector<cv::KeyPoint3D> getDaftKp( cv::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
   std::vector<cv::KeyPoint3D> kp;
@@ -194,6 +196,17 @@ std::vector<cv::KeyPoint3D> getDaftKp( cv::DAFT::DetectorParams p, const cv::Mat
   daft.detect( gray_img, depth_img, K, kp );
   return kp;
 }
+*/
+
+std::vector<cv::KeyPoint3D> getDaftKp( cv::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+{
+  std::vector<cv::KeyPoint3D> kp;
+  p.det_threshold_ *= t;
+  cv::DAFT daft( p );
+  daft.detect( gray_img, depth_img, K, kp );
+  return kp;
+}
+
 
 void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 {
@@ -241,6 +254,16 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     // make intensity image smaller to have the same aspect ratio and size as depth
     cv::Mat tmp1 = cv::Mat( bag_rgb_img, cv::Rect( 0,0, depth_img.cols*scale_fac, depth_img.rows*scale_fac ) );
     cv::resize( tmp1, rgb_img, cvSize(depth_img.cols, depth_img.rows) );
+
+    static bool b=0;
+    if ( !b )
+    {
+      K_(0,0)/=2.0;
+      K_(1,1)/=2.0;
+      K_(0,2)/=2.0;
+      K_(1,2)/=2.0;
+      b=1;
+    }
 #endif
 
 #if 0
@@ -334,9 +357,9 @@ void ExtractDetectorFile::extractAllKeypoints()
 {
   cv::DAFT::DetectorParams p;
   p.max_px_scale_ = 500;
-  p.min_px_scale_ = 3;
-//  p.base_scale_ = 0.0125;
-//  p.scale_levels_ = 5;
+  p.min_px_scale_ = 2;
+  //p.base_scale_ = 0.02;
+  //p.scale_levels_ = 1;
   p.det_threshold_ = 0.1;//115;
   p.pf_threshold_ = 10;
 
@@ -356,7 +379,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
   p.det_type_ = p.DET_LAPLACE;
-  p.max_search_algo_ = p.MAX_FAST;
+  p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
   p.affine_ = true;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 

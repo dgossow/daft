@@ -3,10 +3,10 @@
  * Copyright (C) 2011 David Gossow
  */
 
-#include "rgbd_features_cv/daft.h"
-#include "rgbd_features_cv/filter_kernels.h"
-#include "rgbd_features_cv/feature_detection.h"
-#include "rgbd_features_cv/descriptor_computation.h"
+#include "daft2.h"
+#include "filter_kernels.h"
+#include "feature_detection.h"
+#include "descriptor.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -39,12 +39,32 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     cvtColor(image, gray_image_orig, CV_BGR2GRAY);
   }
 
-  // Convert 8-Bit to Float image
-  cv::Mat1d gray_image;
-  if (gray_image_orig.type() != CV_64F) {
-    gray_image_orig.convertTo(gray_image, CV_64F, 1.0 / 255.0, 0.0);
-  } else {
-    gray_image = gray_image_orig;
+  // Construct integral image
+  Mat1d ii;
+
+  switch (gray_image_orig.type())
+  {
+  case CV_8U:
+  {
+    cv::Mat1b m_in = gray_image_orig;
+    integral2( m_in, ii, 1.0/255.0 );
+  }
+  break;
+  case CV_64F:
+  {
+    cv::Mat1d m_in = gray_image_orig;
+    integral2( m_in, ii );
+  }
+  break;
+  case CV_32F:
+  {
+    cv::Mat1f m_in = gray_image_orig;
+    integral2( m_in, ii );
+  }
+  break;
+  default:
+    //return;
+    break;
   }
 
   // Convert depth map to floating point
@@ -65,7 +85,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
           std::min(image.rows, image.cols) / 16 : params_.max_px_scale_;
 
   const float f = K(0, 0);
-
 
   // Integrate Depth + Depth count (#of valid pixels)
   cv::Mat1d ii_depth_map(depth_map.rows + 1, depth_map.cols + 1);
@@ -140,58 +159,93 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
   }
 
-  // Construct integral image
-  Mat1d ii;
-  integral(gray_image, ii);
-
   kp.clear();
   kp.reserve(50000);
-
-  Mat1f response_map;
-  response_map.create(gray_image_orig.rows, gray_image_orig.cols);
-
-  double scale = base_scale;
 
 #if 0
   cv::Mat1f grad_map_x(depth_map.size());
   cv::Mat1f grad_map_y(depth_map.size());
-  convolveAffine<gradX>(ii, scale_map, ii_depth_map, ii_depth_count, K, scale,
+  convolveAffine<gradX>(ii, scale_map, ii_depth_map, ii_depth_count, base_scale,
       params_.min_px_scale_, max_px_scale, grad_map_x);
-  convolveAffine<gradY>(ii, scale_map, ii_depth_map, ii_depth_count, K, scale,
+  convolveAffine<gradY>(ii, scale_map, ii_depth_map, ii_depth_count, base_scale,
       params_.min_px_scale_, max_px_scale, grad_map_y);
   cv::imshow("grad_map_x", grad_map_x * 0.2 + 0.5);
   cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
 #endif
 
-  // detect keypoints
-  for (int scale_level = 0; scale_level < scale_levels; scale_level++, scale *=
-      params_.scale_step_) {
-    //float mean_response;
+  cv::imshow( "img", gray_image_orig );
+
+  std::vector<Mat1f> smoothed_images(scale_levels+1);
+
+  // compute depth-normalized image pyramid
+  double scale = base_scale;
+  for (int scale_level = 0; scale_level < scale_levels+1; scale_level++, scale *= params_.scale_step_)
+  {
+    std::cout << "l " << scale_level << std::endl;
+    Mat1f& smoothed_image = smoothed_images[scale_level];
+    smoothed_image.create(gray_image_orig.rows, gray_image_orig.cols);
 
     // compute filter response for all pixels
     switch (params_.det_type_) {
     case DetectorParams::DET_DOB:
       if (params_.affine_) {
-        convolveAffine<dobAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
-            scale, params_.min_px_scale_, max_px_scale, response_map);
+        convolveAffine<boxAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
+            scale, params_.min_px_scale_, max_px_scale, smoothed_image);
       } else {
-        convolve<dob>(ii, scale_map, scale, params_.min_px_scale_,
-            max_px_scale, response_map);
+        convolve<box>(ii, scale_map, scale, params_.min_px_scale_,
+            max_px_scale, smoothed_image);
       }
       break;
     case DetectorParams::DET_LAPLACE:
       if (params_.affine_) {
-          convolveAffine<laplaceAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
-              scale, params_.min_px_scale_, max_px_scale, response_map);
+          convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
+              scale, params_.min_px_scale_, max_px_scale, smoothed_image);
       } else {
-        convolve<laplace>(ii, scale_map, scale, params_.min_px_scale_,
-            max_px_scale, response_map);
-//       showBig( 128, sLaplaceKernel.asCvImage() + 0.5f, "laplace" );
+        convolve<gauss>(ii, scale_map, scale, params_.min_px_scale_,
+            max_px_scale, smoothed_image);
+
+        //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
+        //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;
       }
       break;
     default:
       return;
     }
+
+#if 0
+    {
+      static int i=0;
+      cv::Mat display_image;
+      smoothed_image.convertTo( display_image, CV_8UC1, 255, 0.0 );
+      std::ostringstream s;
+      s << "frame # " << i;
+      cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
+
+      s.str("");
+      s << "Smooth Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
+      cv::imshow( s.str(), display_image );
+      cv::waitKey(100);
+
+      /*
+       cv::imshow( "dep orig", depth_map_orig );
+       cv::imshow( "dep", depth_map );
+       cv::imshow( "det", detector_image );
+       cv::imshow( "scale", scale_map );
+       */
+
+      i++;
+    }
+#endif
+  }
+
+  Mat1f response_map;
+  response_map.create(gray_image_orig.rows, gray_image_orig.cols);
+
+  // compute difference of gaussians and detect extrema
+  scale = base_scale;
+  for (int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_)
+  {
+    diff( smoothed_images[scale_level+1], smoothed_images[scale_level], response_map );
 
     // save index where new kps will be inserted
     unsigned kp_first = kp.size();
@@ -262,7 +316,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
       s.str("");
-      s << "Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
+      s << "Response Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
       cv::imshow( s.str(), display_image );
 
       /*
@@ -275,7 +329,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       i++;
     }
 #endif
-
   }
 
   // filter found maxima by applying a threshold on a second kernel
