@@ -243,7 +243,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
     int scale_fac = bag_rgb_img.cols / bag_depth_img.cols;
 
-#if 1
+#if 0
     // Resize depth to have the same width as rgb
     cv::resize( bag_depth_img, depth_img, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
 
@@ -358,8 +358,8 @@ void ExtractDetectorFile::extractAllKeypoints()
   cv::DAFT::DetectorParams p;
   p.max_px_scale_ = 500;
   p.min_px_scale_ = 2;
-  //p.base_scale_ = 0.02;
-  //p.scale_levels_ = 1;
+  p.base_scale_ = 0.02;
+  p.scale_levels_ = 1;
   p.det_threshold_ = 0.1;//115;
   p.pf_threshold_ = 10;
 
@@ -370,18 +370,23 @@ void ExtractDetectorFile::extractAllKeypoints()
 
   p.det_type_=p.DET_DOB;
   p.affine_=true;
-  p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  p.max_search_algo_ = p.MAX_WINDOW;
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
-  p.det_type_ = p.DET_LAPLACE;
-  p.max_search_algo_ = p.MAX_FAST;
+  p.det_type_ = p.DET_DOG9x9;
+  p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = false;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
-  p.det_type_ = p.DET_LAPLACE;
-  p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
+  p.det_type_ = p.DET_DOG9x9;
+  p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+
+  p.det_type_ = p.DET_DOG;
+  p.max_search_algo_ = p.MAX_WINDOW;
+  p.affine_ = true;
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
   //extractKeypoints( &getSurfKp, "SURF" );
   //extractKeypoints( &getSiftKp, "SIFT" );
