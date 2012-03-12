@@ -180,7 +180,7 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
   cv::SIFT::DescriptorParams descp;
   detp.threshold = detp.GET_DEFAULT_THRESHOLD() * t;
   //detp.edgeThreshold = detp.GET_DEFAULT_EDGE_THRESHOLD() * t;
-  cv::SIFT sift = cv::SIFT( cp, detp, descp );
+  cv::SIFT sift( cp, detp, descp );
   std::vector<cv::KeyPoint> kp;
   cv::Mat mask;
   sift( gray_img, mask, kp );
