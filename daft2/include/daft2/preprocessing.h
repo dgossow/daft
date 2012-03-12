@@ -9,6 +9,10 @@
 #ifndef __DAFT2_PREPROCESSING_H__
 #define __DAFT2_PREPROCESSING_H__
 
+namespace cv
+{
+namespace daft2
+{
 
 template< int MaxGapSize >
 void improveDepthMap( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, float max_depth_delta )
@@ -152,5 +156,7 @@ void improveDepthMap( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, flo
 */
 }
 
+}
+}
 
 #endif

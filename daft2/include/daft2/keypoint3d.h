@@ -12,6 +12,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 /*!
   RGBD features implementation.
@@ -62,6 +64,7 @@ vector<KeyPointT> getStrongest( size_t number, vector<KeyPointT> kp_in )
   return kp_in;
 }
 
+}
 }
 
 #endif

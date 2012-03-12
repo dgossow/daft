@@ -14,6 +14,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 /**
  * Approximate ellipse by a convex polygon with
@@ -95,7 +97,6 @@ void approxEllipse45( float beta, float b, float a, Point2f vertices[4] )
   {
     vertices[i] = inter[i] * scaling;
   }
-}
 
 #define ASTEP 16;
 #define MSTEP 16;
@@ -121,4 +122,7 @@ float ellipseMean( const Mat1d& ii, const Mat1d& lii, const Mat1d& rii, float x,
   int m = minor * float(MSTEP-1);
   Point2f vertices[4] = ellipse_vertices[a][m];
   float i1 = ii[ y + int( vertices[0] ) ][];
+}
+
+}
 }

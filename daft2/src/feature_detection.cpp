@@ -14,6 +14,9 @@
 
 namespace cv
 {
+namespace daft2
+{
+
 
 void diff( const cv::Mat1f& l1, const cv::Mat1f& l2, cv::Mat1f& out )
 {
@@ -476,3 +479,4 @@ void filterKpNeighbours( const cv::Mat1d& response_map,
 }
 
 } 
+}

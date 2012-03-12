@@ -4,6 +4,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 inline void showBig( int size, cv::Mat img, std::string name )
 {
@@ -281,6 +283,7 @@ static Kernel2DCache sDxyKernelCache = Kernel2DCache::Create<detail::DxyKernel, 
 //static Kernel2DCache sDyyKernelCacheNaa = Kernel2DCache::Create<detail::DyyKernel, false, 1>(1.2f, "DyyKernel NAA");
 //static Kernel2DCache sDxyKernelCacheNaa = Kernel2DCache::Create<detail::DxyKernel, false, 1>(1.2f, "DxyKernel NAA");
 
+}
 }
 
 #endif

@@ -11,6 +11,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 /** Interpolates linerarly between v1 and v2 given a percentage t */
 template<typename T>
@@ -256,6 +258,7 @@ inline bool ellipseContains(float x, float y, float A, float B, float C)
   return A*x*x + B*x*y + C*y*y <= 1.0f;
 }
 
+}
 }
 
 #endif

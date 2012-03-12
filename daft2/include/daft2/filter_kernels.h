@@ -16,6 +16,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 inline float gradX( const Mat1d &ii,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
@@ -514,7 +516,7 @@ inline float harris( const Mat1d &ii, int x, int y, float s_real )
 }
 
 
-
+}
 }
 
 #endif //rgbd_features_math_stuff_h_

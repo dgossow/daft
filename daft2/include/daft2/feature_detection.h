@@ -18,6 +18,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 /*!
  Compute the kernel response for every pixel of the given image.
@@ -317,7 +319,7 @@ void filterKpKernelAffine( const Mat1d& ii,
   }
 }
 
-
+}
 }
 
 #endif

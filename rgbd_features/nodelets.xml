@@ -1,8 +1,0 @@
-<!-- Kinect driver nodelet publisher -->
-<library path="lib/libextract_rgbd_features_nodelet">
-  <class name="rgbd_features/ExtractRgbdFeaturesNodelet" type="rgbd_features::ExtractRgbdFeaturesNodelet" base_class_type="nodelet::Nodelet">
-    <description>
-      This nodelet extracts features from the Kinect data
-    </description>
-  </class>
-</library>

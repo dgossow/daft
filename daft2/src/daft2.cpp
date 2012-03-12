@@ -16,6 +16,8 @@
 #include <cmath>
 
 namespace cv {
+namespace daft2 {
+
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -424,4 +426,5 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
 }
 
+}
 }

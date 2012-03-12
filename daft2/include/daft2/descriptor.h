@@ -17,6 +17,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 void imshow2( std::string win_title, cv::Mat img, int size = 256 )
 {
@@ -377,6 +379,7 @@ inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx3
   imshow2("dy",dyimg);
 }
 
+}
 }
 
 #endif

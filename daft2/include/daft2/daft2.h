@@ -12,6 +12,8 @@
 
 namespace cv
 {
+namespace daft2
+{
 
 /*!
   Extracts keypoints from an image based on intensity and depth data
@@ -120,6 +122,7 @@ private:
   DetectorParams params_;
 };
 
+}
 }
 
 #endif
