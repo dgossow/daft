@@ -185,7 +185,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       } else {
         convolve<laplace>(ii, scale_map, scale, params_.min_px_scale_,
             max_px_scale, response_map);
-//       showBig( 128, sLaplaceKernel.asCvImage() + 0.5f, "laplace" );
+        //showBig( 128, sLaplaceKernel.asCvImage() + 0.5f, "laplace" );
       }
       break;
     default:

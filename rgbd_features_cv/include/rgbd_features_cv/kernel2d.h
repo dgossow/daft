@@ -112,9 +112,9 @@ struct Kernel2D
         float v;
         if(Samples > 0) {
           v = 0.0f;
-          for(int i=-Samples; i<=+Samples; i++) {
-            for(int j=-Samples; j<=+Samples; j++) {
-              Point2f q = rotation * Point2f(x + float(j)*float(Samples)/float(2*Samples+1), y + float(i)*float(Samples)/float(2*Samples+1));
+          for(int k=-Samples; k<=+Samples; k++) {
+            for(int l=-Samples; l<=+Samples; l++) {
+              Point2f q = rotation * Point2f(x + float(l)*float(Samples)/float(2*Samples+1), y + float(k)*float(Samples)/float(2*Samples+1));
               v += F(sigma, q.x , q.y);
             }
           }
@@ -179,9 +179,7 @@ struct Kernel2DCache
   static const float cRatioMin = 0.2f;
   static const float cRatioMax = 1.0f;
   static const int cRatioSteps = 25;
-  static const float cAngleMin = 0.0f;
-  static const float cAngleMax = M_PI;
-  static const int cAngleSteps = 50;
+  static const int cAngleSteps = 90;
 
   float convolve(float values[9][9], float ratio, float angle) const {
     int ox = findRatioPos(ratio);
@@ -199,11 +197,11 @@ struct Kernel2DCache
 private:
   template <float (*F)(float,float,float), bool AxisAligned, int Samples>
   void create(float sigma, const char* name) {
-    kernel_cache_ = Mat1f(9*(cAngleSteps+1), 9*(cRatioSteps+1));
-    for(int oy=0; oy<cAngleSteps+1; oy++) {
-      for(int ox=0; ox<cRatioSteps+1; ox++) {
-        float angle = cAngleMin + float(oy) / float(cAngleSteps + 1) * (cAngleMax - cAngleMin);
-        float ratio = cRatioMin + float(ox) / float(cRatioSteps + 1) * (cRatioMax - cRatioMin);
+    kernel_cache_ = Mat1f(9*(cAngleSteps), 9*(cRatioSteps));
+    for(int oy=0; oy<cAngleSteps; oy++) {
+      for(int ox=0; ox<cRatioSteps; ox++) {
+        float angle = float(oy) / float(cAngleSteps) * M_PI;
+        float ratio = cRatioMin + float(ox) / float(cRatioSteps-1) * (cRatioMax - cRatioMin);
 //        std::cout << angle << " " << ratio << std::endl;
         float ca = std::cos(angle);
         float sa = std::sin(angle);
@@ -227,13 +225,13 @@ private:
   }
 
   int findRatioPos(float ratio) const {
-    float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps + 1);
+    float p = (ratio - cRatioMin) / (cRatioMax - cRatioMin) * float(cRatioSteps-1);
     int pi = static_cast<int>(p + 0.5f); // round
     if(pi < 0) {
       pi = 0;
     }
-    if(pi >= cRatioSteps + 1) {
-      pi = cRatioSteps;
+    if(pi >= cRatioSteps) {
+      pi = cRatioSteps-1;
     }
     return pi;
   }
@@ -242,10 +240,10 @@ private:
     while(angle < 0.0f) angle += 2.0f*M_PI;
     while(angle > 2.0f*M_PI) angle -= 2.0f*M_PI;
     if(angle > M_PI) angle -= M_PI;
-    float p = (angle - cAngleMin) / (cAngleMax - cAngleMin) * float(cAngleSteps + 1);
+    float p = angle / M_PI * float(cAngleSteps);
     int pi = static_cast<int>(p + 0.5f); // round
-    if(pi == cAngleSteps + 1) {
-      pi --;
+    if(pi == cAngleSteps) {
+      pi = 0;
     }
     return pi;
   }

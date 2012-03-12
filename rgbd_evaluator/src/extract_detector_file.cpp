@@ -272,7 +272,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
       while ( ( kp_size == 0 ) || ( std::abs(kp_size - num_kp) > 10 ) )
       {
         last_kp_size = kp_size;
-        kp_size = getKp( gray_img, depth_img, K_, t ).size();
+        std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
+        kp_size = kp.size();
 
         std::cout << " t_" << its-1 << " = " << last_t << " f(t_n-1) " << last_kp_size << std::endl;
         std::cout << " t_" << its << " = " << t << " f(t_n)=" << kp_size << std::endl;
@@ -292,6 +293,11 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
           t = t_next;
         }
         std::cout << " t_" << its+1 << " = " << t << std::endl;
+
+        cv::Mat kp_img;
+        cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::imshow("KP", kp_img);
+        cv::waitKey(200);
 
         its++;
         std::cout << std::endl;
@@ -348,20 +354,20 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = false;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW_AFFINE;
   p.affine_ = true;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  //extractKeypoints( &getSurfKp, "SURF" );
-  //extractKeypoints( &getSiftKp, "SIFT" );
+  extractKeypoints( &getSurfKp, "SURF" );
+  extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
@@ -418,10 +424,23 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
 
-  cv::imshow(extension, kp_img);
+  //cv::imshow(extension, kp_img);
   cv::waitKey(100);
 
-  cv::imwrite( extra_folder_ + "/" + extension + " " + img_name + ".ppm", kp_img);
+  static int img_count = 0;
+
+  std::stringstream s;
+  s.width(3);
+  s.fill('0');
+  s << img_count;
+
+  //std::string img_file_name = extra_folder_ + "/" + extension + " " + img_name + ".ppm";
+  std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
+
+  std::cout << "Writing " << img_file_name << std::endl;
+
+  cv::imwrite( img_file_name, kp_img);
+  img_count++;
 }
 
 void ExtractDetectorFile::splitFileName(const std::string& str)

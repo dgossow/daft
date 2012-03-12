@@ -55,16 +55,12 @@ void findMaxima( const cv::Mat1d &img,
       int window = s; //(s+0.5) / 2.0 - 0.5;
       if ( window < 1 ) window = 1;
 
-      const int window_sqr = window*window + 1;
-
-      //static const int window = 1;
-
       bool isMax = true;
       for ( int v = 0; isMax && v <= window; v++ )
       {
         // w = width of circle at that y coordinate
         int w=cos(asin(double(v)/double(window+0.5))) * (double)window + 0.5;
-        for ( int u = w; isMax && u <= w; u++ )
+        for ( int u = 0; isMax && u <= w; u++ )
         {
           if (u==0 && v==0)
           {
@@ -79,7 +75,6 @@ void findMaxima( const cv::Mat1d &img,
           }
         }
       }
-      std::cout << std::endl << std::endl;
 
       if ( isMax )
       {
@@ -155,28 +150,51 @@ void findMaximaAffine(
 //      if((y*img.rows + x) % 100 == 0) {
 //        std::cout << window << " " << angle << " " << major << " " << minor << " " << A << " " << B << " " << C << std::endl;
 //      }
+      //angle = 45;
+
+      float cos_angle = cos(angle);
 
       bool is_max = true;
-      for ( int v = -window; is_max && v <= window; v++ )
+      for ( int v = 0; is_max && v <= window; v++ )
       {
-        for ( int u = -window; is_max && u <= window; u++ )
+        int c = float(v) * cos_angle;
+        //std::cout << " v " << v << " C " << c;
+        for ( int u = 0; is_max && u <= window; u++ )
         {
-          if (u==0 && v==0) {
-            continue;
-          }
+          int u2 = c+u;
           // check if point is in ellipse
-          if(!ellipseContains(u, v, A, B, C)) {
-//        if(!ellipseContains(u, v, 1.0f/(s*s), 0.0f, 1.0f/(s*s))) { // circle
-            // only check points in ellipse
+          if(!ellipseContains(u2, v, A, B, C)) {
+            break;
+          }
+          if (u2==0 && v==0)
+          {
             continue;
           }
           // check if other maximum found
-          if(img[y+v][x+u] >= val) {
+          if(img[y+v][x+u2] >= val || img[y-v][x+u2] >= val) {
+            // not a maximum -> search finished
+            is_max = false;
+          }
+        }
+        for ( int u = 0; is_max && u <= window; u++ )
+        {
+          int u2 = c-u;
+          // check if point is in ellipse
+          if(!ellipseContains(u2, v, A, B, C)) {
+            break;
+          }
+          if (u2==0 && v==0)
+          {
+            continue;
+          }
+          // check if other maximum found
+          if(img[y+v][x+u2] >= val || img[y-v][x+u2] >= val) {
             // not a maximum -> search finished
             is_max = false;
           }
         }
       }
+      //std::cout << std::endl;
 
       if(is_max) {
         // is a maximum -> add keypoint

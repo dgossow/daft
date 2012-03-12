@@ -102,7 +102,6 @@ inline float dobAffine( const Mat1d &ii,
 
     intersect_x += 0.5;
     intersect_y += 0.5;
-    major_axis.x += 0.5;
     major_axis.y += 0.5;
 
     // sizes of the four integral rectangles
@@ -112,6 +111,7 @@ inline float dobAffine( const Mat1d &ii,
 
     if ( major_axis.x > 0 )
     {
+      major_axis.x += 0.5;
       // major axis is in the top-right or bottom-left quadrant
       sx1 = std::max( intersect_x, major_axis.x );
       sy1 = std::max( intersect_y, major_axis.y );
@@ -120,6 +120,7 @@ inline float dobAffine( const Mat1d &ii,
     }
     else
     {
+      major_axis.x -= 0.5;
       sx1 = intersect_x;
       // major axis is in the top-left or bottom-right quadrant
       sy1 = intersect_y;
