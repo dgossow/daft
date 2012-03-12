@@ -5,8 +5,8 @@
 
 #include <opencv2/features2d/features2d.hpp>
 
-#ifndef __DAFT_H__
-#define __DAFT_H__
+#ifndef __DAFT2_H__
+#define __DAFT2_H__
 
 #include "keypoint3d.h"
 
@@ -22,9 +22,9 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_LAPLACE=1 };
+    enum { DET_DOB=0, DET_DOG=1, DET_DOG9x9=2 };
     enum { PF_NONE=0, PF_HARRIS=1, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
-    enum { MAX_WINDOW=0, MAX_WINDOW_AFFINE=1, MAX_FAST=2, MAX_EVAL=3 };
+    enum { MAX_WINDOW=0, MAX_FAST=2, MAX_EVAL=3 };
 
     enum { AUTO=-1 };
 

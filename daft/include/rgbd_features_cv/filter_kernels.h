@@ -65,7 +65,7 @@ inline float gradY( const Mat1d &ii,
 */
 inline float dobAffine( const Mat1d &ii,
     const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    const cv::Matx33f& camera_matrix, int x, int y, float sp, float sw )
+    int x, int y, float sp, float sw, float min_sp )
 {
   // sp : pixel scale
   // sw : world scale
@@ -81,7 +81,7 @@ inline float dobAffine( const Mat1d &ii,
 
     Point2f major_axis( -grad[1], grad[0] );
 
-    if ( major_axis.x != 0 && major_axis.y != 0 )
+    if ( major_axis.x != 0 || major_axis.y != 0 )
     {
       major_axis = major_axis * fastInverseLen(major_axis) * float(sp);
 
@@ -91,14 +91,13 @@ inline float dobAffine( const Mat1d &ii,
       }
     }
 
-    const float SQRT_PI_2 = 0.886;
+    static const float SQRT_PI_2 = 0.886;
 
     // intersection of ellipsis with x/y axis
-    float sw2 = sw*sw;
-    float norm1 = sp * sw * SQRT_PI_2;
+    const float sw2 = sw*sw;
+    const float norm1 = sp * sw * SQRT_PI_2;
     float intersect_x = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
     float intersect_y = norm1 * fastInverseSqrt( sw2 + grad[1]*grad[1] );
-
 
     intersect_x += 0.5;
     intersect_y += 0.5;
@@ -128,7 +127,7 @@ inline float dobAffine( const Mat1d &ii,
       sy2 = std::max( intersect_y, major_axis.y );
     }
 
-    if ( sx1 < 3 || sy1 < 3 || sx2 < 3 || sy2 < 3 )
+    if ( sx1 < min_sp || sy1 < min_sp || sx2 < min_sp || sy2 < min_sp )
     {
       return std::numeric_limits<float>::quiet_NaN();
     }
@@ -203,15 +202,26 @@ inline float laplaceAffineImpl( const Mat1d &ii, int x, int y, int a, float rati
   // read mean intensities for 9x9 grid
   float values[9][9];
   integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
-  // convolve with ansisotrope laplace filter
+  // convolve with ansisotropic laplace filter
   float response = sLaplaceKernelCache.convolve(values, ratio, angle);
   // return normalized absolute response
   return std::abs(response) / float(a*a);
 }
 
 /** float as parameter and interpolates */
-inline float laplaceAffine( const Mat1d &ii, int x, int y, float major, float minor, float angle )
+inline float laplaceAffine( const Mat1d &ii,
+	const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+	int x, int y, float sp, float sw, float min_sp )
 {
+    float angle, major, minor;
+    Point3f normal;
+    bool ok = getAffine(ii_depth_map, ii_depth_count, x, y, sp, sw, angle, major, minor, normal);
+    // break if gradient can not be computed
+    // or minor axis too small
+    if(!ok || minor < min_sp) {
+    	return std::numeric_limits<float>::quiet_NaN();
+    }
+
   float a = 0.5893f * major; // sqrt(2)/1.2/2
   int ai = int(a);
   float t = a - float(ai);
@@ -259,15 +269,6 @@ inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )
   float values[9][9];
   integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
 
-//  if ( x==300 && y==300 )
-//  {
-//    cv::Mat1f m1( 9,9, (float*)values[0] );
-//    std::ostringstream s;
-//    s << "s= " << s;
-//    float n = 1.0 / float(a*a);
-//    showBig( 128, m1*n, s.str() );
-//  }
-
   float dxx = sDxxKernel.convolve(values);
   float dyy = sDyyKernel.convolve(values);
   float dxy = sDxyKernel.convolve(values);
@@ -281,7 +282,6 @@ inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )
   }
 
   return trace*trace/det;
-
 }
 
 /** float as parameter and interpolates */

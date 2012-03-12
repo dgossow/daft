@@ -16,8 +16,8 @@
 
 #include <boost/timer.hpp>
 
-#include <rgbd_features_cv/daft.h>
-#include <rgbd_features_cv/preprocessing.h>
+#include <daft2/daft2.h>
+#include <daft2/preprocessing.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
