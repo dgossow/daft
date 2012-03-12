@@ -177,34 +177,43 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   cv::imshow( "img", gray_image_orig );
 
-  std::vector<Mat1f> smoothed_images(scale_levels+1);
+  std::vector<Mat1f> smoothed_imgs(scale_levels+1);
+  std::vector<Mat2f> depth_grads(scale_levels+1);
 
   // compute depth-normalized image pyramid
   double scale = base_scale;
   for (int scale_level = 0; scale_level < scale_levels+1; scale_level++, scale *= params_.scale_step_)
   {
     std::cout << "l " << scale_level << std::endl;
-    Mat1f& smoothed_image = smoothed_images[scale_level];
-    smoothed_image.create(gray_image_orig.rows, gray_image_orig.cols);
+
+    Mat1f& smoothed_img = smoothed_imgs[scale_level];
+    Mat2f& depth_grad = depth_grads[scale_level];
 
     // compute filter response for all pixels
     switch (params_.det_type_) {
     case DetectorParams::DET_DOB:
       if (params_.affine_) {
         convolveAffine<boxAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
-            scale, params_.min_px_scale_, max_px_scale, smoothed_image);
+            scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<box>(ii, scale_map, scale, params_.min_px_scale_,
-            max_px_scale, smoothed_image);
+            max_px_scale, smoothed_img);
       }
       break;
-    case DetectorParams::DET_LAPLACE:
+    case DetectorParams::DET_DOG:
+      if (params_.affine_) {
+        convolveAffineSep< gaussAffineX<4>, gaussAffineY<4> >(ii, scale_map, ii_depth_map, ii_depth_count,
+            scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
+      } else {
+      }
+      break;
+    case DetectorParams::DET_DOG9x9:
       if (params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
-              scale, params_.min_px_scale_, max_px_scale, smoothed_image);
+              scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<gauss>(ii, scale_map, scale, params_.min_px_scale_,
-            max_px_scale, smoothed_image);
+            max_px_scale, smoothed_img);
 
         //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
         //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;
@@ -214,11 +223,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       return;
     }
 
-#if 0
+#if 1
     {
       static int i=0;
       cv::Mat display_image;
-      smoothed_image.convertTo( display_image, CV_8UC1, 255, 0.0 );
+      smoothed_img.convertTo( display_image, CV_8UC1, 255, 0.0 );
       std::ostringstream s;
       s << "frame # " << i;
       cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
@@ -247,7 +256,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   scale = base_scale;
   for (int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_)
   {
-    diff( smoothed_images[scale_level+1], smoothed_images[scale_level], response_map );
+    diff( smoothed_imgs[scale_level+1], smoothed_imgs[scale_level], response_map );
+    Mat2f& depth_grad = depth_grads[scale_level];
 
     // save index where new kps will be inserted
     unsigned kp_first = kp.size();
@@ -255,11 +265,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     // find maxima in response
     switch (params_.max_search_algo_) {
     case DetectorParams::MAX_WINDOW:
-      findMaxima(response_map, scale_map, scale, params_.det_threshold_, kp);
-      break;
-    case DetectorParams::MAX_WINDOW_AFFINE:
-      findMaximaAffine(response_map, scale_map, ii_depth_map, ii_depth_count,
-          scale, params_.det_threshold_, kp);
+      if ( params_.affine_ ) {
+        findMaxima(response_map, scale_map, scale, params_.det_threshold_, kp);
+      }
+      else {
+        findMaximaAffine(response_map, scale_map, depth_grad,
+            scale, params_.det_threshold_, kp);
+      }
       break;
     case DetectorParams::MAX_FAST:
       findMaximaMipMap(response_map, scale_map, scale, params_.det_threshold_,
@@ -290,7 +302,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       return;
     }
 
-#if 0
+    std::cout << "l " << scale_level << ": " << kp.size()-kp_first << " keypoints found." << std::endl;
+
+#if 1
     {
       static int i=0;
       cv::Mat display_image;
@@ -302,13 +316,18 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
-        getAffine( ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
-            kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
-            kp[k].normal );
-        // keypoint shall cover outer and inner and wants size not radius
-        kp[k].affine_minor *= 4.0f;
-        kp[k].affine_major *= 4.0f;
-        kp2.push_back(kp_curr);
+
+        Vec2f grad;
+        if ( computeGradient( ii_depth_map, ii_depth_count, kp_x, kp_x, kp[k].size*0.25f, grad ) )
+        {
+          getAffine( grad, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
+              kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
+              kp[k].normal );
+          // keypoint shall cover outer and inner and wants size not radius
+          kp[k].affine_minor *= 4.0f;
+          kp[k].affine_major *= 4.0f;
+          kp2.push_back(kp_curr);
+        }
       }
 
 //      cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
@@ -376,7 +395,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     int kp_y = kp[k].pt.y;
     getPt3d(f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d);
 
-    if (getAffine(ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size * 0.25f,
+    Vec2f depth_grad;
+    computeGradient( ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size * 0.25f, depth_grad );
+
+    if (getAffine(depth_grad, kp_x, kp_y, kp[k].size * 0.25f,
         kp[k].world_size * 0.25f, kp[k].affine_angle, kp[k].affine_major,
         kp[k].affine_minor, kp[k].normal)) {
       // keypoint shall cover outer and inner and wants size not radius
