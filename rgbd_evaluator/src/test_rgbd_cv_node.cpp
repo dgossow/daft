@@ -16,7 +16,7 @@
 
 #include <boost/timer.hpp>
 
-#include <daft2/daft2.h>
+#include <daft2/daft.h>
 #include <daft2/preprocessing.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
@@ -56,7 +56,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   //orig_depth_image->image
 
   cv::Mat1f depth_image_closed,depth_image_smoothed;
-  improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
+  cv::daft2::improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
 
   cv::GaussianBlur( depth_image_closed, depth_image_smoothed, cv::Size(), 2, 2 );
 
@@ -74,7 +74,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
 
 
-  cv::DAFT::DetectorParams p1,p2,p3;
+  cv::daft2::DAFT::DetectorParams p1,p2,p3;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
   //p1.det_type_ = p1.DET_DOB;
@@ -121,7 +121,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p3 = p2;
   p3.max_search_algo_ = p2.MAX_EVAL;
 
-  cv::DAFT rgbd_features1(p1), rgbd_features2(p2), rgbd_features3(p3);
+  cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2), rgbd_features3(p3);
 
 #ifdef TRANSPOSE_IMAGE
   intensity_image = intensity_image.t();

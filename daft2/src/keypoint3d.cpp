@@ -15,8 +15,6 @@ const int draw_multiplier = 1 << draw_shift_bits;
 
 namespace cv
 {
-namespace daft2
-{
 
 static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar& color, int flags )
 {
@@ -100,5 +98,3 @@ std::vector<KeyPoint> makeKeyPoints( vector<KeyPoint3D> kp )
 }
 
 }
-}
-

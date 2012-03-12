@@ -100,7 +100,7 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-        kp.push_back( cv::KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }
@@ -194,7 +194,7 @@ void findMaximaAffine(
 
       if(is_max) {
         // is a maximum -> add keypoint
-        kp.push_back( cv::KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }

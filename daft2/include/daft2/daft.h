@@ -5,10 +5,10 @@
 
 #include <opencv2/features2d/features2d.hpp>
 
-#ifndef __DAFT2_H__
-#define __DAFT2_H__
+#ifndef __DAFT2_DAFT2_H__
+#define __DAFT2_DAFT2_H__
 
-#include "keypoint3d.h"
+#include "features3d/keypoint3d.h"
 
 namespace cv
 {
@@ -24,7 +24,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_DOG=1, DET_DOG9x9=2 };
+    enum { DET_DOB=0, DET_DOG=1, DET_LAPLACE=2 };
     enum { PF_NONE=0, PF_HARRIS=1, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
     enum { MAX_WINDOW=0, MAX_FAST=2, MAX_EVAL=3 };
 

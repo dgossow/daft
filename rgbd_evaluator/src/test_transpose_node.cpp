@@ -16,8 +16,8 @@
 
 #include <boost/timer.hpp>
 
-#include <rgbd_features_cv/daft.h>
-#include <rgbd_features_cv/preprocessing.h>
+#include <daft2/daft.h>
+#include <daft2/preprocessing.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
@@ -45,7 +45,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
 
   cv::Mat1f depth_image_closed;
-  improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
+  cv::daft2::improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
 
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
   camera_matrix(1,2) /= 2;
@@ -56,7 +56,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
 
-  cv::DAFT::DetectorParams p1,p2,p3;
+  cv::daft2::DAFT::DetectorParams p1,p2,p3;
   std::vector<cv::KeyPoint3D> keypoints,keypoints_t;
 
   p1.base_scale_ = 0.025;
@@ -69,7 +69,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   p1.pf_type_ = p1.PF_NONE;
 
-  cv::DAFT daft(p1);
+  cv::daft2::DAFT daft(p1);
 
   daft.detect( intensity_image, depth_image_closed, camera_matrix, keypoints);
   daft.detect( intensity_image.t(), depth_image_closed.t(), camera_matrix_t, keypoints_t);

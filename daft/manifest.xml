@@ -10,6 +10,8 @@
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
   
+  <depend package="opencv_extra"/>
+  
   <export> 
       <cpp cflags="-I${prefix}/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lrgbd_features_cv"/>
   </export>

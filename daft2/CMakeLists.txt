@@ -22,7 +22,7 @@ include_directories (${OpenCV_INCLUDE_DIR})
 
 # Make shared library
 rosbuild_add_library (daft2
-src/daft2.cpp
+src/daft.cpp
 src/feature_detection.cpp
 src/keypoint3d.cpp
 )

@@ -25,7 +25,6 @@ include_directories (${OpenCV_INCLUDE_DIR})
 rosbuild_add_library (rgbd_features_cv
 src/daft.cpp
 src/feature_detection.cpp
-src/keypoint3d.cpp
 )
 
 target_link_libraries(rgbd_features_cv ${OpenCV_LIBS})

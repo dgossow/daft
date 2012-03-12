@@ -23,7 +23,8 @@
 
 #include <boost/foreach.hpp>
 
-#include <daft2/daft2.h>
+#include <daft2/daft.h>
+#include <daft/daft.h>
 
 namespace rgbd_evaluator
 {

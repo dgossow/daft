@@ -3,10 +3,10 @@
  * Copyright (C) 2011 David Gossow
  */
 
-#include "rgbd_features_cv/daft.h"
-#include "rgbd_features_cv/filter_kernels.h"
-#include "rgbd_features_cv/feature_detection.h"
-#include "rgbd_features_cv/descriptor_computation.h"
+#include "daft/daft.h"
+#include "daft/filter_kernels.h"
+#include "daft/feature_detection.h"
+#include "daft/descriptor_computation.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -15,18 +15,21 @@
 
 #include <cmath>
 
-namespace cv {
+namespace cv
+{
+namespace daft
+{
 
-DAFT2::DAFT2(const DetectorParams & detector_params) :
+DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
 
 }
 
-DAFT2::~DAFT2() {
+DAFT::~DAFT() {
 
 }
 
-void DAFT2::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
+void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp) {
   if (image.size != depth_map_orig.size) {
     return;
@@ -369,4 +372,5 @@ void DAFT2::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
 }
 
+}
 }

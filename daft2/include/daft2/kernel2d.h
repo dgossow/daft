@@ -1,6 +1,6 @@
 
-#ifndef rgbd_features_kernel2d_h_
-#define rgbd_features_kernel2d_h_
+#ifndef __DAFT2_KERNEL2D_H__
+#define __DAFT2_KERNEL2D_H__
 
 namespace cv
 {

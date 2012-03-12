@@ -3,16 +3,14 @@
  * Copyright (C) 2011 David Gossow
 */
 
-#ifndef __DAFT2_KEYPOINT3D_H__
-#define __DAFT2_KEYPOINT3D_H__
+#ifndef __CV_KEYPOINT3D_H__
+#define __CV_KEYPOINT3D_H__
 
 #include <opencv2/features2d/features2d.hpp>
 
 #include <iostream>
 
 namespace cv
-{
-namespace daft2
 {
 
 /*!
@@ -64,7 +62,6 @@ vector<KeyPointT> getStrongest( size_t number, vector<KeyPointT> kp_in )
   return kp_in;
 }
 
-}
 }
 
 #endif

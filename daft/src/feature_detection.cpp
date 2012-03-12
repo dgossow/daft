@@ -8,11 +8,13 @@
 #include <vector>
 
 #include <opencv2/features2d/features2d.hpp>
-#include <rgbd_features_cv/feature_detection.h>
 
-#include "rgbd_features_cv/filter_kernels.h"
+#include "daft/feature_detection.h"
+#include "daft/filter_kernels.h"
 
 namespace cv
+{
+namespace daft
 {
 
 void findMaxima( const cv::Mat1d &img,
@@ -78,7 +80,7 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-        kp.push_back( cv::KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }
@@ -198,7 +200,7 @@ void findMaximaAffine(
 
       if(is_max) {
         // is a maximum -> add keypoint
-        kp.push_back( cv::KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }
@@ -480,3 +482,4 @@ void filterKpNeighbours( const cv::Mat1d& response_map,
 }
 
 } 
+}

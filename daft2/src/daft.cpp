@@ -3,7 +3,7 @@
  * Copyright (C) 2011 David Gossow
  */
 
-#include "daft2.h"
+#include "daft.h"
 #include "filter_kernels.h"
 #include "feature_detection.h"
 #include "descriptor.h"
@@ -207,7 +207,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       } else {
       }
       break;
-    case DetectorParams::DET_DOG9x9:
+    case DetectorParams::DET_LAPLACE:
       if (params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
               scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
