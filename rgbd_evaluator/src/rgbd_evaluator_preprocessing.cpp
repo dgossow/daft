@@ -29,6 +29,8 @@ RgbdEvaluatorPreprocessing::RgbdEvaluatorPreprocessing(std::string file_path, bo
 
   reverse_order_ = reverse_order;
 
+  first_image_ = true;
+
   splitFileName(file_path);
 
   // create folder to store images and homography --> should be in /home/... otherwise root permissions neccessary
@@ -82,8 +84,6 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       if ( image_store_.back().isComplete() )
       {
         image_store_.push_back( ImageData() );
-        //std::cout << "ImageData_"<< count << " complete! Press any key to continue\n\r" << std::endl;
-        //getchar();
         count++;
       }
 
@@ -166,7 +166,6 @@ void RgbdEvaluatorPreprocessing::writeDepth( cv::Mat& depth_img_orig, std::strin
 void RgbdEvaluatorPreprocessing::calculateHomography()
 {
   uint32_t count = 1;
-  bool first_image = true;
 
   std::vector< ImageData >::iterator it;
   std::vector<cv::Point2f> feature_vector_img1;
@@ -182,9 +181,9 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   std::vector<float> rotations;
   std::vector<float> angles;
 
-  float angle_orig;
-  float dist_orig;
-  float rotation_orig;
+  //float angle_orig;
+  //float dist_orig;
+  //float rotation_orig;
 
   int it_step;
   std::vector< ImageData >::iterator it_end,it_begin;
@@ -202,7 +201,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   }
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
-  for (it = it_begin; it != it_end; it+=it_step, count++)
+  for (it = it_begin; it != it_end-1; it+=it_step, count++)
   {
     // convert integer to string
     std::stringstream ss;
@@ -211,13 +210,53 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     cv::Mat imgx = it->rgb_image.get()->image;
 
+    // image for choosing and drawing keypoints
+    keyPointImageOrigin_ = imgx.clone();
+
+    std::stringstream ss2;
+    ss2 << "ImageX - Mark "  << MIN_CORRESPONDENCES << " Keypoints !" << std::endl;
+
+    // for mouse callback
+    std::string windowName = ss2.str();
+    cv::namedWindow( windowName );
+
+    // Set up the callback
+    cv::setMouseCallback( windowName, imgMouseCallback, this);
+    cv::imshow( windowName, keyPointImageOrigin_ );
+
     // store first transforms and images
-    if(first_image)
+    if(first_image_)
     {
+      cv::imshow("Image Original", keyPointImageOrigin_);
+
       // get original image
       img1 = imgx;
       last_imgx = img1;
-      first_image = false;
+
+      std::vector<cv::KeyPoint> temp;
+
+      // wait for at least 4 input points
+      while( (this->mouseKeypointsOrigin_.size() < MIN_CORRESPONDENCES) )
+      {
+        if(this->mouseKeypointsOrigin_.size() > 0 )
+        {
+          cv::KeyPoint::convert( mouseKeypointsOrigin_, temp );
+          cv::drawKeypoints(keyPointImageOrigin_, temp, keyPointImageOrigin_, CV_RGB(255,0,0));
+          cv::imshow(windowName, keyPointImageOrigin_);
+          cv::imshow("Image Original", keyPointImageOrigin_);
+        }
+        cv::waitKey(100);
+      }
+
+      cv::KeyPoint::convert( mouseKeypointsOrigin_, temp );
+      cv::drawKeypoints(keyPointImageOrigin_, temp, keyPointImageOrigin_, CV_RGB(255,0,0));
+      cv::imshow(windowName, keyPointImageOrigin_);
+      cv::imshow("Image Original", keyPointImageOrigin_);
+      cv::waitKey(100);
+
+      // first image done, received at least 4 points
+      std::cout << "First Image done!" << std::endl;
+      first_image_ = false;
 
       /*
       btVector3 zvec = transform_original.inverse().getBasis() * btVector3(0,0,1);
@@ -249,7 +288,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       cv::imshow("Keypoints", img1);
       cv::waitKey(30);
 #endif
-    }
+    } // endif
     else
     {
       /**************************** calculate initial homography ***************************************************************/
@@ -260,14 +299,14 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       // calculate transform from camera position x to original position
       transform_camx_to_original = transform_original * transform_camx.inverse();
 
-      btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(0,0,1);
+      btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(circle0,0,1);
       btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
 
       float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
       float dist_abs = transform_camx.getOrigin().length();
       float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
 
-      std::cout << "angle " << angle_abs << std::endl;
+      std::cout << "angle " << angle_abs << std::endl((RgbdEvaluatorPreprocessing*) param)->;
       std::cout << "dist " << dist_abs << std::endl;
       std::cout << "rotation " << rotation_abs << std::endl;
 
@@ -284,18 +323,43 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       scalings.push_back( scaling );
       */
 
+      std::vector<cv::KeyPoint> temp;
+      // wait for keypoints in image x
+      while( this->mouseKeypointsImageX_.size() < MIN_CORRESPONDENCES )
+      {
+       if(this->mouseKeypointsImageX_.size() > 0 )
+       {
+         cv::KeyPoint::convert( mouseKeypointsImageX_, temp );
+         cv::drawKeypoints(keyPointImageOrigin_, temp, keyPointImageOrigin_,CV_RGB(255,0,0));
+         cv::imshow(windowName, keyPointImageOrigin_);
+       }
+       cv::waitKey(100);
+      }
+
+      cv::KeyPoint::convert( mouseKeypointsImageX_, temp );
+      cv::drawKeypoints(keyPointImageOrigin_, temp, keyPointImageOrigin_,CV_RGB(255,0,0));
+      cv::imshow(windowName, keyPointImageOrigin_);
+      cv::waitKey(100);
+
+      std::cout << "Image X done!" << std::endl;
+
+      cv::Matx33f homography_approx = cv::findHomography( mouseKeypointsImageX_, mouseKeypointsOrigin_, CV_RANSAC );
+      printMat(homography_approx);
+
+      /*
       cv::Matx33f homography_approx = calculateInitialHomography( imgx, last_imgx ) * homography_complete_last;
       last_imgx = imgx;
+       */
 
       // warp images with approx. homography
       cv::Mat imgx_warped_approx;
       cv::warpPerspective( imgx, imgx_warped_approx, cv::Mat(homography_approx), cv::Size(img1.cols,img1.rows) );
 
       cv::Mat tmp1,img1_rewarped;
-      cv::warpPerspective( img1, tmp1, cv::Mat(homography_approx.inv()), cv::Size(img1.cols,img1.rows) );
+      cv::warpPerspective( img1, tmp1, cv::Mat( homography_approx.inv() ), cv::Size( img1.cols, img1.rows ) );
       cv::warpPerspective( tmp1, img1_rewarped, cv::Mat(homography_approx), cv::Size(img1.cols,img1.rows) );
 
-#if 0
+#if 1
       //cv::imshow( "Original Image (Re-Warped)", image_orig_rewarped );
       cv::waitKey(30);
       cv::imshow( "Warped Image", imgx_warped_approx );
@@ -313,21 +377,16 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
         cv::Mat result;
         cv::Point2f keypointNCC;
 
-        if((i % 10) == 0)
-        {
-          //std::cout << "Progress: " << (int)(((float)i/(float)keypoint_vector_original.size())*100) << std::endl;
-        }
-
-        if( calculateNCC( imgx_warped_approx, img1_rewarped, kp_vec_img1.at(i), keypointNCC) >= 0 )
+        if( calculateNCC( imgx_warped_approx, img1_rewarped, kp_vec_img1.at(i), keypointNCC ) >= 0 )
         {
           kp_pts_img1.push_back( cv::Point2f( kp_vec_img1.at(i).pt.x,
-                                                 kp_vec_img1.at(i).pt.y ) );
+                                              kp_vec_img1.at(i).pt.y ) );
 
           kp_pts_imgx.push_back( keypointNCC );
         }
       }
 
-      printf("Finished...Found correspondences: %d\n\r", (uint32_t)kp_pts_imgx.size() );
+      std::cout << "Finished...Found correspondences: " << (uint32_t)kp_pts_imgx.size() << std::endl;
 
       if(kp_pts_imgx.size() < MIN_CORRESPONDENCES || kp_pts_img1.size() < MIN_CORRESPONDENCES )
       {
@@ -360,9 +419,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       imgx *= l_img1_rewarped / l_imgx_warped_final;
       imgx_warped_final *= l_img1_rewarped / l_imgx_warped_final;
 
-      //cv::imshow( "imgx_norm", imgx );
-
-      //transform keypoints from warped image into precise warped image
+      // transform keypoints from warped image into precise warped image
       for ( uint32_t i=0; i < kp_pts_imgx.size(); i++ )
       {
         cv::Matx31f kp_xyw( kp_pts_imgx[i].x, kp_pts_imgx[i].y, 1);
@@ -382,8 +439,6 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
         cv::line( image_original_clone, kp_pts_imgx[i], kp_pts_img1[i], cv::Scalar(0,0,255), 1 );
       }
 
-      //cv::imshow("Error Lines", image_original_clone );
-
       /*************************************************************************************************************************/
 
       // store homography
@@ -402,14 +457,14 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       cv::waitKey(30);
   #endif
 
-  #if 1
+#if 1
       // show images
       //cv::imshow("Current Image", imgx);
       cv::imshow("Final Warped Image", imgx_warped_final);
       cv::waitKey(100);
 
       cv::imwrite( file_created_folder_ + "/" + "warped" + count_str + ".ppm", imgx_warped_final );
-    }
+    } // end else
 
     cv::imwrite( file_created_folder_ + "/" + "img" + count_str + ".ppm", imgx );
     writeDepth( it->depth_image->image, count_str );
@@ -431,10 +486,11 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     mfs << origin.x() << " " << origin.y() << " " << origin.z() << std::endl;
 #endif
 
-    std::cout << "Press any key to continue" << std::endl;
-    //getchar();
+    // reset keypoints
+    mouseKeypointsImageX_.clear();
+
 #endif
-  }
+  } // end for
 
   writeVectorToFile( rotations, "rotation" );
   writeVectorToFile( scalings, "scaling" );
@@ -534,7 +590,6 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
       ( x_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.cols ||
       ( y_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.rows )
   {
-    //std::cout << "nccSlidingWindow: keypoint( " << x_pos << ", " << y_pos << " ) out of range" << std::endl;
     return -1;
   }
 
@@ -548,9 +603,6 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
 
   cv::Mat templ( image_cam_x, batch );
   cv::Mat searchWin( image_original, searchRect );
-
-  //cv::imshow("Batch Image", templ);
-  //cv::waitKey(30);
 
   cv::matchTemplate( searchWin, templ, correlation_img, CV_TM_CCORR_NORMED );
 
@@ -588,7 +640,6 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
   return 0;
 }
 
-
 void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, uint32_t count)
 {
   uint32_t i,j;
@@ -621,7 +672,7 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
 
 void RgbdEvaluatorPreprocessing::writeVectorToFile( std::vector<float> vec, std::string filename )
 {
-  uint32_t i,j;
+  uint32_t i;
   std::fstream file;
 
   // create filepath
@@ -672,6 +723,23 @@ void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
   std::cout << " file: " << file_name_ << std::endl;
   std::cout << " folder: " << file_folder_ << std::endl;
   std::cout << " created folder: " << file_created_folder_ << std::endl;
+}
+
+// Implement mouse callback
+void RgbdEvaluatorPreprocessing::imgMouseCallback( int event, int x, int y, int flags, void* param )
+{
+    if( event != CV_EVENT_LBUTTONDOWN ) return;
+
+    if(((RgbdEvaluatorPreprocessing*) param)->first_image_)
+    {
+      ((RgbdEvaluatorPreprocessing*) param)->mouseKeypointsOrigin_.push_back(cv::Point2f(x,y));
+      std::cout << "Origin: Received mouse click on x: " << x << "  y: " << y << std::endl;
+    }
+    else
+    {
+      ((RgbdEvaluatorPreprocessing*) param)->mouseKeypointsImageX_.push_back(cv::Point2f(x,y));
+      std::cout << "Camx: Received mouse click on x: " << x << "  y: " << y << std::endl;
+    }
 }
 
 } // end namespace
