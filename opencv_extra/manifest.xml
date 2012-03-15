@@ -1,0 +1,19 @@
+<package>
+  <description brief="Feature extraction from RGB-D data">
+
+     rgbd_features provides functions for detecting
+     interest points in RGB-D data based on depth and
+     intensity or color.
+
+  </description>
+  <author>David Gossow</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  
+  <export> 
+      <cpp cflags="-I${prefix}/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lopencv_extra"/>
+  </export>
+    
+</package>
+
+
