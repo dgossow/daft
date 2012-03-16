@@ -24,7 +24,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_DOG=1, DET_LAPLACE=2 };
+    enum { DET_DOB=0, DET_LAPLACE=1 };
     enum { PF_NONE=0, PF_HARRIS=1, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
     enum { MAX_WINDOW=0, MAX_FAST=2, MAX_EVAL=3 };
 
@@ -114,7 +114,7 @@ public:
    * @param keypoints the resulting keypoints
    */
   void detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f camera_matrix,
-      std::vector<KeyPoint3D> & keypoints);
+      std::vector<cv::KeyPoint3D> & keypoints );
 
 private:
 

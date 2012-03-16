@@ -47,7 +47,6 @@ public:
 private:
 
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
-  cv::Matx33f calculateInitialHomography( cv::Mat& img1, cv::Mat& img2 );
 
   int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC);
 
@@ -58,8 +57,6 @@ private:
   void writeVectorToFile( std::vector<float> vec, std::string filename );
 
   void splitFileName (const std::string& str);
-
-  void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
 
   std::string file_path_;
   std::string file_name_;
@@ -79,19 +76,19 @@ private:
   static const uint32_t MIN_CORRESPONDENCES = 4;
   static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 10;
   static const uint32_t MAX_FEATURE_NUMBER = 200;
-  static const uint32_t SLIDING_WINDOW_SIZE = 40;
+  static const uint32_t SLIDING_WINDOW_SIZE = 20;
   static const uint32_t SEARCH_WINDOW_SIZE = 100;
 
   struct ImageData
   {
     boost::shared_ptr<cv_bridge::CvImage> rgb_image;
     boost::shared_ptr<cv_bridge::CvImage> depth_image;
-    //boost::shared_ptr<btTransform> approx_transform;
+    boost::shared_ptr<btTransform> approx_transform;
     //...
 
     bool isComplete()
     {
-      return rgb_image.get() && depth_image.get();// && approx_transform.get();
+      return rgb_image.get() && approx_transform.get();
     }
   };
 

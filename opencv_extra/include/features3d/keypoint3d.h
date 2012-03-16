@@ -36,6 +36,8 @@ struct KeyPoint3D: public cv::KeyPoint
   CV_PROP_RW float affine_angle;
   CV_PROP_RW float affine_major;
   CV_PROP_RW float affine_minor;
+
+  std::vector< float > desc;
 };
 
 void drawKeypoints3D( const Mat& image, const vector<KeyPoint3D>& keypoints, Mat& outImage,

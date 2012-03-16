@@ -6,7 +6,6 @@
 #include "daft/daft.h"
 #include "daft/filter_kernels.h"
 #include "daft/feature_detection.h"
-#include "daft/descriptor_computation.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>

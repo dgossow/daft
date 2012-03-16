@@ -15,6 +15,8 @@
 
 #include <sensor_msgs/image_encodings.h>
 
+#define daft_ns cv::daft2
+
 namespace rgbd_evaluator
 {
 
@@ -162,6 +164,21 @@ std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp )
   }
   return kp_3d;
 }
+std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp, cv::Mat1d descriptors )
+{
+  std::vector<cv::KeyPoint3D> kp3d_vec;
+  kp3d_vec.reserve( kp.size() );
+  for ( size_t k=0; k < kp.size(); k++ )
+  {
+    cv::KeyPoint3D kp3d = kp[k];
+    for ( int i=0; i<descriptors.cols; i++ )
+    {
+      kp3d.desc.push_back( descriptors[k][i] );
+    }
+    kp3d_vec.push_back( kp3d );
+  }
+  return kp3d_vec;
+}
 
 // these helper function compute the number of keypoints
 // for a given threshold
@@ -170,8 +187,10 @@ std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& d
   cv::SURF surf( t * 100.0 );
   cv::Mat mask;
   std::vector<cv::KeyPoint> kp;
-  surf( gray_img, mask, kp );
-  return makeKp3d( kp );
+  std::vector<float> desc_vec;
+  surf( gray_img, mask, kp, desc_vec );
+  cv::Mat1f desc( kp.size(), 64, (float*)&(desc_vec[0]) );
+  return makeKp3d( kp, desc );
 }
 std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
@@ -183,27 +202,19 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
   cv::SIFT sift( cp, detp, descp );
   std::vector<cv::KeyPoint> kp;
   cv::Mat mask;
-  sift( gray_img, mask, kp );
-  return makeKp3d( kp );
+  cv::Mat descriptors;
+  sift( gray_img, mask, kp, descriptors );
+  return makeKp3d( kp, descriptors );
 }
 
-std::vector<cv::KeyPoint3D> getDaftKp( cv::daft::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
   std::vector<cv::KeyPoint3D> kp;
   p.det_threshold_ *= t;
-  cv::daft::DAFT daft( p );
+  daft_ns::DAFT daft( p );
   daft.detect( gray_img, depth_img, K, kp );
   return kp;
 }
-std::vector<cv::KeyPoint3D> getDaft2Kp( cv::daft2::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
-{
-  std::vector<cv::KeyPoint3D> kp;
-  p.det_threshold_ *= t;
-  cv::daft2::DAFT daft( p );
-  daft.detect( gray_img, depth_img, K, kp );
-  return kp;
-}
-
 
 void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 {
@@ -240,7 +251,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
     int scale_fac = bag_rgb_img.cols / bag_depth_img.cols;
 
-#if 0
+#if 1
     // Resize depth to have the same width as rgb
     cv::resize( bag_depth_img, depth_img, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
 
@@ -316,7 +327,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
         cv::Mat kp_img;
         cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        cv::imshow("KP", kp_img);
+        //cv::imshow("KP", kp_img);
         cv::waitKey(200);
 
         its++;
@@ -358,8 +369,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
 void ExtractDetectorFile::extractAllKeypoints()
 {
-  cv::daft::DAFT::DetectorParams p;
-  p.max_px_scale_ = 500;
+  daft_ns::DAFT::DetectorParams p;
+  //p.max_px_scale_ = 200;
   p.min_px_scale_ = 2;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
@@ -369,29 +380,33 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=false;
   p.max_search_algo_ = p.MAX_FAST;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
 
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = false;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
   extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  //extractKeypoints( &getSurfKp, "SURF" );
-  //extractKeypoints( &getSiftKp, "SIFT" );
+  extractKeypoints( &getSurfKp, "SURF" );
+  extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
 {
+  if ( keypoints.size() == 0 )
+  {
+    throw;
+  }
   std::vector< cv::KeyPoint3D >::iterator it;
   double_t ax, bx, ay, by, a_length, b_length, alpha_a, alpha_b;
   double_t A, B, C;
@@ -403,7 +418,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   file.open(filePath.c_str(), std::ios::out);
 
   // header
-  file << "1.0" << std::endl;
+  file << keypoints[0].desc.size()+1 << std::endl;
   file << keypoints.size() << std::endl;
 
   for ( it = keypoints.begin(); it != keypoints.end(); it++ )
@@ -430,7 +445,26 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
     C = ( pow(ay,2) * pow(b_length,2) + pow(by,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
 
-    file << it->pt.x << "  " << it->pt.y << "  " << A << "  " << B << "  " << C << std::endl;
+    file << it->pt.x << "  " << it->pt.y << "  " << A << "  " << B << "  " << C;
+
+    // write world scale as "feature component"
+    // so keypoints of different size don't get matched
+    if ( it->world_size != 0 )
+    {
+      float s_log = log2( it->world_size );
+      file << " " << s_log;
+    }
+    else
+    {
+      file << " 0.0";
+    }
+
+    for ( unsigned i=0; i<it->desc.size(); i++ )
+    {
+      file << " " << it->desc[i];
+    }
+
+    file  << std::endl;
 
   }
 
@@ -444,7 +478,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
 
-  //cv::imshow(extension, kp_img);
+  cv::imshow("kp", kp_img);
   cv::waitKey(100);
 
   static int img_count = 0;

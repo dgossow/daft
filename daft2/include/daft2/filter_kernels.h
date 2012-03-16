@@ -157,13 +157,11 @@ inline float gaussAffineX( const Mat1d &ii, Vec2f &grad,
   const float norm1 = sp * sw;
   // x intersection of affine ellipse with radius sp
   sp = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
-  //std::cout << " sp " << sp << " inter_x " << intersect_x << std::endl;
 
   // integer pixel scale
   const int spi = std::max( int(sp / float(Accuracy)), 1 );
   const int num_steps = int(std::ceil( sp/float(spi)*2.0f ));
   const int win_size = num_steps * spi;
-  //const float alpha = float(win_size) / sp*2;
 
   if ( checkBounds( ii, x, y, win_size ) )
   {
@@ -307,7 +305,7 @@ inline float box( const Mat1d &ii, int x, int y, float s )
 inline float gaussAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )
 {
   // check for boundary effects
-  if ( !checkBounds( ii, x, y, 6*a ) ) {
+  if ( !checkBounds( ii, x, y, 7*a ) ) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   // read mean intensities for 9x9 grid
@@ -513,6 +511,55 @@ inline float harris( const Mat1d &ii, int x, int y, float s_real )
   }
 
   return std::numeric_limits<double>::quiet_NaN();
+}
+
+
+template<int Accuracy>
+inline float gaussX( const Mat1d &ii, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // The roots of the 1-d difference of gaussians
+  // e^(-x^2/8)/(2 sqrt(2 pi)) - e^(-x^2/2)/sqrt(2 pi)
+  // are at +- 1.3595559868917
+  static const float ROOT_DOG_INV = 0.735534255;
+
+  // intersection of ellipsis with x/y axis
+  const float sw2 = sw*sw;
+  const float norm1 = sp * sw;
+  // x intersection of affine ellipse with radius sp
+  sp = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
+
+  // integer pixel scale
+  const int spi = std::max( int(sp / float(Accuracy)), 1 );
+  const int num_steps = int(std::ceil( sp/float(spi)*2.0f ));
+  const int win_size = num_steps * spi;
+
+  if ( checkBounds( ii, x, y, win_size ) )
+  {
+    // this mu makes the zero crossing of the difference-of-gaussians be at +/- sp
+    const float sigma = ROOT_DOG_INV * sp / 2; //* intersect_x;
+
+    float val = 0;
+    float sum_gauss = 0;
+
+    //static const float expCache[MAX_NSTEPS] = {};
+
+    for ( int t = -win_size; t<win_size; t+=spi )
+    {
+      const float t2 = ((float)t+0.5f*spi);
+      // g(x,σ) = e^( -(x)^2/(2 σ^2) ) / (sqrt(2 π) σ)
+      static const float n = sqrt( 2.0 * M_PI ) * sigma;
+      const float g = std::exp( -t2*t2 / (2.0f*sigma*sigma) ) / n;
+      const int x2 = x+t;
+      val += g * float(integrate( ii, x2, x2+spi, y, y+1 )) / float(spi);
+      sum_gauss += g;
+    }
+
+    //return val / float(spi*win_size*2);
+    return val / sum_gauss;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
 }
 
 

@@ -176,7 +176,7 @@ fprintf(1,'\n\nNN ratio matching : ');
 
 tic;
 ds=size(sdout);
-rnmatch_dist=fliplr([1:.05:1.2,1.2:.3:2.8]);
+rnmatch_dist=fliplr([ 1:.05:1.2, 1.2:.3:2.8 ]);
 cmatch_rn=zeros(size(rnmatch_dist));
 tmatch_rn=zeros(size(rnmatch_dist));
 dss=size(rnmatch_dist,2);

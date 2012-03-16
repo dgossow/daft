@@ -9,66 +9,21 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <features3d/keypoint3d.h>
+
 #include "filter_kernels.h"
 #include "stuff.h"
 
 #include <math.h>
 #include <list>
 
+
+//#define DESC_DEBUG_IMG
+
 namespace cv
 {
 namespace daft2
 {
-
-void imshow2( std::string win_title, cv::Mat img, int size = 256 )
-{
-  cv::Mat img2;
-  cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
-  imshow( win_title, img2 );
-}
-
-
-template< int PatchSize >
-inline void getPatch( const cv::Mat1d& ii, const KeyPoint3D& kp, float world_radius, cv::Mat1f& patch )
-{
-  patch.create( PatchSize, PatchSize );
-
-  //const Point2f& pt
-  float relative_scale = world_radius / ( kp.world_size * 0.5 * float(PatchSize) );
-  float angle = kp.affine_angle;
-  float major = kp.affine_major;
-  float minor = kp.affine_minor;
-
-  int s_round = int( 0.25 * relative_scale * sqrt(major*minor) + 0.5 );
-  if ( s_round < 1 ) s_round = 1;
-
-  Matx22f rot_mat;
-  rot_mat(0,0) = cos(angle);
-  rot_mat(1,0) = sin(angle);
-  rot_mat(0,1) = -rot_mat( 1, 0 );
-  rot_mat(1,1) = rot_mat( 0, 0 );
-
-  major *= relative_scale;
-  minor *= relative_scale;
-
-  //float len_major = sqrt( affine_mat(0,0)*affine_mat(0,0) + affine_mat(1,0)*affine_mat(1,0) );
-
-  for ( int u = 0; u<PatchSize; u++ )
-  {
-    for ( int v = 0; v<PatchSize; v++ )
-    {
-      Point2f uv( float(v-PatchSize/2) , float(u-PatchSize/2) );
-      uv = rot_mat.t() * uv;
-      uv.x*=major;
-      uv.y*=minor;
-      Point2f pixel = rot_mat * uv + kp.pt;
-      if ( checkBounds( ii, pixel.x, pixel.y, s_round ) )
-      {
-        patch[u][v] = iiMean( ii, pixel.x, pixel.y, s_round );
-      }
-    }
-  }
-}
 
 struct PtInfo {
   Point3f pos;
@@ -83,151 +38,124 @@ struct PtGradient
   inline bool operator< ( const PtGradient& other ) const { return grad_ori < other.grad_ori; }
 };
 
+float dominantOri( std::vector< PtGradient >& gradients );
 
-inline float dominantOri( std::vector< PtGradient >& gradients )
+Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K );
+
+void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc );
+
+template< int PatchSize, int Sigma3 >
+inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
+    const cv::Mat1f depth_map, cv::Matx33f& K,
+    cv::Matx33f kp_ori_rot = cv::Matx33f::eye() )
 {
-  // sort by orientation
-  sort( gradients.begin(), gradients.end() );
+  static const float Sigma = float(Sigma3) / 3.0;
+  static const float nan = std::numeric_limits<float>::quiet_NaN();
+  Mat1f patch( PatchSize+1, PatchSize+1, nan );
 
-  // find dominant orientation
+#ifdef DESC_DEBUG_IMG
+  Mat1f patch_dx( PatchSize, PatchSize, nan );
+  Mat1f patch_dy( PatchSize, PatchSize, nan );
+  Mat1f patch_weights( PatchSize, PatchSize, 1.0f );
 
-  //estimate orientation using a sliding window of PI/3
-  PtGradient grad_max = gradients[0];
-  double grad_mag_sum = gradients[0].grad_mag;
-  double grad_ori_sum = gradients[0].grad_ori * grad_mag_sum;
+  static const int PATCH_MUL = 32;
+  Mat3b points3d_img( PatchSize*PATCH_MUL, PatchSize*PATCH_MUL, Vec3b( 255,255,255 ) );
 
-  size_t window_begin = 0;
-  size_t window_end = 0;
-
-  float ori_offset = 0;
-
-  std::list< std::pair<float, float> > hist_values;
-  float max_mag = 0;
-
-  while ( window_begin < gradients.size() )
+  // hack: only do this for the descriptor window
+  if ( Sigma3 == 1 )
   {
-      float window_size = ( gradients[window_end].grad_ori + ori_offset ) - gradients[window_begin].grad_ori;
-      if ( window_size < M_PI / 3 )
-      {
-          //found new max.
-          if ( grad_mag_sum > grad_max.grad_mag )
-          {
-              grad_max.grad_mag = grad_mag_sum;
-              grad_max.grad_ori = grad_ori_sum;
-          }
-          window_end++;
-          if ( window_end >= gradients.size() )
-          {
-              window_end = 0;
-              ori_offset += 2 * M_PI;
-          }
-          grad_mag_sum += gradients[window_end].grad_mag;
-          grad_ori_sum += gradients[window_end].grad_mag * ( gradients[window_end].grad_ori + ori_offset );
-
-          hist_values.push_back( std::pair<float,float>( grad_ori_sum/grad_mag_sum , grad_mag_sum ) );
-          max_mag = std::max( max_mag, gradients[window_end].grad_mag );
-      }
-      else
-      {
-          grad_mag_sum -= gradients[window_begin].grad_mag;
-          grad_ori_sum -= gradients[window_begin].grad_mag * gradients[window_begin].grad_ori;
-          window_begin++;
-      }
-  }
-
-  float dominant_ori = grad_max.grad_ori / grad_max.grad_mag;
-
-  // debug visualization
-  cv::Mat3b hist_img( 220, 220, 0.0f );
-  for ( std::list< std::pair<float, float> >::iterator it = hist_values.begin(); it != hist_values.end(); ++it )
-  {
-    float ori = it->first;
-    float mag = it->second / grad_max.grad_mag*100;
-
-    cv::line( hist_img, Point(110,110), Point(110+cos(ori)*mag, 110+sin(ori)*mag ), Scalar(0,255,0), 1, 16 );
-  }
-  cv::line( hist_img, Point(110,110), Point(110+cos(dominant_ori)*100, 110+sin(dominant_ori)*100 ), Scalar(0,0,255), 1, 16 );
-  imshow( "ori hist", hist_img );
-
-  // debug visualization
-  cv::Mat3b grad_img( 440, 440, 0.0f );
-  for ( std::vector< PtGradient >::iterator it = gradients.begin(); it != gradients.end(); ++it )
-  {
-    float ori = it->grad_ori;
-    float mag = it->grad_mag/max_mag*200;
-    grad_img(220+sin(ori)*mag,220+cos(ori)*mag) = Vec3b(0,255,0);
-  }
-  cv::line( grad_img, Point(220,220), Point(220+cos(dominant_ori)*200, 220+sin(dominant_ori)*200 ), Scalar(0,0,255), 1, 16 );
-  imshow( "ori", grad_img );
-
-  return dominant_ori;
-}
-
-
-template< int PatchSize >
-inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx33f& K,
-    const KeyPoint3D& kp, float world_radius, cv::Mat1f& patch, cv::Mat& img )
-{
-  patch.create( PatchSize, PatchSize );
-  float relative_scale = world_radius / ( kp.world_size * 0.5 * float(PatchSize) );
-
-  for ( int u = 0; u<PatchSize; u++ )
-  {
-    for ( int v = 0; v<PatchSize; v++ )
+    for ( int v=0; v<points3d_img.rows; v++ )
     {
-      patch[u][v] = 0;
+      for ( int u=0; u<points3d_img.rows; u++ )
+      {
+        if ( ( (v+2+PatchSize*PATCH_MUL/10) % (PatchSize*PATCH_MUL/5) < 3 ) ||
+             ( (u+2+PatchSize*PATCH_MUL/10) % (PatchSize*PATCH_MUL/5) < 3 ) )
+        {
+          points3d_img[v][u] = Vec3b( 200,200,200 );
+        }
+      }
     }
   }
 
+  Mat tmp, display_img;
+  smoothed_img.convertTo( tmp, CV_8U, 255, 0 );
+  cvtColor( tmp, display_img, CV_GRAY2RGB );
+#endif
+
+  //const Point2f& pt
+  float angle = kp.affine_angle;
+  float major = kp.affine_major*0.5;
+  float minor = kp.affine_minor*0.5;
+
+  // camera params
   float f_inv = 1.0 / K(0,0);
   float cx = K(0,2);
   float cy = K(1,2);
 
-  cv::Matx33f M;
+  Point3f affine_major_axis( 0,-1,0 );//cos(angle), sin(angle), 0 );
 
-  Point3f affine_major_axis( cos(kp.affine_angle), sin(kp.affine_angle), 0 );
+  Vec3f n = kp.normal;
 
-  float affine_ratio = kp.affine_major / kp.affine_minor;
-
-  cv::Matx22f affine_mat( affine_major_axis.x, affine_major_axis.y,
-      - affine_major_axis.y / affine_ratio, affine_major_axis.x / affine_ratio );
-
-  Point3f normal = kp.normal;
+  Point3f normal(n[0],n[1],n[2]);
   Point3f v1 = normal.cross( affine_major_axis );
   v1 = v1  * fastInverseLen( v1 );
   Point3f v2 = v1.cross( normal );
 
-  M( 0,0 ) = v1.x;
-  M( 1,0 ) = v1.y;
-  M( 2,0 ) = v1.z;
+  // transforms from local 3d coords [-0.5...0.5] to 3d
+  cv::Matx33f local_to_cam( -v1.x, -v2.x, normal.x, -v1.y, -v2.y, normal.y, -v1.z, -v2.z, normal.z );
+  local_to_cam = local_to_cam * kp_ori_rot.t();
 
-  M( 0,1 ) = v2.x;
-  M( 1,1 ) = v2.y;
-  M( 2,1 ) = v2.z;
+  // transforms from u/v texture coords [-PatchSize/2 ... PatchSize/2] to 3d
+  cv::Matx33f uvw_to_cam = local_to_cam * kp.world_size * 0.5;
 
-  M( 0,2 ) = normal.x;
-  M( 1,2 ) = normal.y;
-  M( 2,2 ) = normal.z;
+  // transforms from 3d to u/v tex coords
+  cv::Matx33f cam_to_uvw = cv::Matx33f(2.0 / kp.world_size,0,0, 0,2.0 / kp.world_size,0, 0,0,1) * local_to_cam.t();
 
-  /*
-  Vec2f depth_grad;
-  computeGradient( depth_map, kp.pt.x, kp.pt.y, kp.size/2, kp.world_size/2, depth_grad );
-  // compute dx per pixel
-  depth_grad *= 2/kp.world_size;
-
-  float grad_norm_x = 1.0 / sqrt( depth_grad[0]*depth_grad[0] + 1 );
-  float grad_norm_y = 1.0 / sqrt( depth_grad[1]*depth_grad[1] + 1 );
-
-  std::cout << " grad_norm_x " << grad_norm_x << std::endl;
-  std::cout << " grad_norm_y " << grad_norm_y << std::endl;
-  */
-
-  cv::Matx33f M_inv = M.t() * ( 1.0 / world_radius * ((float)PatchSize / 2.0) );
-
+  // sample intensity values using planar assumption
+  for ( int v = 0; v<PatchSize+1; v++ )
   {
-    Point3f pn3d = kp.pt3d + (normal*kp.world_size);
-    Point3f pv13d = kp.pt3d + (v1*kp.world_size);
-    Point3f pv23d = kp.pt3d + (v2*kp.world_size);
+    for ( int u = 0; u<PatchSize+1; u++ )
+    {
+      // compute u-v coordinates
+      Point2f uv( float(u)-float(PatchSize/2), float(v-float(PatchSize/2)) );
+
+      const float dist2 = (uv.x*uv.x + uv.y*uv.y);
+      if ( dist2 > float((PatchSize+1)*(PatchSize+1)) * 0.25f )
+      {
+        continue;
+      }
+
+      Point2f pixel;
+      Point3f pt_cam = (uvw_to_cam * Point3f(uv.x,uv.y,0)) + kp.pt3d;
+      getPt2d( pt_cam, K(0,0), cx, cy, pixel );
+
+      if ( checkBounds( smoothed_img, pixel.x, pixel.y, 1 ) )
+      {
+        patch[v][u] = interpBilinear(smoothed_img,pixel.x,pixel.y);
+
+#ifdef DESC_DEBUG_IMG
+        if ( !isnan( patch[v][u] ) )
+        {
+          float s = 0.5 * kp.world_size * K(0,0) / depth_map(int(pixel.y),int(pixel.x));
+          Size2f bsize( s, minor/major*s );
+          cv::RotatedRect box(pixel, bsize, angle/M_PI*180.0 );
+          ellipse( display_img, box, cv::Scalar(0,0,255), 1, CV_AA );
+        }
+#endif
+      }
+    }
+  }
+
+  //cv::Matx22f kp_ori_rot_2d( kp_ori_rot(0,0), kp_ori_rot(0,1), kp_ori_rot(1,0), kp_ori_rot(1,1) );
+
+  // coordinate in u/v of window center
+  const float center_uv = (float(PatchSize)-1.0f) * 0.5;
+
+#ifdef DESC_DEBUG_IMG
+  {
+    Point3f pn3d = kp.pt3d + (local_to_cam * Point3f(0,0,1)*kp.world_size);
+    Point3f pv13d = kp.pt3d + (local_to_cam * Point3f(1,0,0)*kp.world_size);
+    Point3f pv23d = kp.pt3d + (local_to_cam * Point3f(0,1,0)*kp.world_size);
 
     Point2f p,pn,pv1,pv2;
 
@@ -236,150 +164,156 @@ inline void getPatch2( const cv::Mat1d& ii, const cv::Mat1f depth_map, cv::Matx3
     getPt2d( pv23d, (float)K(0,0), cx, cy, pv2 );
     getPt2d( kp.pt3d, (float)K(0,0), cx, cy, p );
 
-    cv::line( img, p, pv1, cv::Scalar( 0,0,255 ), 1, 16 );
-    cv::line( img, p, pv2, cv::Scalar( 0,255,0 ), 1, 16 );
-    cv::line( img, p, pn, cv::Scalar( 255,0,0 ), 1, 16 );
+    cv::line( display_img, p, pv1, cv::Scalar( 0,0,255 ), 2, 16 );
+    cv::line( display_img, p, pv2, cv::Scalar( 0,255,0 ), 2, 16 );
+    cv::line( display_img, p, pn, cv::Scalar( 255,0,0 ), 2, 16 );
   }
-
-#if 0
-  for ( int u = 0; u<3; u++ )
-  {
-    for ( int v = 0; v<3; v++ )
-    {
-      std::cout << M_inv(u,v) << " ";
-    }
-    std::cout << std::endl;
-  }
-
-  std::cout << std::endl;
-  //usleep( 3000000 );
 #endif
 
-  float s = 0.25 * relative_scale * sqrt(kp.affine_major*kp.affine_minor);
-  if ( s < 1 ) s = 1;
+  vector<PtInfo> ptInfos;
+  ptInfos.reserve(PatchSize*PatchSize);
 
-  int s_ceil = std::ceil( s );
-
-  int win_size = std::ceil( kp.size * 0.25 * float(PatchSize) * relative_scale );
-
-  int step_size = std::ceil( kp.affine_minor * relative_scale );
-
-  // for debug
-  step_size /= 2;
-
-  if ( step_size < 1 ) step_size = 1;
-
-  int start_x = kp.pt.x-win_size;
-  int end_x = kp.pt.x+win_size;
-  int start_y = kp.pt.y-win_size;
-  int end_y = kp.pt.y+win_size;
-
-  if ( start_x < s_ceil*2 ) start_x = s_ceil*2;
-  if ( start_y < s_ceil*2 ) start_y = s_ceil*2;
-  if ( end_x > ii.cols-s_ceil*2-1 ) end_x = ii.cols-s_ceil*2-1;
-  if ( end_y > ii.rows-s_ceil*2-1 ) end_y = ii.rows-s_ceil*2-1;
-
-  cv::rectangle( img, Point(start_x,start_y), Point(end_x,end_y), cv::Scalar(0,0,0) );
-
-  std::vector< PtInfo > pts;
-  std::vector< PtGradient > gradients;
-
-  pts.reserve( (end_x-start_x)*(end_y-start_y) );
-  gradients.reserve( pts.size() );
-
-  float depth_norm = 1.0 / kp.pt3d.z;
-
-  for ( int y=start_y; y<end_y; y+=step_size )
+  // compute gradients
+  for ( int v = 0; v<PatchSize; v++ )
   {
-    for ( int x=start_x; x<=end_x; x+=step_size )
+    for ( int u = 0; u<PatchSize; u++ )
     {
-      if ( finite(depth_map[y][x]) )
+      // 0-centered u/v coords
+      Point2f uv( float(u)-center_uv, float(v)-center_uv );
+
+      Point2f pixel;
+      Point3f pt_cam = (uvw_to_cam * Point3f(uv.x,uv.y,0)) + kp.pt3d;
+      getPt2d( pt_cam, K(0,0), cx, cy, pixel );
+
+      if ( !checkBounds( smoothed_img, pixel.x, pixel.y, 1 ) )
       {
-        // get 3d point
-        Point3f pt3d;
-        getPt3d( f_inv, cx, cy, x, y, depth_map[y][x], pt3d );
+        continue;
+      }
 
-        // compute relative translation
-        Point3f pt3d_local = M_inv * (pt3d - kp.pt3d);
+      // get the 3d coordinates of the points
+      Point3f pt3d;
+      int pixel_x_int = pixel.x + 0.5;
+      int pixel_y_int = pixel.y + 0.5;
+      getPt3d( f_inv, cx, cy, pixel.x, pixel.y, depth_map[pixel_y_int][pixel_x_int], pt3d );
 
-        float dist_2 = (pt3d_local.x*pt3d_local.x + pt3d_local.y*pt3d_local.y) / (PatchSize*PatchSize/4);
+      // local 3d tex coords of point [-PatchSize/2,PatchSize/2]
+      Point3f pt3d_uvw = cam_to_uvw * (pt3d - kp.pt3d);
 
-        if ( fabs(pt3d_local.z) < float(PatchSize)*0.2 &&
-            dist_2 < 0.8 )
+      // uv indices of reprojected 3d point [0,PatchSize]
+      Point2f uv_reproj( pt3d_uvw.x + float(PatchSize/2), pt3d_uvw.y + float(PatchSize/2) );
+
+      // normalized patch coords [-1,1]
+      Point3f pt3d_uvw1 = pt3d_uvw * (2.0f/float(PatchSize));
+      float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y + 3*pt3d_uvw1.z*pt3d_uvw1.z;
+
+      const float weight = 1.0 - dist_2;
+      if ( weight <= 0.0 )
+      {
+        continue;
+      }
+
+      float dx = 0.5 * weight * ( patch[v][u+1] + patch[v+1][u+1] - patch[v][u] - patch[v+1][u] );
+      float dy = 0.5 * weight * ( patch[v+1][u] + patch[v+1][u+1] - patch[v][u] - patch[v][u+1] );
+
+      if ( !isnan(dx) && !isnan(dy) )
+      {
+        PtInfo ptInfo;
+        ptInfo.grad = Point2f(dx,dy);
+        ptInfo.weight = weight;
+        ptInfo.pos = pt3d_uvw1;
+
+        float val = smoothed_img[int(pixel.y)][int(pixel.x)];
+        ptInfo.intensity = val;
+
+        ptInfos.push_back( ptInfo );
+
+#ifdef DESC_DEBUG_IMG
+        Size2f bsize( float(PATCH_MUL)*weight,float(PATCH_MUL)*weight );
+        cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, angle/M_PI*180.0 );
+        ellipse( points3d_img, box, cv::Scalar(val*255,val*255,val*255),-1, CV_AA );
+        //ellipse( points3d_img, box, cv::Scalar(128,0,0),1, CV_AA );
+
+        patch_weights[v][u] = weight;
+        patch_dx[v][u] = dx;
+        patch_dy[v][u] = dy;
+
+        if ( !isnan( patch_dx[v][u] ) && !isnan( patch_dy[v][u] ) )
         {
-          PtInfo ptInfo;
-
-          // get pixel intensity
-          ptInfo.intensity = interpolateKernel<iiMean>( ii, x, y, s );
-          ptInfo.grad.x = interpolateKernel<iiDx>( ii, x, y, s );
-          ptInfo.grad.y = interpolateKernel<iiDy>( ii, x, y, s );
-
-          // correct for scaling along axis
-          ptInfo.grad = affine_mat * ptInfo.grad;
-
-          // the weight will be
-          // - lower further away from the center
-          // - higher for higher depth (one pixel covers more surface there, and the sampling is more sparse)
-
-          ptInfo.weight = ( 1.0-dist_2 ) * pt3d.z * depth_norm;
-
-          ptInfo.pos = pt3d_local;
-
-          pts.push_back( ptInfo );
-
-          // save gradient info for orientation histogram
-          if ( finite(ptInfo.grad.x) && finite(ptInfo.grad.y) )
-          {
-            PtGradient grad;
-            grad.grad_mag = sqrt ( ptInfo.grad.x*ptInfo.grad.x + ptInfo.grad.y*ptInfo.grad.y ) * ptInfo.weight;
-            if ( grad.grad_mag > 0 )
-            {
-              grad.grad_ori = atan2 ( ptInfo.grad.y, ptInfo.grad.x );
-              gradients.push_back( grad );
-            }
-          }
+          Size2f bsize( 3,3 );
+          cv::RotatedRect box(pixel, bsize, angle/M_PI*180.0 );
+          ellipse( display_img, box, cv::Scalar(0,255,0), 1, CV_AA );
         }
+#endif
       }
     }
   }
 
+#ifdef DESC_DEBUG_IMG
+  /*
+  Size2f bsize( kp.affine_major, kp.affine_minor );
+  cv::RotatedRect box( kp.pt, bsize, kp.affine_angle/M_PI*180.0 );
+  ellipse( display_img, box, cv::Scalar(0,0,255), 1, CV_AA );
+  */
+
+  std::ostringstream s;
+  s << PatchSize << "-" << Sigma3 << " ";
+  std::string prefix = s.str();
+
+  imshow( prefix+"sampling points", display_img );
+  imshow2( prefix+"affine patch", patch );
+  imshow2( prefix+"affine patch dx", patch_dx*5 + 0.5 );
+  imshow2( prefix+"affine patch dy", patch_dy*5 + 0.5 );
+  imshow2( prefix+"weights", patch_weights );
+  imshow( prefix+"3d points", points3d_img );
+#endif
+
+  return ptInfos;
+}
+
+
+template< int OriPatchSize, int DescPatchSize >
+inline void getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
+{
+  static const float nan = std::numeric_limits<float>::quiet_NaN();
+
+  // compute exact normal unsing pca
+  kp.normal = getNormal(kp, depth_map, K );
+
+  // get gradients from larger scale
+  std::vector<PtInfo> pt_infos_ori = getGradPatch<OriPatchSize,2>( smoothed_img2, kp, depth_map, K );
+
+  // construct gradient vector
+  std::vector< PtGradient > gradients;
+  gradients.reserve(pt_infos_ori.size());
+
+  for ( unsigned i=0; i<pt_infos_ori.size(); i++ )
+  {
+    PtInfo& pt_info = pt_infos_ori[i];
+    PtGradient grad;
+    grad.grad_mag = sqrt ( pt_info.grad.x*pt_info.grad.x + pt_info.grad.y*pt_info.grad.y ) * pt_info.weight;
+    if ( grad.grad_mag > 0 )
+    {
+      grad.grad_ori = atan2 ( pt_info.grad.y, pt_info.grad.x );
+      gradients.push_back( grad );
+    }
+  }
+
+  // get dominant orientation
   float kp_ori = dominantOri( gradients );
-  kp_ori = 0;
 
   Point2f kp_ori_vec( cos(kp_ori), sin(kp_ori) );
 
-  cv::Matx22f kp_ori_rot(
-      -kp_ori_vec.x,  -kp_ori_vec.y,
-      kp_ori_vec.y, - kp_ori_vec.x );
+  cv::Matx33f kp_ori_rot(
+      -kp_ori_vec.x,  -kp_ori_vec.y, 0,
+      kp_ori_vec.y, - kp_ori_vec.x, 0,
+      0,0,1 );
 
-  cv::Mat1f dximg( PatchSize, PatchSize, 0.5f );
-  cv::Mat1f dyimg( PatchSize, PatchSize, 0.5f );
+  std::vector<PtInfo> pt_infos_desc = getGradPatch<DescPatchSize,1>( smoothed_img, kp, depth_map, K, kp_ori_rot );
 
-  for ( unsigned p=0; p<pts.size(); p++ )
-  {
-    Point2f pt3d_rot = kp_ori_rot * Point2f( pts[p].pos.x, pts[p].pos.y );
-    Point2f grad_rot = kp_ori_rot * Point2f( pts[p].grad.x, pts[p].grad.y );
-
-    pt3d_rot += Point2f(float(PatchSize)*0.5,float(PatchSize)*0.5);
-
-    for ( int y = -0; y<=0; y++ )
-    {
-      for ( int x = -0; x<=0; x++ )
-      {
-        float w = 1;//pts[p].weight
-        patch( pt3d_rot.y + y, pt3d_rot.x + x ) = pts[p].intensity * w;
-        dximg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.x * w );
-        dyimg( pt3d_rot.y + y, pt3d_rot.x + x ) = 0.5 + ( grad_rot.y * w );
-      }
-    }
-  }
-
-  imshow2("i",patch);
-  imshow2("dx",dximg);
-  imshow2("dy",dyimg);
+  computeDesc( pt_infos_desc, kp.desc );
 }
 
-}
-}
+
+}}
 
 #endif

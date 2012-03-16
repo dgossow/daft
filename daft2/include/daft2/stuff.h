@@ -14,6 +14,86 @@ namespace cv
 namespace daft2
 {
 
+inline void imshow( std::string win_title, cv::Mat img )
+{
+  cv::Mat img2 = img;
+  if ( ( img.type() == CV_32F ) || ( img.type() == CV_64F ) )
+  {
+    img.convertTo( img2, CV_8U, 255, 0.0);
+  }
+
+  cv::imshow( "x"+ win_title, img2 );
+  cv::imwrite( "/tmp/img/"+win_title+".png", img2 );
+}
+
+inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
+{
+  cv::Mat img2;
+  cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
+  imshow( win_title, img2 );
+}
+
+inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
+{
+  double minv,maxv;
+  int tmp;
+  cv::minMaxIdx( img, &minv, &maxv, &tmp, &tmp );
+  imshow2( win_title, img, size );
+  cv::Mat img2;
+  cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
+  imshow( win_title, img2 );
+}
+
+
+
+Matx33f inline pointCovariance(const std::vector<Vec3f>& points)
+{
+    float xx=0.0f, xy=0.0f, xz=0.0f, yy=0.0f, yz=0.0f, zz=0.0f;
+    for( typename std::vector<Vec3f>::const_iterator it=points.begin(); it!=points.end(); ++it)
+    {
+        const Vec3f& p = *it;
+        float x = p[0];
+        float y = p[1];
+        float z = p[2];
+        xx += x*x;
+        xy += x*y;
+        xz += x*z;
+        yy += y*y;
+        yz += y*z;
+        zz += z*z;
+    };
+    Matx33f A;
+    A << xx, xy, xz, xy, yy, yz, xz, yz, zz;
+    return A;
+}
+
+/** Fits a plane into points and returns the plane normal */
+Vec3f inline fitNormal(const std::vector<Vec3f>& points)
+{
+    Matx33f A = pointCovariance(points);
+    Mat1f eigen_vals;
+    Mat1f eigen_vecs;
+    cv::eigen(A, eigen_vals,eigen_vecs);
+    Vec3f normal( eigen_vecs[2][0], eigen_vecs[2][1], eigen_vecs[2][2] );
+    if ( normal[2] > 0.0 ) normal *= -1.0;
+    return normal;
+}
+
+
+inline float interpBilinear( Mat1f& img, float x, float y )
+{
+  const int x_low = x;
+  const int y_low = y;
+  const float tx = x - float(x_low);
+  const float ty = y - float(y_low);
+  const float v1 = (1.0-tx) * img[y_low][x_low] + tx * img[y_low][x_low+1];
+  const float v2 = (1.0-tx) * img[y_low+1][x_low] + tx * img[y_low+1][x_low+1];
+  const float v = (1.0-ty) * v1 + ty * v2;
+  return v;
+}
+
+
+
 /** Interpolates linerarly between v1 and v2 given a percentage t */
 template<typename T>
 inline T interpolateLinear(T t, T v1, T v2)

@@ -13,7 +13,7 @@
 
 #include <fstream>
 
-#include "keypoint3d.h"
+#include <features3d/keypoint3d.h>
 #include "stuff.h"
 
 namespace cv
@@ -183,7 +183,7 @@ void convolveAffine( const Mat1d &ii,
         computeGradient( ii_depth_map, ii_depth_count, x, y, sp, depth_grad[y][x] );
       }
 
-      if ( std::isnan( depth_grad[y][x][0] ) || sp < min_px_scale || sp > max_px_scale )
+      if ( isnan( depth_grad[y][x][0] ) || isnan( depth_grad[y][x][1] ) || sp < min_px_scale || sp > max_px_scale )
       {
         img_out(y,x) = nan;
         continue;
@@ -249,7 +249,7 @@ void convolveAffineSep( const Mat1d &ii,
         computeGradient( ii_depth_map, ii_depth_count, x, y, sp, depth_grad[y][x] );
       }
 
-      if ( std::isnan( depth_grad[y][x][0] ) || sp < min_px_scale || sp > max_px_scale )
+      if ( isnan( depth_grad[y][x][0] ) || sp < min_px_scale || sp > max_px_scale )
       {
         ii_y(y,x) = ii_y(y-1,x);
         ii_y_count(y,x) = ii_y_count(y-1,x);
@@ -289,7 +289,7 @@ void filterKpKernel( const Mat1d& ii,
 
     if ( response < thresh )
     {
-      kp_in[k].response = response;
+      //kp_in[k].response = response;
       kp.push_back( kp_in[k] );
     }
   }
@@ -313,7 +313,7 @@ void filterKpKernelAffine( const Mat1d& ii,
 
     if ( response < thresh )
     {
-      kp_in[k].response = response;
+      //kp_in[k].response = response;
       kp.push_back( kp_in[k] );
     }
   }

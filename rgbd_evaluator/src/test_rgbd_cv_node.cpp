@@ -58,30 +58,13 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::Mat1f depth_image_closed,depth_image_smoothed;
   cv::daft2::improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
 
-  cv::GaussianBlur( depth_image_closed, depth_image_smoothed, cv::Size(), 2, 2 );
-
-  //assert( depth_image.cols == intensity_image.cols && depth_image.rows == intensity_image.rows );
-
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
   camera_matrix(1,2) /= 2;
 
-#ifdef TRANSPOSE_IMAGE
-  cv::Matx33d camera_matrix2 = camera_matrix;
-  camera_matrix(0,2) = camera_matrix2(1,2);
-  camera_matrix(1,2) = camera_matrix2(0,2);
-#endif
-
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
 
-
-  cv::daft2::DAFT::DetectorParams p1,p2,p3;
+  cv::daft2::DAFT::DetectorParams p1,p2;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
-
-  //p1.det_type_ = p1.DET_DOB;
-  //p1.min_px_scale_ = 4;
-
-  //p1.scale_step_ = 2.0;
-  //p1.det_threshold_ = 0;
 
   p1.base_scale_ = 0.025;
   p1.scale_levels_ = 1;
@@ -99,34 +82,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p2.affine_ = false;
   p2.pf_type_ = p1.PF_NONE;
 
-/*  p2.affine_ = true;
-  p2.base_scale_ = 0.05;
-  p2.det_threshold_ = 0.1;
-  p2.pf_type_ = p2.PF_NONE;
-  p2.scale_levels_ = 1;
-  p2.max_px_scale_ = 1000;
-  p2.min_px_scale_ = 4;
-  */
-  //p2.pf_type_ = p2.PF_NEIGHBOURS;
-  //p2.pf_threshold_ = 0.95;
-
-  //p2.affine_ = true;
-  //p2.pf_type_ = p1.PF_NEIGHBOURS;
-  //p2.pf_threshold_ = 0.85;
-  //p2.det_type_ = p1.DET_DOB;
-  //p2.det_type_ = p1.DET_LAPLACE;
-  //p2.max_search_algo_ = p2.MAX_FAST;
-
-  // compare speeds
-  p3 = p2;
-  p3.max_search_algo_ = p2.MAX_EVAL;
-
-  cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2), rgbd_features3(p3);
-
-#ifdef TRANSPOSE_IMAGE
-  intensity_image = intensity_image.t();
-  depth_image_smoothed = depth_image_smoothed.t();
-#endif
+ cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
 #if 0
   // compare speeds
@@ -159,12 +115,12 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
 #else
   rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
-  rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
+  //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
 #endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
 
-#if 1
+#if 0
   // draw
   cv::Mat intensity_image1,intensity_image2;
 

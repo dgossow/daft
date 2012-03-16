@@ -18,6 +18,7 @@
 namespace cv {
 namespace daft2 {
 
+//#define SHOW_DEBUG_WIN
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -29,7 +30,7 @@ DAFT::~DAFT() {
 }
 
 void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
-    cv::Matx33f K, std::vector<KeyPoint3D> & kp) {
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp ) {
   if (image.size != depth_map_orig.size) {
     return;
   }
@@ -80,11 +81,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   // Initialize parameters
 
   double base_scale = params_.base_scale_;
-  int scale_levels = params_.scale_levels_;
+  int n_octaves = params_.scale_levels_;
 
   int max_px_scale =
       params_.max_px_scale_ == params_.AUTO ?
-          std::min(image.rows, image.cols) / 16 : params_.max_px_scale_;
+          std::min(image.rows, image.cols) / 10 : params_.max_px_scale_;
 
   const float f = K(0, 0);
 
@@ -148,7 +149,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     base_scale = params_.base_scale_
         * std::pow((double) params_.scale_step_, n_min);
-    scale_levels = n_max - n_min + 1;
+    n_octaves = n_max - n_min + 1;
   }
   else
   {
@@ -175,19 +176,19 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
 #endif
 
-  cv::imshow( "img", gray_image_orig );
+  //cv::imshow( "img", gray_image_orig );
 
-  std::vector<Mat1f> smoothed_imgs(scale_levels+1);
-  std::vector<Mat2f> depth_grads(scale_levels+1);
+  std::vector<Mat1f> smoothed_imgs(n_octaves+1);
+  std::vector<Mat2f> depth_grads(n_octaves+1);
 
   // compute depth-normalized image pyramid
   double scale = base_scale;
-  for (int scale_level = 0; scale_level < scale_levels+1; scale_level++, scale *= params_.scale_step_)
+  for (int octave = 0; octave < n_octaves+1; octave++, scale *= params_.scale_step_)
   {
-    std::cout << "l " << scale_level << std::endl;
+    std::cout << "l " << octave << std::endl;
 
-    Mat1f& smoothed_img = smoothed_imgs[scale_level];
-    Mat2f& depth_grad = depth_grads[scale_level];
+    Mat1f& smoothed_img = smoothed_imgs[octave];
+    Mat2f& depth_grad = depth_grads[octave];
 
     // compute filter response for all pixels
     switch (params_.det_type_) {
@@ -200,6 +201,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
             max_px_scale, smoothed_img);
       }
       break;
+      /*
     case DetectorParams::DET_DOG:
       if (params_.affine_) {
         convolveAffineSep< gaussAffineX<4>, gaussAffineY<4> >(ii, scale_map, ii_depth_map, ii_depth_count,
@@ -207,6 +209,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       } else {
       }
       break;
+      */
     case DetectorParams::DET_LAPLACE:
       if (params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
@@ -223,19 +226,18 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       return;
     }
 
-#if 1
+#ifdef SHOW_DEBUG_WIN
     {
       static int i=0;
       cv::Mat display_image;
       smoothed_img.convertTo( display_image, CV_8UC1, 255, 0.0 );
       std::ostringstream s;
       s << "frame # " << i;
-      cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
+      //cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
       s.str("");
       s << "Smooth Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
-      cv::imshow( s.str(), display_image );
-      cv::waitKey(100);
+      imshow( s.str(), display_image );
 
       /*
        cv::imshow( "dep orig", depth_map_orig );
@@ -254,10 +256,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   // compute difference of gaussians and detect extrema
   scale = base_scale;
-  for (int scale_level = 0; scale_level < scale_levels; scale_level++, scale *= params_.scale_step_)
+  for (int octave = 0; octave < n_octaves; octave++, scale *= params_.scale_step_)
   {
-    diff( smoothed_imgs[scale_level+1], smoothed_imgs[scale_level], response_map );
-    Mat2f& depth_grad = depth_grads[scale_level];
+    diff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
+    Mat2f& depth_grad = depth_grads[octave];
 
     // save index where new kps will be inserted
     unsigned kp_first = kp.size();
@@ -302,9 +304,15 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       return;
     }
 
-    std::cout << "l " << scale_level << ": " << kp.size()-kp_first << " keypoints found." << std::endl;
+    std::cout << "l " << octave << ": " << kp.size()-kp_first << " keypoints found." << std::endl;
 
-#if 1
+    // assign octave
+    for ( unsigned k=kp_first; k<kp.size(); k++ )
+    {
+      kp[k].octave = octave;
+    }
+
+#ifdef SHOW_DEBUG_WIN
     {
       static int i=0;
       cv::Mat display_image;
@@ -338,7 +346,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       s.str("");
       s << "Response Detector type=" << params_.det_type_ << " max=" << params_.max_search_algo_ << " scale = " << scale << " affine = " << params_.affine_;
-      cv::imshow( s.str(), display_image );
+      imshow( s.str(), display_image );
 
       /*
        cv::imshow( "dep orig", depth_map_orig );
@@ -382,8 +390,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     return;
   }
 
-  cv::Mat1f patch1, patch2;
-
   // assign 3d points, normals and local affine params
   float f_inv = 1.0 / f;
   float cx = K(0, 2);
@@ -400,16 +406,24 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     if (getAffine(depth_grad, kp_x, kp_y, kp[k].size * 0.25f,
         kp[k].world_size * 0.25f, kp[k].affine_angle, kp[k].affine_major,
-        kp[k].affine_minor, kp[k].normal)) {
+        kp[k].affine_minor, kp[k].normal))
+    {
       // keypoint shall cover outer and inner and wants size not radius
       kp[k].affine_minor *= 4.0f;
       kp[k].affine_major *= 4.0f;
+
+      Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
+      Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
+      getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
+
       kp2.push_back(kp[k]);
     }
   }
   kp = kp2;
 
-#if 0
+#ifdef SHOW_DEBUG_WIN
+  cv::Mat1f patch1, patch2;
+
   cv::Mat display_image;
   cv::drawKeypoints3D( image, kp, display_image, cv::Scalar(0,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
@@ -427,20 +441,24 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   if ( kp.size() > 0 )
   {
+    vector<KeyPoint3D> kp2;
+    kp2.push_back(kp[k_max]);
+    cv::Mat tmp;
+    response_map.convertTo( tmp, CV_8UC1, 900, 0.0 );
+    cv::drawKeypoints3D( tmp, kp2, tmp, cv::Scalar(0,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+    imshow("max_kp",tmp);
+
     int k=k_max;
     std::stringstream s;
     s << "max response patch";
 
     const float scale_fac = 3; //40.0/2.0;
-    getPatch<40>( ii, kp[k], kp[k].world_size * 0.5 * scale_fac, patch1 );
-    getPatch2<40>( ii, depth_map, K, kp[k], kp[k].world_size * 0.5 * scale_fac, patch2, display_image );
-    /*
-     cv::Mat1f patch1l,patch2l;
-     cv::resize( patch1, patch1l, Size( 256, 256 ), 0, 0, INTER_NEAREST );
-     cv::resize( patch2, patch2l, Size( 256, 256 ), 0, 0, INTER_NEAREST );
-     imshow( "affine " + s.str(), patch1l );
-     imshow( "projected " + s.str(), patch2l );
-     */
+
+    Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
+    Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
+    Mat2f& depth_grad = depth_grads[kp[k].octave];
+
+    getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
   }
 
   imshow( "rgb", display_image );
