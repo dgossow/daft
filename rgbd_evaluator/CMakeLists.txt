@@ -46,3 +46,8 @@ src/extract_detector_file.cpp
 )
 #target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
 #target_link_libraries(extract_detector rgbd_evaluator)
+
+# Make apply blur noise app
+rosbuild_add_executable (apply_blur_noise 
+src/apply_blur_noise.cpp
+)

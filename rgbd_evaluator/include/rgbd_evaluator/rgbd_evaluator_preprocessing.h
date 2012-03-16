@@ -65,6 +65,8 @@ private:
 
   void writeVectorToFile( std::vector<float> vec, std::string filename );
 
+  void writeMaskPointsToFile( std::vector<cv::Point2f> maskPoints );
+
   void splitFileName (const std::string& str);
 
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
@@ -86,11 +88,13 @@ private:
 
   static const uint32_t BUFF_SIZE = 500;
   static const uint32_t MAX_CORRESPONDENCES_DIST_THRES = 10;
-  static const uint32_t MIN_CORRESPONDENCES = 8;
+  static const uint32_t MIN_CORRESPONDENCES = 4;
   static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 10;
   static const uint32_t MAX_FEATURE_NUMBER = 200;
   static const uint32_t SLIDING_WINDOW_SIZE = 40;
   static const uint32_t SEARCH_WINDOW_SIZE = 100;
+
+  static const float_t  NCC_MAX_VAL = 0.98;
 
   struct ImageData
   {
