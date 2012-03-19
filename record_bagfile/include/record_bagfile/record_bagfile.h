@@ -4,18 +4,13 @@
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
-#include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CameraInfo.h>
-
-//#include <ar_pose/
 
 #include <tf/transform_listener.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
-
-#include <visualization_msgs/MarkerArray.h>
 
 #include <cv.h>
 
@@ -37,8 +32,7 @@ public:
 
     void recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img,
                          const sensor_msgs::Image::ConstPtr depth_img,
-                         const sensor_msgs::CameraInfo::ConstPtr cam_info,
-                         const sensor_msgs::PointCloud2::ConstPtr point_cloud);
+                         const sensor_msgs::CameraInfo::ConstPtr cam_info);
 private:
 
     rosbag::Bag bag_;
@@ -51,9 +45,8 @@ private:
     message_filters::Subscriber<sensor_msgs::Image> rgb_img_sub_;
     message_filters::Subscriber<sensor_msgs::Image> depth_img_sub_;
     message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub_;
-    message_filters::Subscriber<sensor_msgs::PointCloud2>  point_cloud2_sub_;
 
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::PointCloud2 > RgbdSyncPolicy;
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> RgbdSyncPolicy;
 
     message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync_;
 

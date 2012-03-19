@@ -14,9 +14,7 @@
   <depend package="rosbag"/>
   <depend package="pcl_ros"/>
   <depend package="tf"/>
-  <depend package="ar_fixed_frame"/>
   <depend package="ar_kinect"/>
-  <depend package="ar_pose"/>
   
   <depend package="visualization_msgs" />
   <depend package="sensor_msgs" />
@@ -26,7 +24,6 @@
   <depend package="dynamic_reconfigure" />
   <depend package="cv_bridge" />
   <depend package="eigen" />
-  <depend package="rgbd_features" />
 
 </package>
 
