@@ -83,6 +83,21 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       // if the current image data is complete, go to next one
       if ( image_store_.back().isComplete() )
       {
+        cv::Mat depth_image_orig = image_store_.back().depth_image;
+        cv::Mat intensity_image_orig = image_store_.back().rgb_image;
+
+        int scale_fac =   intensity_image_orig.cols / depth_image_orig.cols;
+
+        cv::Mat depth_image, intensity_image;
+
+        // Resize depth to have the same width as rgb
+        cv::resize( depth_image_orig, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
+        // Crop rgb so it has the same size as depth
+        intensity_image = cv::Mat( intensity_image_orig, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
+
+        image_store_.back().rgb_image = intensity_image;
+        image_store_.back().depth_image = depth_image;
+
         image_store_.push_back( ImageData() );
         count++;
       }
@@ -107,7 +122,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       //check if rgb_img message arrived
       if (p_rgb_img != NULL && p_rgb_img->encoding == "bgr8" )
       {
-        if ( image_store_.back().rgb_image )
+        if ( image_store_.back().rgb_image.rows > 0 )
         {
           std::cout << "There is already an rgb image for the current dataset! Bagfile invalid." << std::endl;
           return;
@@ -117,7 +132,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_rgb_img);
 
         // store data in vectorImageData
-        image_store_.back().rgb_image = ptr;
+        image_store_.back().rgb_image = ptr->image;
       }
 
       // load depth image
@@ -125,7 +140,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
       //check if depth_img message arrived
       if (p_depth_img != NULL && p_depth_img->encoding == "32FC1" )
       {
-        if ( image_store_.back().depth_image )
+        if ( image_store_.back().depth_image.rows > 0 )
         {
           std::cout << "There is already an depth image for the current dataset! Bagfile invalid." << std::endl;
           return;
@@ -135,7 +150,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_depth_img);
 
         // store data in vectorImageData
-        image_store_.back().depth_image = ptr;
+        image_store_.back().depth_image = ptr->image;
       }
   }
 }
@@ -182,9 +197,11 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   std::vector<float> rotations;
   std::vector<float> angles;
 
-  //float angle_orig;
-  //float dist_orig;
-  //float rotation_orig;
+  float angle_orig = 0.0;
+  float dist_orig = 0.0;
+  float rotation_orig = 0.0;
+
+  tf::StampedTransform transform_original;
 
   int it_step;
   std::vector< ImageData >::iterator it_end,it_begin;
@@ -208,7 +225,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     ss << count;
     std::string count_str = ss.str();
 
-    cv::Mat imgx = it->rgb_image.get()->image;
+    cv::Mat imgx = it->rgb_image;
 
     // image for choosing and drawing keypoints
     keyPointImageOrigin_ = imgx.clone();
@@ -222,6 +239,18 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     // Set up the callback
     cv::setMouseCallback( windowName, imgMouseCallback, this);
+
+    for(int h = 0; h < keyPointImageOrigin_.cols; h++)
+    {
+      for(int t = 0; t < keyPointImageOrigin_.rows; t++)
+          {
+              if (std::isnan(it->depth_image.at<float>(t,h)))
+              {
+                keyPointImageOrigin_.col(h).row(t) = cv::Scalar(0,255,0);
+              }
+          }
+    }
+
     cv::imshow( windowName, keyPointImageOrigin_ );
 
     // store first transforms and images
@@ -262,9 +291,10 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       // first image done, received at least 4 points
       std::cout << "First Image processed!" << std::endl;
-      first_image_ = false;
 
-      /*
+      // Calculate angle_orig, dist_orig, rotation_orig
+      transform_original = calculateCoordinatesystem(it->depth_image, mouseKeypointsOrigin_);
+
       btVector3 zvec = transform_original.inverse().getBasis() * btVector3(0,0,1);
       btVector3 xvec = transform_original.inverse().getBasis() * btVector3(1,0,0);
 
@@ -275,7 +305,6 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       std::cout << "angle_orig " << angle_orig << std::endl;
       std::cout << "dist_orig " << dist_orig << std::endl;
       std::cout << "rotation_orig " << rotation_orig << std::endl;
-      */
 
       // convert image to grayscale
       cv::Mat image_grayscale;
@@ -287,47 +316,12 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       cv::imwrite( file_created_folder_ + "/" + "img1.ppm", img1 );
 
-#if 0
-      cv::drawKeypoints( img1, kp_vec_img1, img1 );
+      first_image_ = false;
 
-       //store original corner points
-      cv::imshow("Keypoints", img1);
-      cv::waitKey(30);
-#endif
-    } // endif
+    } // endif first img
     else
     {
       /**************************** calculate initial homography ***************************************************************/
-
-      /*
-      transform_camx = *(it->approx_transform.get());
-
-      // calculate transform from camera position x to original position
-      transform_camx_to_original = transform_original * transform_camx.inverse();
-
-      btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(circle0,0,1);
-      btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
-
-      float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
-      float dist_abs = transform_camx.getOrigin().length();
-      float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
-
-      std::cout << "angle " << angle_abs << std::endl((RgbdEvaluatorPreprocessing*) param)->;
-      std::cout << "dist " << dist_abs << std::endl;
-      std::cout << "rotation " << rotation_abs << std::endl;
-
-      float scaling = dist_orig / dist_abs;
-      float rotation = std::abs( rotation_abs - rotation_orig );
-      float angle = std::abs( angle_abs - angle_orig );
-
-      std::cout << "angle_rel " << angle << std::endl;
-      std::cout << "scaling " << scaling << std::endl;
-      std::cout << "rotation_rel " << rotation << std::endl;
-
-      angles.push_back( angle );
-      rotations.push_back( rotation );
-      scalings.push_back( scaling );
-      */
 
       std::vector<cv::KeyPoint> tmpKeypoints;
 
@@ -356,6 +350,36 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       }
 
       std::cout << "Image_" << count_str << " processed!" << std::endl;
+
+      tf::StampedTransform transform_camx;
+      transform_camx = calculateCoordinatesystem(it->depth_image, mouseKeypointsImageX_);
+
+      // calculate transform from camera position x to original position
+      tf::StampedTransform transform_camx_to_original;
+      transform_camx_to_original.mult(transform_camx.inverse(),transform_original);
+
+      btVector3 zvec = transform_camx.inverse().getBasis() * btVector3(0,0,1);
+      btVector3 xvec = transform_camx.inverse().getBasis() * btVector3(1,0,0);
+
+      float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
+      float dist_abs = transform_camx.getOrigin().length();
+      float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
+
+      std::cout << "angle " << angle_abs << std::endl;
+      std::cout << "dist " << dist_abs << std::endl;
+      std::cout << "rotation " << rotation_abs << std::endl;
+
+      float scaling = dist_orig / dist_abs;
+      float rotation = std::abs( rotation_abs - rotation_orig );
+      float angle = std::abs( angle_abs - angle_orig );
+
+      std::cout << "angle_rel " << angle << std::endl;
+      std::cout << "scaling " << scaling << std::endl;
+      std::cout << "rotation_rel " << rotation << std::endl;
+
+      angles.push_back( angle );
+      rotations.push_back( rotation );
+      scalings.push_back( scaling );
 
       cv::Matx33f homography_approx = cv::findHomography( mouseKeypointsImageX_, mouseKeypointsOrigin_, CV_RANSAC );
       //printMat(homography_approx);
@@ -478,7 +502,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
     cv::imwrite( file_created_folder_ + "/" + "img" + count_str + ".ppm", imgx );
     //cv::imshow("depth",it->depth_image->image);
-    writeDepth( it->depth_image->image, count_str );
+    writeDepth( it->depth_image, count_str );
 
 #if 0
     std::ofstream mfs( (fileName+"_pose").c_str() );
@@ -758,6 +782,79 @@ void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
   std::cout << " file: " << file_name_ << std::endl;
   std::cout << " folder: " << file_folder_ << std::endl;
   std::cout << " created folder: " << file_created_folder_ << std::endl;
+}
+
+btVector3 getPt3D( int u, int v, float z, float f_inv, float cx, float cy )
+{
+  float zf = z*f_inv;
+  btVector3 p;
+  p[0] = zf * (u-cx);
+  p[1] = zf * (v-cy);
+  p[2] = z;
+  return p;
+}
+
+tf::StampedTransform RgbdEvaluatorPreprocessing::calculateCoordinatesystem( cv::Mat& depth_img,  std::vector<cv::Point2f> mouseKeypoints)
+{
+  float f_inv = 1.0 / K_(0,0);
+  float cx  = K_(0,2);
+  float cy  = K_(1,2);
+  float z = 0;
+  int32_t rand_np = 0;
+
+  tf::StampedTransform transform_original;
+  std::vector<btVector3> CooPoint;
+  btVector3 center;
+
+  for(uint32_t i = 0; i < 3; i++)
+  {
+    for(uint32_t k = 0; k < 50; k++)
+      {
+      if (std::isnan(z))
+      {
+        rand_np =(int32_t)(std::rand()%9-5);
+        std::cout << "no depth value available!!!" << std::endl;
+        z = depth_img.at<float>( (mouseKeypoints.at(i).y+rand_np), (mouseKeypoints.at(i).x+rand_np));
+      }
+    }
+
+    z = depth_img.at<float>( mouseKeypoints.at(i).y, mouseKeypoints.at(i).x);
+
+    if (std::isnan(z))
+    {
+      std::cout << "no depth value available!!!" << std::endl;
+    }
+
+    btVector3 CooPoint_tmp = getPt3D(
+        mouseKeypoints.at(i).x,
+        mouseKeypoints.at(i).y,
+        z, f_inv, cx, cy );
+    CooPoint.push_back( CooPoint_tmp );
+
+//    std::cout << "Tiefe " << i << ": "  << CooPoint_tmp[2] << std::endl;
+    center += CooPoint_tmp;
+  }
+
+  center /= 3.0;
+
+  btVector3 u = CooPoint[1] - CooPoint[0];
+  btVector3 v = CooPoint[2] - CooPoint[0];
+  btVector3 w = u.cross(v);
+  btVector3 v1 = w.cross( u );
+
+  btMatrix3x3 basis;
+  basis[0] = u.normalize();
+  basis[1] = v1.normalize();
+  basis[2] = w.normalize();
+  basis=basis.transpose();
+
+  transform_original.setOrigin( center );
+  transform_original.setBasis( basis );
+
+  std::cout << transform_original.getOrigin().getX() << " " << transform_original.getOrigin().getY() << " " << transform_original.getOrigin().getZ() << std::endl;
+
+  return transform_original;
+
 }
 
 // Implement mouse callback

@@ -71,6 +71,8 @@ private:
 
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
 
+  tf::StampedTransform calculateCoordinatesystem(cv::Mat& depth_img, std::vector<cv::Point2f> mouseKeypoints);
+
   static void imgMouseCallback( int event, int x, int y, int flags, void* param );
 
   std::string file_path_;
@@ -98,13 +100,12 @@ private:
 
   struct ImageData
   {
-    boost::shared_ptr<cv_bridge::CvImage> rgb_image;
-    boost::shared_ptr<cv_bridge::CvImage> depth_image;
-    //...
+    cv::Mat rgb_image;
+    cv::Mat depth_image;
 
     bool isComplete()
     {
-      return rgb_image.get() && depth_image.get();
+      return rgb_image.rows > 0 && depth_image.rows > 0;
     }
   };
 

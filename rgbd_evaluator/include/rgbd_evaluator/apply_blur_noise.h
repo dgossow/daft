@@ -31,7 +31,6 @@ private:
   void splitFileName( const std::string& str );
   std::string extractDigit( std::string& str );
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
-  void readDepth(cv::Mat& depth_img,std::string ImagePath );
 
   cv::Mat image_in_;
 

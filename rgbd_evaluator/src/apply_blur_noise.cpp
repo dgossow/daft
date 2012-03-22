@@ -174,9 +174,7 @@ void ApplyBlurNoise::noiseDepthImage()
     depthImagePath.append("/depth");
     depthImagePath.append(imageNumber);
     depthImagePath.append(".pgm");
-
-    cv::Mat depth_img;
-    readDepth(depth_img, depthImagePath);
+    cv::Mat depth_img = cv::imread(depthImagePath);
 
     // write MaskPoints to file
     writeMaskPointFile( NUMBER_DEPTH_IMAGES_NOISED, atoi(imageNumber.c_str()));
@@ -216,12 +214,6 @@ void ApplyBlurNoise::noiseDepthImage()
       cv::waitKey(30);
       cv::imshow("img_out", image_out);
       cv::waitKey();
-
-      for(uint32_t p = 0; p < 10; p++)
-      {
-        std::cout << "img_in from ("<< i <<"," << p << "): " << depth_img.at<float>(i+200,p+200) << std::endl;
-        std::cout << "image_out from ("<< i <<"," << p << "): " << image_out.at<float>(i+200,p+200) << std::endl;
-      }
 
       // store noised depth image
       cv::imwrite(depthFileName, image_out);
@@ -486,33 +478,6 @@ void ApplyBlurNoise::writeDepth( cv::Mat& depth_img_orig, std::string count_str 
     fs << std::endl;
   }
 }
-
-void ApplyBlurNoise::readDepth(cv::Mat& depth_img, std::string ImagePath )
-{
-  uint32_t depth_rows = 0;
-  uint32_t depth_cols = 0;
-
-  std::string input_string;
-  std::ifstream infile;
-  infile.open(ImagePath.c_str(), std::ios::out);
-  getline(infile,input_string); //Header1
-  infile >> depth_cols;
-  infile >> depth_rows;
-  std::cout << "depth_rows: " << depth_rows << ", depth_cols: " << depth_cols << std::endl;
-  getline(infile,input_string); //Header2
-
-  cv::Mat depth_img_in;
-  depth_img.create(depth_rows,depth_cols,CV_32F);
-
-  for ( uint32_t y=0; y<depth_rows; y++ )
-  {
-    for ( uint32_t x=0; x<depth_cols; x++ )
-    {
-      infile >> depth_img.at<float>(y,x);
-    }
-  }
-}
-
 
 } /* namespace rgbd_evaluator */
 
