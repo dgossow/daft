@@ -19,7 +19,7 @@ namespace cv {
 namespace daft2 {
 
 //#define SHOW_DEBUG_WIN
-//#define FIND_MAXKP
+#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -188,8 +188,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   double scale = base_scale;
   for (int octave = 0; octave < n_octaves+1; octave++, scale *= params_.scale_step_)
   {
-    std::cout << "l " << octave << std::endl;
-
     Mat1f& smoothed_img = smoothed_imgs[octave];
     Mat2f& depth_grad = depth_grads[octave];
 
@@ -387,9 +385,12 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   float cy = K(1, 2);
   vector<KeyPoint3D> kp2;
   kp2.reserve(kp.size());
-  for (unsigned k = 0; k < kp.size(); k++) {
+
+  for (unsigned k = 0; k < kp.size(); k++)
+  {
     int kp_x = kp[k].pt.x;
     int kp_y = kp[k].pt.y;
+
     getPt3d(f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d);
 
     Vec2f depth_grad;
@@ -405,9 +406,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-      getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
-
-      kp2.push_back(kp[k]);
+      //if ( getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
+      {
+        kp2.push_back(kp[k]);
+      }
     }
   }
   kp = kp2;

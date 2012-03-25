@@ -483,7 +483,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
@@ -493,10 +493,10 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  extractKeypoints( &getSurfKp, "SURF" );
-  extractKeypoints( &getSiftKp, "SIFT" );
+  //extractKeypoints( &getSurfKp, "SURF" );
+  //extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )

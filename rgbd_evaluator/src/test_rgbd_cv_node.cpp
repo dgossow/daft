@@ -167,10 +167,37 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::waitKey(500);
 }
 
-
+using namespace cv;
 
 int main( int argc, char** argv )
 {
+  /*
+  const int PatchSize=20;
+  float sum_weights = 0;
+  const float center_uv = (float(PatchSize)-1.0f) * 0.5;
+  for ( int v = 0; v<PatchSize; v++ )
+  {
+    for ( int u = 0; u<PatchSize; u++ )
+    {
+      // 0-centered u/v coords
+      cv::Point2f uv( float(u)-center_uv, float(v)-center_uv );
+
+      // normalized patch coords [-1,1]
+      Point2f pt3d_uvw1 = uv * (2.0f/float(PatchSize));
+      float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y;
+
+      const float weight = 1.0 - dist_2;
+      if ( isnan(weight) || weight <= 0.0 )
+      {
+        continue;
+      }
+
+      sum_weights += weight;
+    }
+  }
+  std::cout << sum_weights / double(PatchSize*PatchSize) << std::endl;
+  */
+
   ros::init( argc, argv, "rgbd_evaluator_node" );
 
   ros::NodeHandle comm_nh(""); // for topics, services
