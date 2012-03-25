@@ -7,7 +7,7 @@ mkdir(graph_path)
 mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
 num_det = size(det_suffix,1);
 x_vals = load( sprintf( '%s%s', data_path, x_val_file ) );
-num_img = size( x_vals, 2 );
+num_img = size( x_vals, 2 ) + 1;
 
 figure(1);clf;
 axes('LineWidth',3);
@@ -49,11 +49,11 @@ for d=1:num_det
 end
 
 figure(1)
-axis([x_vals(1) x_vals(num_img) 30 100]);
+axis([x_vals(1) x_vals(num_img-1) 30 100]);
 %axis 'auto x'
 
 figure(2)
-axis([x_vals(1) x_vals(num_img) 0 750]);
+axis([x_vals(1) x_vals(num_img-1) 0 750]);
 
 for f=1:2
     figure(f);
