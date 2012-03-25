@@ -18,7 +18,7 @@
 #include <list>
 
 
-#define DESC_DEBUG_IMG
+//#define DESC_DEBUG_IMG
 
 namespace cv
 {
@@ -47,7 +47,7 @@ void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc );
 template< int PatchSize, int Sigma3 >
 inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
     const cv::Mat1f depth_map, cv::Matx33f& K, vector<PtInfo>& ptInfos, float& coverage,
-    float step_size=1, cv::Matx33f kp_ori_rot = cv::Matx33f::eye() )
+    float step_size=1.0, cv::Matx33f kp_ori_rot = cv::Matx33f::eye() )
 {
   float sum_weights = 0;
 
@@ -108,10 +108,11 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
   local_to_cam = local_to_cam * kp_ori_rot.t();
 
   // transforms from u/v texture coords [-PatchSize/2 ... PatchSize/2] to 3d
-  cv::Matx33f uvw_to_cam = local_to_cam * kp.world_size * 0.25 * step_size;
+  cv::Matx33f uvw_to_cam = local_to_cam * kp.world_size * 0.5 * step_size;
 
   // transforms from 3d to u/v tex coords
-  cv::Matx33f cam_to_uvw = cv::Matx33f(4.0 / (step_size*kp.world_size),0,0, 0,4.0 / kp.world_size,0, 0,0,1) * local_to_cam.t();
+  float s1 = 2.0 / (step_size*kp.world_size);
+  cv::Matx33f cam_to_uvw = cv::Matx33f(s1,0,0, 0,s1,0, 0,0,1) * local_to_cam.t();
 
   // sample intensity values using planar assumption
   for ( int v = 0; v<PatchSize+1; v++ )
@@ -272,11 +273,11 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
 #endif
 
   coverage = sum_weights / float(PatchSize*PatchSize) / 0.4;
-  std::cout << "coverage: " << coverage << std::endl;
+  //std::cout << "coverage: " << coverage << std::endl;
 }
 
 
-template< int OriPatchSize, int DescPatchSize >
+template< int DescPatchSize >
 inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
 {
   static const float nan = std::numeric_limits<float>::quiet_NaN();
@@ -288,6 +289,11 @@ inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
   std::vector<PtInfo> pt_infos_ori;
   float coverage;
   getGradPatch<DescPatchSize,2>( smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5 );
+
+  if ( coverage < 0.5 )
+  {
+    return false;
+  }
 
   // construct gradient vector
   std::vector< PtGradient > gradients;
@@ -317,6 +323,11 @@ inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
 
   std::vector<PtInfo> pt_infos_desc;
   getGradPatch<DescPatchSize,1>( smoothed_img, kp, depth_map, K, pt_infos_desc, coverage, 1.0, kp_ori_rot );
+
+  if ( coverage < 0.5 )
+  {
+    return false;
+  }
 
   computeDesc( pt_infos_desc, kp.desc );
   return true;

@@ -1,5 +1,5 @@
 
-detectors = {'DAFT-Fast Affine';'SIFT';'SURF'};
+detectors = {'DAFT Affine';'DAFT-Fast Affine';'SIFT';'SURF'};
 %detectors = {'DAFT Affine'};
 
 bagpath = '/work/gossow/bags/';

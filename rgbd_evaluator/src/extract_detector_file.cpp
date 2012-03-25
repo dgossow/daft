@@ -25,6 +25,7 @@ namespace rgbd_evaluator
 {
 
 const int num_kp = 750;
+int img_count = 0;
 
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_order)
 {
@@ -468,8 +469,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 void ExtractDetectorFile::extractAllKeypoints()
 {
   daft_ns::DAFT::DetectorParams p;
-  //p.max_px_scale_ = 800;
-  p.min_px_scale_ = 2;
+  p.max_px_scale_ = 800;
+  p.min_px_scale_ = 3;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
   p.det_threshold_ = 0.1;//115;
@@ -493,10 +494,10 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  //extractKeypoints( &getSurfKp, "SURF" );
-  //extractKeypoints( &getSiftKp, "SIFT" );
+  extractKeypoints( &getSurfKp, "SURF" );
+  extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
@@ -550,7 +551,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
     if ( it->world_size != 0 )
     {
       float s_log = log2( it->world_size );
-      file << " " << s_log;
+      file << " " << s_log*100;
     }
     else
     {
@@ -578,8 +579,6 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
   cv::imshow("kp", kp_img);
   cv::waitKey(100);
-
-  static int img_count = 0;
 
   std::stringstream s;
   s.width(3);
@@ -637,6 +636,7 @@ int main( int argc, char** argv )
 
   for ( int i=start_i; i<argc; i++ )
   {
+    rgbd_evaluator::img_count = 0;
     std::string file_name(argv[i]);
     rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name, reverse_order);
   }

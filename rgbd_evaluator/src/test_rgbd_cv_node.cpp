@@ -73,7 +73,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   p1.det_type_=p1.DET_DOB;
   p1.affine_=true;
-  p1.max_search_algo_ = p1.MAX_WINDOW;
+  p1.max_search_algo_ = p1.MAX_FAST;
 
   p1.det_threshold_ = 0.04;
 
@@ -142,7 +142,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::drawKeypoints(surf_img, surf_kp, surf_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
   cv::imshow("SURF Keypoints", surf_img);
 #endif
-  cv::waitKey(500);
+  cv::waitKey(50);
 }
 
 using namespace cv;

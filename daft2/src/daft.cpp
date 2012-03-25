@@ -19,8 +19,8 @@
 namespace cv {
 namespace daft2 {
 
-#define SHOW_DEBUG_WIN
-#define FIND_MAXKP
+//#define SHOW_DEBUG_WIN
+//#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -156,8 +156,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     Mat2f& depth_grad = depth_grads[octave];
 
     smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
+
+#ifdef SHOW_DEBUG_WIN
     std::stringstream s; s<<"smooth_depth s="<<scale;
     imshowNorm( s.str(), smoothed_depth_map, 0 );
+#endif
 
     // compute filter response for all pixels
     switch (params_.det_type_) {
@@ -373,7 +376,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-      //if ( getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
+      if ( getDesc<20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
       {
         kp2.push_back(kp[k]);
       }
@@ -418,7 +421,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
     Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
 
-    getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], smoothed_depth_map, K );
+    getDesc<20>( smoothed_img, smoothed_img2, kp[k], smoothed_depth_map, K );
   }
 
   imshow( "rgb", display_image );
