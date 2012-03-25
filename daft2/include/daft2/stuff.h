@@ -14,6 +14,7 @@ namespace cv
 namespace daft2
 {
 
+/*
 inline void imshow( std::string win_title, cv::Mat img )
 {
   cv::Mat img2 = img;
@@ -25,11 +26,19 @@ inline void imshow( std::string win_title, cv::Mat img )
   cv::imshow( "x"+ win_title, img2 );
   cv::imwrite( "/tmp/img/"+win_title+".png", img2 );
 }
+*/
 
 inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
 {
   cv::Mat img2;
-  cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
+  if ( size > 0 )
+  {
+    cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
+  }
+  else
+  {
+    img2 = img;
+  }
   imshow( win_title, img2 );
 }
 
@@ -40,7 +49,6 @@ inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
   cv::minMaxIdx( img, &minv, &maxv, &tmp, &tmp );
   imshow2( win_title, (img - minv) * (1.0 / (maxv-minv)), size );
 }
-
 
 
 Matx33f inline pointCovariance(const std::vector<Vec3f>& points)
@@ -229,17 +237,11 @@ inline float meanDepth(const Mat1d &ii_depth_map,
  * @param sp step width in projected pixel
  */
 inline bool computeGradient(
-    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    int x, int y, float sp, Vec2f& grad)
+    const Mat1f &depth_map, int x, int y, float sp, Vec2f& grad)
 {
   int sp_int = int(sp+0.5f);
 
-  if ( sp_int < 6 )
-  {
-    sp_int = 6;
-  }
-
-  if ( !checkBounds( ii_depth_count, x, y, sp_int*2 ) )
+  if ( !checkBounds( depth_map, x, y, sp_int ) )
   {
     grad[0] = std::numeric_limits<float>::quiet_NaN();
     grad[1] = std::numeric_limits<float>::quiet_NaN();
@@ -247,11 +249,11 @@ inline bool computeGradient(
   }
 
   // get depth values from image
-  float d_center = meanDepth( ii_depth_map, ii_depth_count, x, y, sp_int);
-  float d_xp = meanDepth( ii_depth_map, ii_depth_count, x+sp_int, y, sp_int);
-  float d_yp = meanDepth( ii_depth_map, ii_depth_count, x, y+sp_int, sp_int);
-  float d_xn = meanDepth( ii_depth_map, ii_depth_count, x-sp_int, y, sp_int);
-  float d_yn = meanDepth( ii_depth_map, ii_depth_count, x, y-sp_int, sp_int);
+  float d_center = depth_map(y,x);// meanDepth( ii_depth_map, ii_depth_count, x, y, sp_int);
+  float d_xp = depth_map(y,x+sp_int);
+  float d_yp = depth_map(y+sp_int,x);
+  float d_xn = depth_map(y,x-sp_int);
+  float d_yn = depth_map(y-sp_int,x);
 
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
@@ -261,10 +263,10 @@ inline bool computeGradient(
   float dxx = d_xp - 2*d_center + d_xn;
   float dyy = d_yp - 2*d_center + d_yn;
 
-  const float cMaxCurvature = 2.0f;
+  const float MaxCurvature = 4.0f;
   // test for local planarity
   // TODO note: this does not check for the case of a saddle
-  if ( std::abs(dxx + dyy) > 2.0f*cMaxCurvature )
+  if ( std::abs(dxx + dyy) > MaxCurvature )
   {
     return false;
   }

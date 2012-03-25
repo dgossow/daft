@@ -19,50 +19,6 @@ namespace cv
 namespace daft2
 {
 
-inline float gradX( const Mat1d &ii,
-    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    int x, int y, float sp, float sw, float min_sp )
-{
-  // sp : pixel scale
-  // sw : world scale
-
-  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
-  if ( checkBounds( ii, x, y, 3*sp ) )
-  {
-    // depth gradient between (x+sp) and (x-sp)
-    Vec2f grad;
-
-    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
-      return std::numeric_limits<float>::quiet_NaN();
-
-    return grad[0] / sw;
-  }
-
-  return std::numeric_limits<float>::quiet_NaN();
-}
-
-inline float gradY( const Mat1d &ii,
-    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
-    int x, int y, float sp, float sw, float min_sp )
-{
-  // sp : pixel scale
-  // sw : world scale
-
-  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
-  if ( checkBounds( ii, x, y, 3*sp ) )
-  {
-    // depth gradient between (x+sp) and (x-sp)
-    Vec2f grad;
-
-    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
-      return std::numeric_limits<float>::quiet_NaN();
-
-    return grad[1] / sw;
-  }
-
-  return std::numeric_limits<float>::quiet_NaN();
-}
-
 /* Compute approximate affine Gaussian using rectangular integrals */
 inline float boxAffine( const Mat1d &ii, Vec2f &grad,
     int x, int y, float sp, float sw, float min_sp )

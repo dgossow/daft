@@ -5,6 +5,7 @@
 
 #include "daft.h"
 #include "filter_kernels.h"
+#include "depth_filter.h"
 #include "feature_detection.h"
 #include "descriptor.h"
 
@@ -27,8 +28,8 @@ DAFT::DAFT(const DetectorParams & detector_params) :
 }
 
 DAFT::~DAFT() {
-
 }
+
 
 void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp ) {
@@ -36,48 +37,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     return;
   }
 
-  Mat gray_image_orig = image;
-
-  // Convert RGB to Grey image
-  if (image.type() == CV_8UC3) {
-    cvtColor(image, gray_image_orig, CV_BGR2GRAY);
-  }
-
-  // Construct integral image
+  // Convert input to correct format
+  Mat gray_image;
   Mat1d ii;
-
-  switch (gray_image_orig.type())
-  {
-  case CV_8U:
-  {
-    cv::Mat1b m_in = gray_image_orig;
-    integral2( m_in, ii, 1.0/255.0 );
-  }
-  break;
-  case CV_64F:
-  {
-    cv::Mat1d m_in = gray_image_orig;
-    integral2( m_in, ii );
-  }
-  break;
-  case CV_32F:
-  {
-    cv::Mat1f m_in = gray_image_orig;
-    integral2( m_in, ii );
-  }
-  break;
-  default:
-    //return;
-    break;
-  }
-
-  // Convert depth map to floating point
-  cv::Mat1f depth_map;
-  if (depth_map_orig.type() == CV_16U) {
-    depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
-  } else {
-    depth_map = depth_map_orig;
-  }
+  Mat1f depth_map;
+  prepareData( image, depth_map_orig, gray_image, ii, depth_map );
 
   // Initialize parameters
 
@@ -114,7 +78,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
 
   // Compute scale map from depth map
-  Mat1f scale_map(gray_image_orig.rows, gray_image_orig.cols);
+  Mat1f scale_map(gray_image.rows, gray_image.cols);
   Mat1f::iterator scale_it = scale_map.begin();
   Mat1f::iterator scale_map_end = scale_map.end();
   Mat1f::iterator depth_it = depth_map.begin();
@@ -180,24 +144,26 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   //cv::imshow( "img", gray_image_orig );
 
   std::vector<Mat1f> smoothed_imgs(n_octaves+1);
+  std::vector<Mat1f> smoothed_depth_maps(n_octaves+1);
   std::vector<Mat2f> depth_grads(n_octaves+1);
-
-  // TODO: compute depth gradient
 
   // compute depth-normalized image pyramid
   double scale = base_scale;
   for (int octave = 0; octave < n_octaves+1; octave++, scale *= params_.scale_step_)
   {
-    std::cout << "l " << octave << std::endl;
-
     Mat1f& smoothed_img = smoothed_imgs[octave];
+    Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
     Mat2f& depth_grad = depth_grads[octave];
+
+    smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
+    std::stringstream s; s<<"smooth_depth s="<<scale;
+    imshowNorm( s.str(), smoothed_depth_map, 0 );
 
     // compute filter response for all pixels
     switch (params_.det_type_) {
     case DetectorParams::DET_DOB:
       if (params_.affine_) {
-        convolveAffine<boxAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
+        convolveAffine<boxAffine>(ii, scale_map, smoothed_depth_map,
             scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<box>(ii, scale_map, scale, params_.min_px_scale_,
@@ -206,7 +172,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       break;
     case DetectorParams::DET_LAPLACE:
       if (params_.affine_) {
-          convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
+          convolveAffine<gaussAffine>(ii, scale_map, smoothed_depth_map,
               scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<gauss>(ii, scale_map, scale, params_.min_px_scale_,
@@ -246,7 +212,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
 
   Mat1f response_map;
-  response_map.create(gray_image_orig.rows, gray_image_orig.cols);
+  response_map.create(gray_image.rows, gray_image.cols);
 
   // compute difference of gaussians and detect extrema
   scale = base_scale;
@@ -319,13 +285,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
 
-        Vec2f grad;
-        if ( computeGradient( ii_depth_map, ii_depth_count, kp_x, kp_x, kp[k].size*0.25f, grad ) )
-        {
-          getAffine( grad, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
+        Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
+        Vec2f depth_grad = depth_grads[kp[k].octave](kp_y,kp_x);
+
+        if ( getAffine( depth_grad, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
               kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
-              kp[k].normal );
-          // keypoint shall cover outer and inner and wants size not radius
+              kp[k].normal ) )
+        {
           kp[k].affine_minor *= 4.0f;
           kp[k].affine_major *= 4.0f;
           kp2.push_back(kp_curr);
@@ -387,17 +353,19 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   float cy = K(1, 2);
   vector<KeyPoint3D> kp2;
   kp2.reserve(kp.size());
-  for (unsigned k = 0; k < kp.size(); k++) {
+
+  for (unsigned k = 0; k < kp.size(); k++)
+  {
     int kp_x = kp[k].pt.x;
     int kp_y = kp[k].pt.y;
+
     getPt3d(f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d);
 
-    Vec2f depth_grad;
-    computeGradient( ii_depth_map, ii_depth_count, kp_x, kp_y, kp[k].size * 0.25f, depth_grad );
+    Vec2f depth_grad = depth_grads[kp[k].octave](kp_y,kp_x);
 
     if (getAffine(depth_grad, kp_x, kp_y, kp[k].size * 0.25f,
         kp[k].world_size * 0.25f, kp[k].affine_angle, kp[k].affine_major,
-        kp[k].affine_minor, kp[k].normal))
+        kp[k].affine_minor, kp[k].normal) && kp[k].affine_major / kp[k].affine_minor < 10.0 )
     {
       // keypoint shall cover outer and inner and wants size not radius
       kp[k].affine_minor *= 4.0f;
@@ -405,12 +373,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-      //getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
-
-      kp2.push_back(kp[k]);
+      //if ( getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
+      {
+        kp2.push_back(kp[k]);
+      }
     }
   }
-  kp = kp2;
+  kp.swap(kp2);
 
 #ifdef FIND_MAXKP
   cv::Mat1f patch1, patch2;
@@ -447,15 +416,63 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
     Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-    Mat2f& depth_grad = depth_grads[kp[k].octave];
+    Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
 
-    getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
+    getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], smoothed_depth_map, K );
   }
 
   imshow( "rgb", display_image );
 #endif
 
 }
+
+
+
+
+void DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
+    Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map )
+{
+  gray_image = image;
+
+  // Convert RGB to Grey image
+  if (image.type() == CV_8UC3) {
+    cvtColor(image, gray_image, CV_BGR2GRAY);
+  }
+
+  // Construct integral image
+  switch (gray_image.type())
+  {
+  case CV_8U:
+  {
+    cv::Mat1b m_in = gray_image;
+    integral2( m_in, ii, 1.0/255.0 );
+  }
+  break;
+  case CV_64F:
+  {
+    cv::Mat1d m_in = gray_image;
+    integral2( m_in, ii );
+  }
+  break;
+  case CV_32F:
+  {
+    cv::Mat1f m_in = gray_image;
+    integral2( m_in, ii );
+  }
+  break;
+  default:
+    //return;
+    break;
+  }
+
+  // Convert depth map to floating point
+  if (depth_map_orig.type() == CV_16U) {
+    depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
+  } else {
+    depth_map = depth_map_orig;
+  }
+}
+
 
 }
 }

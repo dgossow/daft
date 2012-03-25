@@ -66,9 +66,10 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::daft2::DAFT::DetectorParams p1,p2;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
-  p1.base_scale_ = 0.005;
+  p1.base_scale_ = 0.01;
   p1.scale_levels_ = 1;
-  p1.max_px_scale_ = 1000;
+  p1.min_px_scale_ = 1;
+  //p1.max_px_scale_ = 1000;
 
   p1.det_type_=p1.DET_DOB;
   p1.affine_=true;
@@ -86,39 +87,8 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
  cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
-#if 0
-  // compare speeds
-  for ( int i=0; i<10; i++ )
-  {
-    rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-  }
-  {
-    boost::timer timer;
-    timer.restart();
-    for ( int i=0; i<10; i++ )
-    {
-      rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-    }
-    std::cout << "detect 1 execution time [ms]: " << timer.elapsed()*100 << std::endl;
-  }
-  for ( int i=0; i<10; i++ )
-  {
-    rgbd_features2.detect( intensity_image, depth_image, camera_matrix, keypoints1);
-  }
-  {
-    boost::timer timer;
-    timer.restart();
-    for ( int i=0; i<10; i++ )
-    {
-      rgbd_features2.detect( intensity_image, depth_image, camera_matrix, keypoints2);
-    }
-    std::cout << "detect 2 execution time [ms]: " << timer.elapsed()*100 << std::endl;
-  }
-
-#else
   rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
   //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
-#endif
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
 
@@ -134,8 +104,12 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   std::ostringstream s;
   s << p1.det_type_;
-  cv::imshow( "KP1 (type "+s.str()+", Green) over KP2", intensity_image1 );
+  if ( keypoints1.size() != 0 )
+  {
+    cv::imshow( "keypoints2=green", intensity_image1 );
+  }
 
+  /*
   static int f=0;
   s.str("");
   s << "/tmp/vid/";
@@ -144,10 +118,14 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   s << f << ".jpg";
   cv::imwrite( s.str(), intensity_image1 );
   f++;
+  */
 
   s.str("");
   s << p2.det_type_;
-  cv::imshow( "KP2 (type "+s.str()+", Red) over KP1", intensity_image2 );
+  if ( keypoints2.size() != 0 )
+  {
+    cv::imshow( "keypoints2=red", intensity_image2 );
+  }
 #endif
 
 #if 0
@@ -167,17 +145,44 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::waitKey(500);
 }
 
-
+using namespace cv;
 
 int main( int argc, char** argv )
 {
+  /*
+  const int PatchSize=20;
+  float sum_weights = 0;
+  const float center_uv = (float(PatchSize)-1.0f) * 0.5;
+  for ( int v = 0; v<PatchSize; v++ )
+  {
+    for ( int u = 0; u<PatchSize; u++ )
+    {
+      // 0-centered u/v coords
+      cv::Point2f uv( float(u)-center_uv, float(v)-center_uv );
+
+      // normalized patch coords [-1,1]
+      Point2f pt3d_uvw1 = uv * (2.0f/float(PatchSize));
+      float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y;
+
+      const float weight = 1.0 - dist_2;
+      if ( isnan(weight) || weight <= 0.0 )
+      {
+        continue;
+      }
+
+      sum_weights += weight;
+    }
+  }
+  std::cout << sum_weights / double(PatchSize*PatchSize) << std::endl;
+  */
+
   ros::init( argc, argv, "rgbd_evaluator_node" );
 
   ros::NodeHandle comm_nh(""); // for topics, services
 
-  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "intensity_image", 1);
-  message_filters::Subscriber<sensor_msgs::Image> depth_img_sub(comm_nh, "depth_image", 1);
-  message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub(comm_nh, "camera_info", 1);
+  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "/camera/rgb/image_rect", 1);
+  message_filters::Subscriber<sensor_msgs::Image> depth_img_sub(comm_nh, "/camera/depth_registered/image_rect", 1);
+  message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub(comm_nh, "/camera/rgb/camera_info", 1);
 
   message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync(
       RgbdSyncPolicy(10), intensity_img_sub, depth_img_sub, cam_info_sub );
@@ -192,3 +197,22 @@ int main( int argc, char** argv )
     ros::spinOnce();
   }
 }
+
+
+
+#if 0
+  // compare speeds
+  for ( int i=0; i<10; i++ )
+  {
+    rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
+  }
+  {
+    boost::timer timer;
+    timer.restart();
+    for ( int i=0; i<10; i++ )
+    {
+      rgbd_features1.detect( intensity_image, depth_image, camera_matrix, keypoints1);
+    }
+    std::cout << "detect 1 execution time [ms]: " << timer.elapsed()*100 << std::endl;
+  }
+#endif

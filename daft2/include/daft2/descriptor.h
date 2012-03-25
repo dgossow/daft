@@ -18,7 +18,7 @@
 #include <list>
 
 
-//#define DESC_DEBUG_IMG
+#define DESC_DEBUG_IMG
 
 namespace cv
 {
@@ -45,10 +45,12 @@ Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K
 void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc );
 
 template< int PatchSize, int Sigma3 >
-inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
-    const cv::Mat1f depth_map, cv::Matx33f& K,
-    cv::Matx33f kp_ori_rot = cv::Matx33f::eye() )
+inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
+    const cv::Mat1f depth_map, cv::Matx33f& K, vector<PtInfo>& ptInfos, float& coverage,
+    float step_size=1, cv::Matx33f kp_ori_rot = cv::Matx33f::eye() )
 {
+  float sum_weights = 0;
+
   static const float Sigma = float(Sigma3) / 3.0;
   static const float nan = std::numeric_limits<float>::quiet_NaN();
   Mat1f patch( PatchSize+1, PatchSize+1, nan );
@@ -106,10 +108,10 @@ inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
   local_to_cam = local_to_cam * kp_ori_rot.t();
 
   // transforms from u/v texture coords [-PatchSize/2 ... PatchSize/2] to 3d
-  cv::Matx33f uvw_to_cam = local_to_cam * kp.world_size * 0.5;
+  cv::Matx33f uvw_to_cam = local_to_cam * kp.world_size * 0.25 * step_size;
 
   // transforms from 3d to u/v tex coords
-  cv::Matx33f cam_to_uvw = cv::Matx33f(2.0 / kp.world_size,0,0, 0,2.0 / kp.world_size,0, 0,0,1) * local_to_cam.t();
+  cv::Matx33f cam_to_uvw = cv::Matx33f(4.0 / (step_size*kp.world_size),0,0, 0,4.0 / kp.world_size,0, 0,0,1) * local_to_cam.t();
 
   // sample intensity values using planar assumption
   for ( int v = 0; v<PatchSize+1; v++ )
@@ -170,7 +172,7 @@ inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
   }
 #endif
 
-  vector<PtInfo> ptInfos;
+  ptInfos.clear();
   ptInfos.reserve(PatchSize*PatchSize);
 
   // compute gradients
@@ -207,10 +209,12 @@ inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
       float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y + 3*pt3d_uvw1.z*pt3d_uvw1.z;
 
       const float weight = 1.0 - dist_2;
-      if ( weight <= 0.0 )
+      if ( isnan(weight) || weight <= 0.0 )
       {
         continue;
       }
+
+      sum_weights += weight;
 
       float dx = 0.5 * weight * ( patch[v][u+1] + patch[v+1][u+1] - patch[v][u] - patch[v+1][u] );
       float dy = 0.5 * weight * ( patch[v+1][u] + patch[v+1][u+1] - patch[v][u] - patch[v][u+1] );
@@ -267,12 +271,13 @@ inline vector<PtInfo> getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
   imshow( prefix+"3d points", points3d_img );
 #endif
 
-  return ptInfos;
+  coverage = sum_weights / float(PatchSize*PatchSize) / 0.4;
+  std::cout << "coverage: " << coverage << std::endl;
 }
 
 
 template< int OriPatchSize, int DescPatchSize >
-inline void getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
+inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
 {
   static const float nan = std::numeric_limits<float>::quiet_NaN();
 
@@ -280,7 +285,9 @@ inline void getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
   kp.normal = getNormal(kp, depth_map, K );
 
   // get gradients from larger scale
-  std::vector<PtInfo> pt_infos_ori = getGradPatch<OriPatchSize,2>( smoothed_img2, kp, depth_map, K );
+  std::vector<PtInfo> pt_infos_ori;
+  float coverage;
+  getGradPatch<DescPatchSize,2>( smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5 );
 
   // construct gradient vector
   std::vector< PtGradient > gradients;
@@ -308,9 +315,11 @@ inline void getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
       kp_ori_vec.y, - kp_ori_vec.x, 0,
       0,0,1 );
 
-  std::vector<PtInfo> pt_infos_desc = getGradPatch<DescPatchSize,1>( smoothed_img, kp, depth_map, K, kp_ori_rot );
+  std::vector<PtInfo> pt_infos_desc;
+  getGradPatch<DescPatchSize,1>( smoothed_img, kp, depth_map, K, pt_infos_desc, coverage, 1.0, kp_ori_rot );
 
   computeDesc( pt_infos_desc, kp.desc );
+  return true;
 }
 
 

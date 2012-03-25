@@ -468,7 +468,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 void ExtractDetectorFile::extractAllKeypoints()
 {
   daft_ns::DAFT::DetectorParams p;
-  p.max_px_scale_ = 300;
+  //p.max_px_scale_ = 800;
   p.min_px_scale_ = 2;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
@@ -495,8 +495,8 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.affine_ = true;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  extractKeypoints( &getSurfKp, "SURF" );
-  extractKeypoints( &getSiftKp, "SIFT" );
+  //extractKeypoints( &getSurfKp, "SURF" );
+  //extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )

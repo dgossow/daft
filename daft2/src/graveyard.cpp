@@ -1,20 +1,145 @@
 //
-//        _.---,._,'
-//       /' _.--.<
-//         /'     `'
-//       /' _.---._____
-//       \.'   ___, .-'`
-//           /'    \\             .
-//         /'       `-.          -|-
-//        |                       |
-//        |                   .-'~~~`-.
-//        |                 .'         `.
-//        |                 |  R  I  P  |
-//        |                 |           |
-//        |                 | Obsolete  |
-//        |                 |   Code    |
-//         \              \\|           |//
-//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//                                                              .....
+//                                                             C C  /
+//      _.---,._,'                                            /<   /
+//     /' _.--.<                               ___ __________/_#__=o
+//       /'     `'                            /(- /(\_\________   \
+//     /' _.---._____                         \ ) \ )_      \o     \
+//     \.'   ___, .-'`                        /|\ /|\       |'     |
+//         /'    \\             .                           |     _|
+//       /'       `-.          -|-                          /o   __\
+//      |                       |                          / '     |
+//      |                   .-'~~~`-.                     / /      |
+//      |                 .'         `.                  /_/\______|
+//      |                 |  R  I  P  |                 (   _(    <
+//      |                 |           |                  \    \    \
+//      |                 | Obsolete  |                   \    \    |
+//      |                 |   Code    |                    \    \    |
+//       \              \\|           |//                   \____\____\
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+
+/*!
+ Compute the kernel response for every pixel of the given image.
+ The kernel size and shape will be a local affine transformation.
+ The template argument specifies the filter kernel.
+ * @param ii            The Integral Image
+ * @param scale_map     The scale map (scale multiplier per pixel)
+ * @param ii_depth_map  The integral depth map (im meters)
+ * @param ii_depth_countIntegral of the number of valid depth pixels
+ * @param camera_matrix Camera intrinsics
+ * @param base_scale    The global scale multiplier
+ * @param min_px_scale  Minimal scale in pixels
+ * @param max_px_scale  Maximal scale in pixels
+ * @param img_out       The output image
+ */
+template < float (*Fx)( const Mat1d &ii, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp ),
+    float (*Fy)( const Mat1f &ii_y, const Mat1f &ii_y_count, Vec2f &grad,
+        int x, int y, float sp, float sw, float min_sp ) >
+void convolveAffineSep( const Mat1d &ii,
+    const Mat1f &scale_map,
+    const Mat1d &ii_depth_map, const Mat_<uint64_t>& ii_depth_count,
+    float sw,
+    float min_px_scale,
+    float max_px_scale,
+    Mat1f &img_out,
+    Mat2f& depth_grad )
+{
+  img_out.create( ii.rows-1, ii.cols-1 );
+
+  Mat1f ii_y( ii.rows, ii.cols );
+  Mat1f ii_y_count( ii.rows, ii.cols );
+
+  // determine if we need to compute the depth gradient
+  const bool compute_grad = ( depth_grad.rows != ii.rows-1 || depth_grad.cols != ii.cols-1 );
+  if ( compute_grad ) {
+    depth_grad.create( ii.rows-1, ii.cols-1 );
+  }
+
+  static const float nan = std::numeric_limits<float>::quiet_NaN();
+  for ( int x = 0; x < ii.cols-1; ++x )
+  {
+    ii_y[0][x] = 0;
+    ii_y_count[0][x] = 0;
+  }
+  // convolute in x direction and integrate in y direction
+  for ( int y = 1; y < ii.rows; y++ )
+  {
+    for ( int x = 0; x < ii.cols; ++x )
+    {
+      const float sp = scale_map[y][x] * sw;
+      if ( compute_grad )
+      {
+        computeGradient( ii_depth_map, ii_depth_count, x, y, sp, depth_grad[y][x] );
+      }
+
+      if ( isnan( depth_grad[y][x][0] ) || sp < min_px_scale || sp > max_px_scale )
+      {
+        ii_y(y,x) = ii_y(y-1,x);
+        ii_y_count(y,x) = ii_y_count(y-1,x);
+        continue;
+      }
+
+      ii_y(y,x) = ii_y(y-1,x) + Fx( ii, depth_grad[y][x], x, y, sp, sw, min_px_scale );
+      ii_y_count(y,x) = ii_y_count(y-1,x) + 1.0f;
+    }
+  }
+  // convolute in major axis direction using y integral
+  for ( int y = 0; y < ii.rows-1; y++ )
+  {
+    for ( int x = 0; x < ii.cols-1; ++x )
+    {
+      float sp = scale_map[y][x] * sw;
+      img_out(y,x) = ii_y[y+1][x] - ii_y[y][x];//Fy( ii_y, ii_y_count, depth_grad[y][x], x, y, sp, sw, min_px_scale );
+    }
+  }
+}
+
+inline float gradX( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // sp : pixel scale
+  // sw : world scale
+
+  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
+  if ( checkBounds( ii, x, y, 3*sp ) )
+  {
+    // depth gradient between (x+sp) and (x-sp)
+    Vec2f grad;
+
+    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
+      return std::numeric_limits<float>::quiet_NaN();
+
+    return grad[0] / sw;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+inline float gradY( const Mat1d &ii,
+    const Mat1d &ii_depth_map, const cv::Mat_<uint64_t>& ii_depth_count,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // sp : pixel scale
+  // sw : world scale
+
+  //std::cout << x << " " << y << "   " << s << " * 2 = " << 2*s << std::endl;
+  if ( checkBounds( ii, x, y, 3*sp ) )
+  {
+    // depth gradient between (x+sp) and (x-sp)
+    Vec2f grad;
+
+    if ( !computeGradient( ii_depth_map, ii_depth_count, x, y, sp, grad ) )
+      return std::numeric_limits<float>::quiet_NaN();
+
+    return grad[1] / sw;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
 
 
 

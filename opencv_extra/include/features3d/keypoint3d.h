@@ -13,9 +13,6 @@
 namespace cv
 {
 
-/*!
-  RGBD features implementation.
-*/
 struct KeyPoint3D: public cv::KeyPoint
 {
   KeyPoint3D(float x, float y, float _size, float _world_size,

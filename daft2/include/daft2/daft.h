@@ -118,6 +118,9 @@ public:
 
 private:
 
+  void prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
+      Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map );
+
   /** Parameters tuning RgbdFeatures */
   DetectorParams params_;
 };

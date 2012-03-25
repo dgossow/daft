@@ -210,6 +210,7 @@ struct DescEntry
   }
   void normalize()
   {
+    /*
     if ( sum_weights != 0 )
     {
       sum_dx /= sum_weights;
@@ -217,6 +218,7 @@ struct DescEntry
       sum_dx_abs /= sum_weights;
       sum_dy_abs /= sum_weights;
     }
+    */
   }
 };
 
