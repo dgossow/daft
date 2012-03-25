@@ -1,8 +1,7 @@
-function [precision, recall] = descperf_evaluation( base_path, dataset_name, det_suffix, x_val_file, num_img )
+function [precision, recall] = descperf_evaluation( base_path, dataset_name, det_suffix, x_val_file )
 
 data_path = [base_path, dataset_name, '/'];
 graph_path = [data_path, 'results/'];
-
 mkdir(graph_path)
 
 fprintf(1,'It may take a while, i.e. 30min \n');
@@ -11,14 +10,20 @@ num_det = size(det_suffix,1);
 
 mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
 x_vals = load( sprintf( '%s%s', data_path, x_val_file ) );
+num_img = size( x_vals, 2 ) + 1;
 
 for i=2:num_img
 
     figure(1);clf;
-    set(gca,'FontSize',17)
+    axes('LineWidth',3);
+    set(gca,'FontSize',35);
+    set(gca,'XTick',[0 0.1 0.2 0.3 0.4 0.5]);
     grid on;
-    ylabel('recall')
+    ylabel('recall');
     xlabel('1 - precision');
+    title( sprintf('%s = %1.1f', x_val_file, x_vals(i-1) ) );
+
+    
     hold on;
     
     for d=1:num_det
@@ -36,14 +41,11 @@ for i=2:num_img
         recall=correct_match_rn./corresp(4)
         precision=(total_match_rn-correct_match_rn)./total_match_rn
 
-        plot( precision, recall, mark{d} );
+        plot( precision, recall, mark{d},'LineWidth',3 );
     end
 
     axis([0 0.5 0 1]);
-
-    figname = sprintf('%s%s_descperf %s %f.pdf',graph_path, dataset_name, x_val_file, x_vals(i-1) );
-    legend(det_suffix,'Location','NorthOutside');
-    print(figure(1),'-dpdf',figname)
-
+    figname = sprintf('%sdescperf_%i.pdf',graph_path, i-1 );
+    print(figure(1),'-dpdf',figname);
 end
 

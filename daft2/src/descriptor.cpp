@@ -192,12 +192,12 @@ struct DescEntry
 {
   float sum_dx,sum_dy;
   float sum_dx_abs,sum_dy_abs;
-  int count;
+  float sum_weights;
 
   DescEntry() :
     sum_dx(0), sum_dy(0),
     sum_dx_abs(0), sum_dy_abs(0),
-    count(0) {};
+    sum_weights(0) {};
   void add( float weight, float dx, float dy )
   {
     dx *= weight;
@@ -206,16 +206,16 @@ struct DescEntry
     sum_dy += dy;
     sum_dx_abs += std::abs(dx);
     sum_dy_abs += std::abs(dy);
-    count++;
+    sum_weights += weight;
   }
   void normalize()
   {
-    if ( count != 0 )
+    if ( sum_weights != 0 )
     {
-      sum_dx /= float(count);
-      sum_dy /= float(count);
-      sum_dx_abs /= float(count);
-      sum_dy_abs /= float(count);
+      sum_dx /= sum_weights;
+      sum_dy /= sum_weights;
+      sum_dx_abs /= sum_weights;
+      sum_dy_abs /= sum_weights;
     }
   }
 };
@@ -300,7 +300,7 @@ void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc )
   {
     for ( unsigned i=0; i<4; i++ )
     {
-      count_img[j][i] = entries[j][i].count;
+      count_img[j][i] = entries[j][i].sum_weights;
       //entries[j][i].normalize();
       dx_img[j][i] = entries[j][i].sum_dx;
       dy_img[j][i] = entries[j][i].sum_dy;
@@ -310,10 +310,10 @@ void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc )
   }
 
   imshowNorm( "count", count_img );
-  imshowNorm( "dx", dx_img );
-  imshowNorm( "dy", dy_img );
-  imshowNorm( "dx_abs", dx_abs_img );
-  imshowNorm( "dy_abs", dy_abs_img );
+  imshow2( "dx", dx_img*0.5+0.5 );
+  imshow2( "dy", dy_img*0.5+0.5 );
+  imshow2( "dx_abs", dx_abs_img*0.5+0.5 );
+  imshow2( "dy_abs", dy_abs_img*0.5+0.5 );
 #endif
 }
 

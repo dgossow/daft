@@ -6,6 +6,10 @@
  */
 
 #include "rgbd_evaluator/extract_detector_file.h"
+#include "sift/Sift.h"
+#include "parallelsurf/KeyPointDetector.h"
+#include "parallelsurf/KeyPointDescriptor.h"
+#include "parallelsurf/Image.h"
 
 #include <iostream>
 #include <fstream>
@@ -182,29 +186,122 @@ std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp, cv::Mat1d de
 
 // these helper function compute the number of keypoints
 // for a given threshold
+
+//define insertor class which collects keypoints in a vector
+class VecIns : public parallelsurf::KeyPointInsertor
+{
+  public:
+    VecIns ( std::vector<parallelsurf::KeyPoint>& keyPoints ) : m_KeyPoints ( keyPoints ) {};
+    inline virtual void operator() ( const parallelsurf::KeyPoint &keyPoint )
+    {
+      m_KeyPoints.push_back ( keyPoint );
+    }
+  private:
+    std::vector<parallelsurf::KeyPoint>& m_KeyPoints;
+};
 std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
-  cv::SURF surf( t * 100.0 );
-  cv::Mat mask;
-  std::vector<cv::KeyPoint> kp;
-  std::vector<float> desc_vec;
-  surf( gray_img, mask, kp, desc_vec );
-  cv::Mat1f desc( kp.size(), 64, (float*)&(desc_vec[0]) );
-  return makeKp3d( kp, desc );
+  unsigned char** pixels = new unsigned char*[gray_img.rows];
+  for ( int y=0; y<gray_img.rows; y++ )
+  {
+    pixels[y] = new unsigned char[gray_img.cols];
+    for ( int x=0; x<gray_img.cols; x++ )
+    {
+      pixels[y][x] = gray_img.at<uchar>(y,x);
+    }
+  }
+  parallelsurf::Image intImage ( (const unsigned char**)pixels, gray_img.cols, gray_img.rows );
+
+  parallelsurf::KeyPointDetector detector;
+  detector.setScoreThreshold( 0.1 * t );
+
+  parallelsurf::KeyPointDescriptor descriptor ( intImage, false );
+  std::vector<parallelsurf::KeyPoint> surf_kps;
+  VecIns insertor( surf_kps );
+
+  detector.detectKeyPoints( intImage, insertor );
+  descriptor.assignOrientations ( surf_kps.begin(), surf_kps.end() );
+  descriptor.makeDescriptors ( surf_kps.begin(), surf_kps.end() );
+
+  if ( surf_kps.size() == 0 )
+  {
+    return std::vector<cv::KeyPoint3D>();
+  }
+
+  int desc_len = surf_kps[0]._vec.size();
+  int num_kp = surf_kps.size();
+
+  std::vector<cv::KeyPoint> kps;
+  cv::Mat1d descriptors( num_kp, desc_len );
+
+  for ( int i=0; i<num_kp; i++ )
+  {
+    cv::KeyPoint kp;
+    parallelsurf::KeyPoint &surf_kp = surf_kps[i];
+
+    kp.angle = surf_kp._ori;
+    kp.class_id = 0;
+    kp.octave = 0;
+    kp.pt = cv::Point2f( surf_kp._x, surf_kp._y );
+    kp.response = surf_kp._score;
+    kp.size = surf_kp._scale * 1.3595559868917 * 4.0;
+    kps.push_back(kp);
+
+    for ( int j=0; j<desc_len; j++ )
+    {
+      descriptors[i][j] = surf_kp._vec[j];
+    }
+  }
+
+  return makeKp3d( kps, descriptors );
 }
+
 std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
-  cv::SIFT::CommonParams cp;
-  cv::SIFT::DetectorParams detp;
-  cv::SIFT::DescriptorParams descp;
-  detp.threshold = detp.GET_DEFAULT_THRESHOLD() * t;
-  //detp.edgeThreshold = detp.GET_DEFAULT_EDGE_THRESHOLD() * t;
-  cv::SIFT sift( cp, detp, descp );
-  std::vector<cv::KeyPoint> kp;
-  cv::Mat mask;
-  cv::Mat descriptors;
-  sift( gray_img, mask, kp, descriptors );
-  return makeKp3d( kp, descriptors );
+  Lowe::SIFT sift;
+  sift.PeakThreshInit = 0.01 * t;
+
+  Lowe::SIFT::KeyList lowe_kps;
+  Lowe::SIFT::Image lowe_img( gray_img.rows, gray_img.cols );
+
+  for ( int y=0; y<gray_img.rows; y++ )
+  {
+    for ( int x=0; x<gray_img.cols; x++ )
+    {
+      lowe_img.pixels[y][x] = gray_img.at<uchar>(y,x) / 255.0;
+    }
+  }
+
+  lowe_kps = sift.getKeypoints( lowe_img );
+  if ( lowe_kps.size() == 0 )
+  {
+    return std::vector<cv::KeyPoint3D>();
+  }
+
+  int desc_len = lowe_kps[0].ivec.size();
+  int num_kp = lowe_kps.size();
+
+  std::vector<cv::KeyPoint> kps;
+  cv::Mat1d descriptors( num_kp, desc_len );
+
+  for ( int i=0; i<num_kp; i++ )
+  {
+    cv::KeyPoint kp;
+    Lowe::SIFT::Key& lowe_kp = lowe_kps[i];
+    kp.angle = 0;
+    kp.class_id = 0;
+    kp.octave = 0;
+    kp.pt = cv::Point2f( lowe_kp.col, lowe_kp.row );
+    kp.response = lowe_kp.strength;
+    kp.size = lowe_kp.scale * 1.3595559868917 * 4.0;
+    kps.push_back(kp);
+    for ( int j=0; j<desc_len; j++ )
+    {
+      descriptors[i][j] = lowe_kp.ivec[j];
+    }
+  }
+
+  return makeKp3d( kps, descriptors );
 }
 
 std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
@@ -323,6 +420,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
           last_t = t;
           t = t_next;
         }
+        if ( t < 0 ) t = 0;
         std::cout << " t_" << its+1 << " = " << t << std::endl;
 
         cv::Mat kp_img;
@@ -370,8 +468,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 void ExtractDetectorFile::extractAllKeypoints()
 {
   daft_ns::DAFT::DetectorParams p;
-  //p.max_px_scale_ = 200;
-  p.min_px_scale_ = 2;
+  p.max_px_scale_ = 100000;
+  p.min_px_scale_ = 3;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
   p.det_threshold_ = 0.1;//115;
@@ -380,17 +478,17 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=false;
   p.max_search_algo_ = p.MAX_FAST;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
 
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = false;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;

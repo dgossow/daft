@@ -18,9 +18,9 @@ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
 # Dynamic reconfigure
-rosbuild_find_ros_package(dynamic_reconfigure)
-include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
-gencfg()
+#rosbuild_find_ros_package(dynamic_reconfigure)
+#include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
+#gencfg()
 
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
@@ -35,7 +35,7 @@ src/test_transpose_node.cpp
 
 # Make preprocessing app
 rosbuild_add_executable (rgbd_preprocessing 
-src/rgbd_evaluator_preprocessing.cpp
+src/rgbd_preprocessing.cpp
 )
 #target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
 #target_link_libraries(rgbd_preprocessing rgbd_evaluator)
@@ -43,6 +43,11 @@ src/rgbd_evaluator_preprocessing.cpp
 # Make extract_detector_file app
 rosbuild_add_executable (extract_detector 
 src/extract_detector_file.cpp
+src/sift/Sift.cpp
+src/parallelsurf/Image.cpp
+src/parallelsurf/KeyPointDescriptor.cpp
+src/parallelsurf/KeyPointDetector.cpp
+src/parallelsurf/MathStuff.cpp  
 )
 #target_link_libraries(rgbd_evaluator_nodelet ${OpenCV_LIBS})
 #target_link_libraries(extract_detector rgbd_evaluator)

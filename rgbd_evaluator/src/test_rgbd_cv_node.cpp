@@ -38,20 +38,20 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   int scale_fac = orig_intensity_image->image.cols / orig_depth_image->image.cols;
 
-  /*
   // Resize depth to have the same width as rgb
   cv::resize( orig_depth_image->image, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
 
   // Crop rgb so it has the same size as depth
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
-  */
 
+  /*
   depth_image = orig_depth_image->image;
 
   // make intensity image smaller
   cv::Mat intensity_image_tmp = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols*scale_fac, depth_image.rows*scale_fac ) );
 
   cv::resize( intensity_image_tmp, intensity_image, cvSize(depth_image.cols, depth_image.rows) );
+  */
 
   //orig_depth_image->image
 
@@ -66,16 +66,18 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::daft2::DAFT::DetectorParams p1,p2;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
-  p1.base_scale_ = 0.025;
+  p1.base_scale_ = 0.005;
   p1.scale_levels_ = 1;
   p1.max_px_scale_ = 1000;
 
   p1.det_type_=p1.DET_DOB;
   p1.affine_=true;
-  p1.max_search_algo_ = p1.MAX_FAST;
+  p1.max_search_algo_ = p1.MAX_WINDOW;
+
+  p1.det_threshold_ = 0.04;
 
   p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
-  p1.pf_threshold_ = 10;
+  p1.pf_threshold_ = 5;
 
   p2 = p1;
   //p1.det_type_=p1.DET_LAPLACE;
@@ -120,7 +122,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
 
-#if 0
+#if 1
   // draw
   cv::Mat intensity_image1,intensity_image2;
 
@@ -162,7 +164,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::drawKeypoints(surf_img, surf_kp, surf_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
   cv::imshow("SURF Keypoints", surf_img);
 #endif
-  cv::waitKey(10);
+  cv::waitKey(500);
 }
 
 

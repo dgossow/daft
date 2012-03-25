@@ -115,7 +115,7 @@ class SIFT
      *  of 0.08 considers only the most stable keypoints, but applications
      *  may wish to use lower values such as 0.02 to find keypoints from
      *  low-contast regions. */
-    static const float PeakThreshInit;
+    static float PeakThreshInit;
 
   protected:
     //---------------------------

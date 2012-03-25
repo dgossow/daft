@@ -19,6 +19,7 @@ namespace cv {
 namespace daft2 {
 
 //#define SHOW_DEBUG_WIN
+//#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -181,6 +182,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   std::vector<Mat1f> smoothed_imgs(n_octaves+1);
   std::vector<Mat2f> depth_grads(n_octaves+1);
 
+  // TODO: compute depth gradient
+
   // compute depth-normalized image pyramid
   double scale = base_scale;
   for (int octave = 0; octave < n_octaves+1; octave++, scale *= params_.scale_step_)
@@ -201,15 +204,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
             max_px_scale, smoothed_img);
       }
       break;
-      /*
-    case DetectorParams::DET_DOG:
-      if (params_.affine_) {
-        convolveAffineSep< gaussAffineX<4>, gaussAffineY<4> >(ii, scale_map, ii_depth_map, ii_depth_count,
-            scale, params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
-      } else {
-      }
-      break;
-      */
     case DetectorParams::DET_LAPLACE:
       if (params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, ii_depth_map, ii_depth_count,
@@ -268,11 +262,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     switch (params_.max_search_algo_) {
     case DetectorParams::MAX_WINDOW:
       if ( params_.affine_ ) {
-        findMaxima(response_map, scale_map, scale, params_.det_threshold_, kp);
-      }
-      else {
         findMaximaAffine(response_map, scale_map, depth_grad,
             scale, params_.det_threshold_, kp);
+      }
+      else {
+        findMaxima(response_map, scale_map, scale, params_.det_threshold_, kp);
       }
       break;
     case DetectorParams::MAX_FAST:
@@ -364,9 +358,6 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   switch (params_.pf_type_) {
   case DetectorParams::PF_NONE:
     break;
-  case DetectorParams::PF_HARRIS:
-    filterKpKernel<harris>(ii, params_.pf_threshold_, kp);
-    break;
   case DetectorParams::PF_NEIGHBOURS:
     filterKpNeighbours(response_map, params_.pf_threshold_, kp);
     break;
@@ -421,7 +412,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
   kp = kp2;
 
-#ifdef SHOW_DEBUG_WIN
+#ifdef FIND_MAXKP
   cv::Mat1f patch1, patch2;
 
   cv::Mat display_image;

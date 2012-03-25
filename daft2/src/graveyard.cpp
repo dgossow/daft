@@ -16,6 +16,272 @@
 //         \              \\|           |//
 //   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+
+
+template<int Accuracy>
+inline float gaussAffineX( const Mat1d &ii, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // The roots of the 1-d difference of gaussians
+  // e^(-x^2/8)/(2 sqrt(2 pi)) - e^(-x^2/2)/sqrt(2 pi)
+  // are at +- 1.3595559868917
+  static const float ROOT_DOG_INV = 0.735534255;
+
+  // intersection of ellipsis with x/y axis
+  const float sw2 = sw*sw;
+  const float norm1 = sp * sw;
+  // x intersection of affine ellipse with radius sp
+  sp = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
+
+  // integer pixel scale
+  const int spi = std::max( int(sp / float(Accuracy)), 1 );
+  const int num_steps = int(std::ceil( sp/float(spi)*2.0f ));
+  const int win_size = num_steps * spi;
+
+  if ( checkBounds( ii, x, y, win_size ) )
+  {
+    // this mu makes the zero crossing of the difference-of-gaussians be at +/- sp
+    // g = e^(-(x-μ)^2/(2 σ^2))/(sqrt(2 π) σ)
+    const float sigma = ROOT_DOG_INV * sp / 2; //* intersect_x;
+
+    static int last_ws = 0;
+
+#if 0
+    if ( last_ws != num_steps )
+      std::cout << "-- sp " << sp << " sigma " << sigma << std::endl;
+#endif
+
+    float val = 0;
+    float sum_gauss = 0;
+
+    //static const float expCache[MAX_NSTEPS] = {};
+
+    for ( int t = -win_size; t<win_size; t+=spi )
+    {
+      const float t2 = ((float)t+0.5f*spi);
+      // g(x) = e^( -(x)^2/(2 σ^2) ) / (sqrt(2 π) σ)
+      static const float n = sqrt( 2.0 * M_PI ) * sigma;
+      const float g = std::exp( -t2*t2 / (2.0f*sigma*sigma) ) / n;
+#if 0
+      if ( last_ws != num_steps )
+        std::cout << g << " ";
+#endif
+      const int x2 = x+t;
+      val += g * float(integrate( ii, x2, x2+spi, y, y+1 )) / float(spi);
+      sum_gauss += g;
+    }
+#if 0
+    if ( last_ws != num_steps )
+      std::cout << std::endl;
+    //std::cout << std::endl << " sum/mu = " << sv/mu << " mu =  " << mu << std::endl;
+    if ( last_ws != num_steps )
+      std::cout<< " val " << val << std::endl << " num_steps = " << num_steps << " sum_gauss = " << sum_gauss << std::endl;
+    last_ws = num_steps;
+#endif
+
+    //return val / float(spi*win_size*2);
+    return val / sum_gauss;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+template<int Accuracy>
+inline float gaussAffineY( const Mat1f &ii_y, const Mat1f &ii_y_count, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // The roots of the 1-d difference of gaussians
+  // e^(-x^2/8)/(2 sqrt(2 pi)) - e^(-x^2/2)/sqrt(2 pi)
+  // are at +- 1.3595559868917
+  static const float ROOT_DOG_INV = 0.735534255;
+
+  // compute major axis
+  Vec2f major_axis( grad * fastInverseSqrt( grad[0]*grad[0]+grad[1]*grad[1] ) * sp );
+  // scale in y-direction
+  sp = major_axis[1];
+
+  // integer pixel scale
+  const int spi = std::max( int(sp / float(Accuracy)), 1 );
+  const int num_steps = std::max( int(std::ceil( sp/float(spi)*2.0f )), 1 );
+  const int win_size = num_steps * spi;
+  //const float alpha = float(win_size) / sp*2;
+
+  if ( checkBounds( ii_y, x, y, win_size ) )
+  {
+    // this mu makes the zero crossing of the difference-of-gaussians be at +/- sp
+    // g = e^(-(x-μ)^2/(2 σ^2))/(sqrt(2 π) σ)
+    const float sigma = ROOT_DOG_INV * sp / 2; //* intersect_x;
+
+    static int last_ws = 0;
+
+#if 0
+    if ( last_ws != num_steps )
+      std::cout << "-- sp " << sp << " sigma " << sigma << std::endl;
+#endif
+
+    float val = 0;
+    float sum_gauss = 0;
+
+    //static const float expCache[MAX_NSTEPS] = {};
+
+    for ( int t = -win_size; t<win_size; t+=spi )
+    {
+      const float t2 = ((float)t+0.5f*spi);
+      // g(x) = e^( -(x)^2/(2 σ^2) ) / (sqrt(2 π) σ)
+      static const float n = sqrt( 2.0 * M_PI ) * sigma;
+      const float g = std::exp( -t2*t2 / (2.0f*sigma*sigma) ) / n;
+#if 0
+      if ( last_ws != num_steps )
+        std::cout << g << " ";
+#endif
+      const int y2 = y+t;
+      const int x_offs = t2 / float(win_size);
+      const int x2 = x+x_offs;
+      if ( last_ws != num_steps )
+      std::cout << "x2 " << x2 << " y2 " << y2 << std::endl;
+      val += g * ( ii_y[y2+spi][x] - ii_y[y2][x] ) / float( ii_y_count[y2+spi][x] - ii_y_count[y2][x] );
+      sum_gauss += g;
+    }
+#if 1
+    if ( last_ws != num_steps )
+      std::cout << std::endl;
+    //std::cout << std::endl << " sum/mu = " << sv/mu << " mu =  " << mu << std::endl;
+    if ( last_ws != num_steps )
+      std::cout<< " val " << val << std::endl << " num_steps = " << num_steps << " sum_gauss = " << sum_gauss << std::endl;
+    last_ws = num_steps;
+#endif
+
+    //return val / float(spi*win_size*2);
+    return val / sum_gauss;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+
+/*
+ *  0  0  0  0
+ *  0  1  1  0
+ *  0  1  1  0
+ *  0  0  0  0
+ */
+inline float iiMean( const Mat1d &ii, int x, int y, int s )
+{
+  return integrate ( ii, x - s,  x + s, y - s, y + s ) / float(4*s*s);
+}
+
+
+
+
+/*
+ *  0  0  0  0
+ * -1 -1  1  1
+ * -1 -1  1  1
+ *  0  0  0  0
+ */
+inline float iiDx( const Mat1d &ii, int x, int y, int s )
+{
+    return ( integrate ( ii, x,  x + 2*s, y - s, y + s )
+           - integrate ( ii, x - 2*s,  x, y - s, y + s ) ) / float(4*s*s);
+  return 0;
+}
+inline float iiDy( const Mat1d &ii, int x, int y, int s )
+{
+    return ( integrate ( ii, x - s,  x + s, y, y + 2*s )
+           - integrate ( ii, x - s,  x + s, y - 2*s, y ) ) / float(4*s*s);
+  return 0;
+}
+
+
+/* Compute Harris corner measure h(x,y)
+ * Value range: 0..1
+*/
+inline float harris( const Mat1d &ii, int x, int y, float s_real )
+{
+  int s = s_real;
+  // FIXME interpolate!!!
+  if ( checkBounds( ii, x, y, 4*s ) )
+  {
+    double sum_dxdx=0;
+    double sum_dydy=0;
+    double sum_dxdy=0;
+
+    // dx and dy have range -4s² .. 4s²
+    double norm = 0.25 / double(s*s);
+    int s2 = s*2;
+
+    for ( int x2 = x-s; x2 <= x+s; x2 += s )
+    {
+      for ( int y2 = y-s; y2 <= y+s; y2 += s )
+      {
+        double dx = ( - integrate ( ii, x2-s2, x2,    y2-s,  y2+s  )
+                      + integrate ( ii, x2,    x2+s2, y2-s,  y2+s  ) ) * norm;
+        double dy = ( - integrate ( ii, x2-s,  x2+s,  y2-s2, y2    )
+                      + integrate ( ii, x2-s,  x2+s,  y2,    y2+s2 ) ) * norm;
+        sum_dxdx += dx * dx;
+        sum_dydy += dy * dy;
+        sum_dxdy += dx * dy;
+      }
+    }
+
+    double trace = ( sum_dxdx + sum_dydy );
+    double det = (sum_dxdx * sum_dydy) - (sum_dxdy * sum_dxdy);
+
+    return det - 0.1 * (trace * trace);
+  }
+
+  return std::numeric_limits<double>::quiet_NaN();
+}
+
+template<int Accuracy>
+inline float gaussX( const Mat1d &ii, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp )
+{
+  // The roots of the 1-d difference of gaussians
+  // e^(-x^2/8)/(2 sqrt(2 pi)) - e^(-x^2/2)/sqrt(2 pi)
+  // are at +- 1.3595559868917
+  static const float ROOT_DOG_INV = 0.735534255;
+
+  // intersection of ellipsis with x/y axis
+  const float sw2 = sw*sw;
+  const float norm1 = sp * sw;
+  // x intersection of affine ellipse with radius sp
+  sp = norm1 * fastInverseSqrt( sw2 + grad[0]*grad[0] );
+
+  // integer pixel scale
+  const int spi = std::max( int(sp / float(Accuracy)), 1 );
+  const int num_steps = int(std::ceil( sp/float(spi)*2.0f ));
+  const int win_size = num_steps * spi;
+
+  if ( checkBounds( ii, x, y, win_size ) )
+  {
+    // this mu makes the zero crossing of the difference-of-gaussians be at +/- sp
+    const float sigma = ROOT_DOG_INV * sp / 2; //* intersect_x;
+
+    float val = 0;
+    float sum_gauss = 0;
+
+    //static const float expCache[MAX_NSTEPS] = {};
+
+    for ( int t = -win_size; t<win_size; t+=spi )
+    {
+      const float t2 = ((float)t+0.5f*spi);
+      // g(x,σ) = e^( -(x)^2/(2 σ^2) ) / (sqrt(2 π) σ)
+      static const float n = sqrt( 2.0 * M_PI ) * sigma;
+      const float g = std::exp( -t2*t2 / (2.0f*sigma*sigma) ) / n;
+      const int x2 = x+t;
+      val += g * float(integrate( ii, x2, x2+spi, y, y+1 )) / float(spi);
+      sum_gauss += g;
+    }
+
+    //return val / float(spi*win_size*2);
+    return val / sum_gauss;
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();
+}
+
+
 template<typename K>
 inline float LocalFiniteDifferencesKinect(K v0, K v1, K v2, K v3, K v4)
 {

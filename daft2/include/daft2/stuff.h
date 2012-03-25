@@ -38,10 +38,7 @@ inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
   double minv,maxv;
   int tmp;
   cv::minMaxIdx( img, &minv, &maxv, &tmp, &tmp );
-  imshow2( win_title, img, size );
-  cv::Mat img2;
-  cv::resize( img, img2, Size( size, size), 0, 0, INTER_NEAREST );
-  imshow( win_title, img2 );
+  imshow2( win_title, (img - minv) * (1.0 / (maxv-minv)), size );
 }
 
 

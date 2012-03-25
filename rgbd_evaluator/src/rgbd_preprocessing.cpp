@@ -5,7 +5,7 @@
  *      Author: praktikum
  */
 
-#include "rgbd_evaluator/rgbd_evaluator_preprocessing.h"
+#include "rgbd_evaluator/rgbd_preprocessing.h"
 
 #include <iostream>
 #include <fstream>
@@ -231,7 +231,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     keyPointImageOrigin_ = imgx.clone();
 
     std::stringstream ss2;
-    ss2 << "ImageX: Mark " << MIN_CORRESPONDENCES << " Keypoints" << std::endl;
+    ss2 << "ImageX: Mark " << MIN_CORRESPONDENCES << " Keypoints";
 
     // for mouse callback
     std::string windowName = ss2.str();

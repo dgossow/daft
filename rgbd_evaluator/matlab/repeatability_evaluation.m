@@ -1,33 +1,28 @@
-function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file, num_img )
+function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file )
 
 data_path = [base_path, dataset_name, '/'];
+graph_path = [data_path, 'results/'];
+mkdir(graph_path)
 
-fprintf(1,'It may take a while, i.e. 30min \n');
-%mex c_eoverlap.cxx;
-
-%det_suffix=['haraff';'hesaff';'mseraf';'ibraff';'ebraff'];
+mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
+num_det = size(det_suffix,1);
+x_vals = load( sprintf( '%s%s', data_path, x_val_file ) );
+num_img = size( x_vals, 2 );
 
 figure(1);clf;
-set(gca,'FontSize',17)
+axes('LineWidth',3);
+set(gca,'FontSize',35)
 grid on;
 ylabel('repeatability %')
 xlabel(x_val_file);
 hold on;
 figure(2);clf;
-set(gca,'FontSize',17)
+axes('LineWidth',3);
+set(gca,'FontSize',35)
 grid on;
 ylabel('nb of correspondences')
 xlabel(x_val_file);
 hold on;
-
-mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
-
-%set(0,'DefaultAxesColorOrder',[0 0 0; 0.9 0 0; 0 0.7 0; 0 0 1; 0.5 0.5 0; 0 0.5 0.5; 0.5 0 0.5]);
-%set(0,'DefaultAxesLineStyleOrder','--x|-.x|:x');
-
-num_det = size(det_suffix,1);
-
-x_vals = load( sprintf( '%s%s', data_path, x_val_file ) );
 
 for d=1:num_det
     
@@ -48,27 +43,26 @@ for d=1:num_det
     end
     
     mark{d}
-    figure(1);  plot(x_vals,seqrepeat,mark{d});
-    figure(2);  plot(x_vals,seqcorresp,mark{d});
+    figure(1);  plot(x_vals,seqrepeat,mark{d},'LineWidth',3);
+    figure(2);  plot(x_vals,seqcorresp,mark{d},'LineWidth',3);
 
 end
 
 figure(1)
-axis([x_vals(1) x_vals(size(x_vals,2)) 30 100]);
+axis([x_vals(1) x_vals(num_img) 30 100]);
 %axis 'auto x'
 
 figure(2)
-axis([x_vals(1) x_vals(size(x_vals,2)) 0 750]);
+axis([x_vals(1) x_vals(num_img) 0 750]);
 
 for f=1:2
     figure(f);
-    %legend(det_suffix,'Location','NorthOutside');
 end
 
-print(figure(1),'-dpdf',sprintf('%s%s_repeatability.pdf',base_path, dataset_name))
-print(figure(2),'-dpdf',sprintf('%s%s_num_correspondences.pdf',base_path, dataset_name))
+print(figure(1),'-dpdf',sprintf('%srepeatability.pdf',graph_path))
+print(figure(2),'-dpdf',sprintf('%snum_correspondences.pdf',graph_path))
 
 figure(1)
-legend(det_suffix,'Location','SouthWest');
-print(figure(1),'-dpdf',sprintf('%s%s_legend.pdf',base_path, dataset_name))
+legend(det_suffix,'Location','NorthOutside');
+print(figure(1),'-dpdf',sprintf('%slegend.pdf',graph_path))
 
