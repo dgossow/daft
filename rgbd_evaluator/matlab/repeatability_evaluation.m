@@ -1,8 +1,14 @@
 function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file )
 
-data_path = [base_path, dataset_name, '/'];
-graph_path = [data_path, 'results/'];
-mkdir(graph_path)
+data_path = [base_path dataset_name '/'];
+graph_path = [data_path 'results/'];
+
+fprintf(1,'Data path: %s\n', data_path);
+fprintf(1,'Graph path: %s\n', graph_path);
+
+
+mkdir(data_path);
+mkdir(graph_path);
 
 mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
 num_det = size(det_suffix,1);
@@ -48,12 +54,16 @@ for d=1:num_det
 
 end
 
+fprintf('x axis: %f %f\n', x_vals(1), x_vals(num_img-1));
+
+x1 = min(x_vals(1), x_vals(num_img-1));
+x2 = max(x_vals(1), x_vals(num_img-1));
+
 figure(1)
-axis([x_vals(1) x_vals(num_img-1) 30 100]);
-%axis 'auto x'
+axis([x1 x2 30 100]);
 
 figure(2)
-axis([x_vals(1) x_vals(num_img-1) 0 750]);
+axis([x1 x2 0 750]);
 
 for f=1:2
     figure(f);

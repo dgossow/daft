@@ -167,7 +167,7 @@ match_overlap=40;
 if common_part==0
 match_overlap=50;
 end
-fprintf(1,'Matching with the descriptor for the overlap error < %d\%\n',match_overlap);
+fprintf(1,'Matching with the descriptor for the overlap error < %d%%\n',match_overlap);
 if common_part==0
 twi=(twout<match_overlap);
 else

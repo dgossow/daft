@@ -197,9 +197,9 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   std::vector<float> rotations;
   std::vector<float> angles;
 
+  btVector3 xvec_orig;
   float angle_orig = 0.0;
   float dist_orig = 0.0;
-  float rotation_orig = 0.0;
 
   tf::StampedTransform transform_original;
 
@@ -246,7 +246,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
           {
               if (std::isnan(it->depth_image.at<float>(t,h)))
               {
-                keyPointImageOrigin_.col(h).row(t) = cv::Scalar(0,255,0);
+                keyPointImageOrigin_.col(h).row(t) = cv::Scalar(0,255*(((h+t)/2)%2),0);
               }
           }
     }
@@ -296,23 +296,30 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       transform_original = calculateCoordinatesystem(it->depth_image, mouseKeypointsOrigin_);
 
       btVector3 zvec = transform_original.inverse().getBasis() * btVector3(0,0,1);
-      btVector3 xvec = transform_original.inverse().getBasis() * btVector3(1,0,0);
+      xvec_orig = transform_original.inverse().getBasis() * btVector3(1,0,0);
 
       angle_orig = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
       dist_orig = transform_original.getOrigin().length();
-      rotation_orig = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
 
       std::cout << "angle_orig " << angle_orig << std::endl;
       std::cout << "dist_orig " << dist_orig << std::endl;
-      std::cout << "rotation_orig " << rotation_orig << std::endl;
 
       // convert image to grayscale
       cv::Mat image_grayscale;
       cv::cvtColor( img1, image_grayscale, CV_RGB2GRAY );
+
+      /*
       cv::goodFeaturesToTrack( image_grayscale, feature_vector_img1, MAX_FEATURE_NUMBER, 0.01,
                                MIN_FEATURE_NEIGHBOUR_DIST, cv::noArray(), 3, true );
+      cv::KeyPoint::convert( feature_vector_img1, kp_vec_img1 );\
+      */
 
-      cv::KeyPoint::convert( feature_vector_img1, kp_vec_img1 );
+      // save mouse clicks as keypoints
+      kp_vec_img1.clear();
+      for ( int i=0; i<mouseKeypointsOrigin_.size(); i++ )
+      {
+        kp_vec_img1.push_back( cv::KeyPoint( mouseKeypointsOrigin_[i], 1 ) );
+      }
 
       cv::imwrite( file_created_folder_ + "/" + "img1.ppm", img1 );
 
@@ -363,14 +370,12 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       float angle_abs = zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0;
       float dist_abs = transform_camx.getOrigin().length();
-      float rotation_abs = xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
 
       std::cout << "angle " << angle_abs << std::endl;
       std::cout << "dist " << dist_abs << std::endl;
-      std::cout << "rotation " << rotation_abs << std::endl;
 
       float scaling = dist_orig / dist_abs;
-      float rotation = std::abs( rotation_abs - rotation_orig );
+      float rotation = xvec.angle( xvec_orig ) / M_PI*180.0;
       float angle = std::abs( angle_abs - angle_orig );
 
       std::cout << "angle_rel " << angle << std::endl;
@@ -881,19 +886,22 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName>" << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> <bagfileName> .." << std::endl;
     return -1;
   }
 
-  std::string fileName(argv[1]);
-
   bool reverse_order = argc > 2 && std::string(argv[2]) == "-r";
-
   std::cout << "reverse_order " << reverse_order << std::endl;
 
-  rgbd_evaluator::RgbdEvaluatorPreprocessing fd(fileName, reverse_order);
-  fd.createTestFiles();
-  fd.calculateHomography();
+  int start_i = reverse_order ? 2 : 1;
+
+  for ( int i=start_i; i<argc; i++ )
+  {
+    std::string file_name(argv[i]);
+    rgbd_evaluator::RgbdEvaluatorPreprocessing fd(file_name, reverse_order);
+    fd.createTestFiles();
+    fd.calculateHomography();
+  }
 
   std::cout << "Exiting.." << std::endl;
   return 0;

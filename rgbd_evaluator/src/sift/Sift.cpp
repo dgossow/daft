@@ -41,7 +41,7 @@ const int SIFT::BorderDist = 5;
 
 float SIFT::PeakThreshInit = 0.01;
 
-const float SIFT::EdgeEigenRatio = 10.0;//2.5;
+const float SIFT::EdgeEigenRatio = 5.0;//2.5;
 
 const bool SIFT::UseHistogramOri = true;
 

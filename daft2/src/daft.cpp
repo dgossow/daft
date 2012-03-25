@@ -18,8 +18,8 @@
 namespace cv {
 namespace daft2 {
 
-//#define SHOW_DEBUG_WIN
-//#define FIND_MAXKP
+#define SHOW_DEBUG_WIN
+#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params) :
     params_(detector_params) {
@@ -405,7 +405,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-      getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
+      //getDesc<10,20>( smoothed_img, smoothed_img2, kp[k], depth_map, K );
 
       kp2.push_back(kp[k]);
     }

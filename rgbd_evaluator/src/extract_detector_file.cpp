@@ -468,12 +468,12 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 void ExtractDetectorFile::extractAllKeypoints()
 {
   daft_ns::DAFT::DetectorParams p;
-  p.max_px_scale_ = 100000;
-  p.min_px_scale_ = 3;
+  p.max_px_scale_ = 300;
+  p.min_px_scale_ = 2;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
   p.det_threshold_ = 0.1;//115;
-  p.pf_threshold_ = 10;
+  p.pf_threshold_ = 5;
 
   p.det_type_=p.DET_DOB;
   p.affine_=false;
@@ -483,7 +483,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_DOB;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
 
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
@@ -493,7 +493,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_ = p.DET_LAPLACE;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
   extractKeypoints( &getSurfKp, "SURF" );
   extractKeypoints( &getSiftKp, "SIFT" );
@@ -626,16 +626,20 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName>" << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> <bagfileName> .." << std::endl;
     return -1;
   }
 
-  std::string file_name(argv[1]);
-
-  bool reverse_order = argc > 2 && std::string(argv[2]) == "-r";
+  bool reverse_order = argc >= 2 && std::string(argv[1]) == "-r";
   std::cout << "reverse_order " << reverse_order << std::endl;
 
-  rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name, reverse_order);
+  int start_i = reverse_order ? 2 : 1;
+
+  for ( int i=start_i; i<argc; i++ )
+  {
+    std::string file_name(argv[i]);
+    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name, reverse_order);
+  }
 
   std::cout << "Exiting.." << std::endl;
   return 0;
