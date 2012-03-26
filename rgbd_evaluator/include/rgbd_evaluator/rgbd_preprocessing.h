@@ -63,6 +63,8 @@ private:
 
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
 
+  void writeIntrinsicMatToFile(cv::Matx33f K);
+
   void writeVectorToFile( std::vector<float> vec, std::string filename );
 
   void writeMaskPointsToFile( std::vector<cv::Point2f> maskPoints );

@@ -83,7 +83,7 @@ void ApplyBlurNoise::noiseRGBImage()
     cv::Mat depth_image = cv::imread(depthImagePath);
 
     // write MaskPoints to file
-    writeMaskPointFile( NUMBER_RGB_IMAGES_NOISED, atoi(imageNumber.c_str()));
+    writeMaskPointFile( NUMBER_RGB_IMAGES_NOISED, atoi(imageNumber.c_str()) );
 
     for ( i = 0; i < NUMBER_RGB_IMAGES_NOISED; i++)
     {
@@ -177,7 +177,7 @@ void ApplyBlurNoise::noiseDepthImage()
     cv::Mat depth_img = cv::imread(depthImagePath);
 
     // write MaskPoints to file
-    writeMaskPointFile( NUMBER_DEPTH_IMAGES_NOISED, atoi(imageNumber.c_str()));
+    writeMaskPointFile( NUMBER_DEPTH_IMAGES_NOISED, atoi(imageNumber.c_str()) );
 
     for ( i = 0; i < NUMBER_DEPTH_IMAGES_NOISED; i++)
     {
@@ -277,7 +277,7 @@ void ApplyBlurNoise::blurImage()
   cv::Mat depth_image = cv::imread(depthImagePath);
 
   // write MaskPoints to file
-  writeMaskPointFile( NUMBER_IMAGES_BLURRED ,atoi(imageNumber.c_str()));
+  writeMaskPointFile( NUMBER_IMAGES_BLURRED , atoi(imageNumber.c_str()) );
 
   for ( i = 0; i < NUMBER_IMAGES_BLURRED; i++)
   {

@@ -56,9 +56,7 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_ord
     return;
   }
 
-  bag_.open(file_path, rosbag::bagmode::Read);
-
-  readBagFile();
+  readDataFiles();
 
   extractAllKeypoints();
 }
@@ -66,98 +64,119 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_ord
 ExtractDetectorFile::~ExtractDetectorFile()
 {
   std::cout << "Stopping extract_detector_file..." << std::endl;
-
-  bag_.close();
+  cv::destroyAllWindows();
 }
 
-void ExtractDetectorFile::readBagFile()
+void ExtractDetectorFile::readDataFiles()
 {
-  bool got_cam_info = false;
+  uint32_t i = 0;
+  uint32_t numberOfImages = 12;
 
-  // Image topics to load
-  std::vector<std::string> topics;
-  topics.push_back("rgb_img");
-  topics.push_back("depth_img");
-  topics.push_back("cam_info");
+  std::string path;
+  path.append(file_created_folder_);
+  path.append("/");
+  path.append("K_");
 
-  rosbag::View view(bag_, rosbag::TopicQuery(topics));
+  // read intrinsic matrix K once
+  if( !readMatrix( path, K_ ) )
+  {
+    std::cout << path << " not found - aborting..." << std::endl;
+    return;
+  }
+
+  // create image paths
+  std::string image_rgb_name;
+  image_rgb_name.append( file_created_folder_ );
+  image_rgb_name.append( "/" );
+  image_rgb_name.append( "img" );
+
+  std::string image_depth_name;
+  image_depth_name.append( file_created_folder_ );
+  image_depth_name.append( "/" );
+  image_depth_name.append( "depth" );
 
   image_store_.push_back( ImageData() );
 
-  // Load all messages into our stereo dataset
-  BOOST_FOREACH(rosbag::MessageInstance const m, view)
+  // read rgb and depth images
+  for( i = 0; i < numberOfImages; i++ )
   {
-      // if the current image data is complete, go to next one
-      if ( image_store_.back().isComplete() )
-      {
-        image_store_.push_back( ImageData() );
-      }
+    std::cout << "Processing image: " << i+1 << std::endl;
 
-      // load rgb image
-      sensor_msgs::Image::ConstPtr p_rgb_img = m.instantiate<sensor_msgs::Image>();
+    std::stringstream ss;
+    ss << i+1;
 
-      //check if rgb_img message arrived
-      if (p_rgb_img != NULL && p_rgb_img->encoding == "bgr8" )
-      {
-        if ( image_store_.back().rgb_image )
-        {
-          std::cout << "There is already an rgb image for the current dataset! Bagfile invalid." << std::endl;
-          return;
-        }
+    std::string tmp_rgb_name;
+    tmp_rgb_name.append( image_rgb_name );
+    tmp_rgb_name.append( ss.str() );
+    tmp_rgb_name.append( ".ppm" );
 
-        // transform bag image to cvimage
-        cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_rgb_img);
+    std::string tmp_depth_name;
+    tmp_depth_name.append( image_depth_name );
+    tmp_depth_name.append( ss.str() );
+    tmp_depth_name.append( ".pgm" );
 
-        // store data in vectorImageData
-        image_store_.back().rgb_image = ptr;
-      }
+    if( !fileExists( tmp_rgb_name ) )
+    {
+      std::cout << tmp_rgb_name << " not found! - aborting..." << std::endl;
+      return;
+    }
 
-      /**********************************************************************************************************************/
+    if( !fileExists( tmp_depth_name ) )
+    {
+      std::cout << tmp_depth_name << " not found! - aborting..." << std::endl;
+      return;
+    }
 
-      // load depth image
-      sensor_msgs::Image::ConstPtr p_depth_img = m.instantiate<sensor_msgs::Image>();
+    // read rgb and depth image and store data
+    cv::Mat image_rgb = cv::imread(tmp_rgb_name);
+    image_store_.back().rgb_image = cv::Mat(image_rgb);
 
-      //check if depth_img message arrived
-      if (p_depth_img != NULL && p_depth_img->encoding == "32FC1" )
-      {
-        if ( image_store_.back().depth_image )
-        {
-          std::cout << "There is already an depth image for the current dataset! Bagfile invalid." << std::endl;
-          return;
-        }
+    cv::Mat image_depth = cv::imread(tmp_depth_name);
+    image_store_.back().depth_image = cv::Mat(image_depth);
 
-        // transform bag image to cvimage
-        cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(p_depth_img);
-
-        // store data in vectorImageData
-        image_store_.back().depth_image = ptr;
-      }
-
-      /**********************************************************************************************************************/
-
-      // load cam_info
-      sensor_msgs::CameraInfo::ConstPtr p_cam_info = m.instantiate<sensor_msgs::CameraInfo>();
-
-      if(( p_cam_info != NULL ) && ( got_cam_info == false ))
-      {
-        boost::array<double,9> cam_info = p_cam_info->K;
-
-        K_ = cv::Matx33f(cam_info.at(0), cam_info.at(1), cam_info.at(2),
-                         cam_info.at(3), cam_info.at(4), cam_info.at(5),
-                         cam_info.at(6), cam_info.at(7), cam_info.at(8));
-
-        got_cam_info = true;
-      }
-  }
-
-  // if the current image data is complete, go to next one
-  if ( !image_store_.back().isComplete() )
-  {
-    image_store_.erase( image_store_.end()-1 );
+    image_store_.push_back( ImageData() );
   }
 
 }
 
+bool ExtractDetectorFile::fileExists(const std::string & fileName)
+{
+  std::ifstream fileTest(fileName.c_str());
+
+  if(!fileTest) return false;
+
+  fileTest.close();
+  return true;
+}
+
+bool ExtractDetectorFile::readMatrix(const std::string & fileName, cv::Matx33f& K)
+{
+  static const uint32_t MATRIX_DIM = 3;
+
+  // check if file exists
+  if( !fileExists( fileName ) ) return false;
+
+  // start reading data
+  std::ifstream data( fileName.c_str() );
+
+  K_ = cv::Matx33f( MATRIX_DIM, MATRIX_DIM );
+
+  for( uint32_t i = 0; i < MATRIX_DIM; i++ )
+  {
+    uint32_t pos = 0;
+    float_t n;
+
+    while( data >> n )
+    {
+      // write values to matrix
+      K_( i, pos++ ) = n;
+    }
+  }
+
+  data.close();
+
+  return true;
+}
 
 std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp )
 {
@@ -341,8 +360,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
   for (it = it_begin; it != it_end; it+=it_step)
   //it = it_begin;
   {
-    cv::Mat bag_rgb_img = it->rgb_image.get()->image;
-    cv::Mat bag_depth_img = it->depth_image.get()->image;
+    cv::Mat bag_rgb_img = it->rgb_image;
+    cv::Mat bag_depth_img = it->depth_image;
 
     cv::Mat rgb_img = bag_rgb_img;
     cv::Mat depth_img = bag_depth_img;
@@ -625,7 +644,7 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> <bagfileName> .." << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << " <folderName> .." << std::endl;
     return -1;
   }
 
