@@ -107,6 +107,7 @@ inline float box( const Mat1d &ii, int x, int y, float s )
   static const float NORM_1 = 0.73469f;
   // make the box which cover the same area as a circle withradius s
   s *= 0.886f;
+  if ( s < 1 ) s=1;
   int si = int(s);
   int si1 = si+1;
   if (!checkBounds( ii, x, y, si+1 ) )

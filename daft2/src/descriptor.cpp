@@ -124,7 +124,7 @@ float dominantOri( std::vector< PtGradient >& gradients )
 }
 
 
-Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
+Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K, float size_mult )
 {
   float angle = kp.affine_angle;
   float major = kp.affine_major * 0.25;
@@ -153,8 +153,8 @@ Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K
     {
       Point2f uv( u, v );
       uv = rot_mat.t() * uv;
-      uv.x*=major;
-      uv.y*=minor;
+      uv.x*=major*size_mult;
+      uv.y*=minor*size_mult;
       Point2f pixel = rot_mat * uv + kp.pt;
 
       if ( checkBounds( depth_map, int(pixel.x), int(pixel.y), 1 ) )
@@ -210,6 +210,7 @@ struct DescEntry
   }
   void normalize()
   {
+  /*
     if ( sum_weights != 0 )
     {
       sum_dx /= sum_weights;
@@ -217,6 +218,7 @@ struct DescEntry
       sum_dx_abs /= sum_weights;
       sum_dy_abs /= sum_weights;
     }
+    */
   }
 };
 

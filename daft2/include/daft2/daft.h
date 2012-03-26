@@ -69,6 +69,17 @@ public:
     {
     }
 
+
+    struct DescriptorParams
+    {
+      /** default constructor */
+      DescriptorParams( int octave_offset=0 ) : octave_offset_(octave_offset)
+      {
+      }
+
+      int octave_offset_;
+    };
+
     /** The smallest scale (in meters) at which to search for features */
     double base_scale_;
 
@@ -100,10 +111,22 @@ public:
     bool affine_;
   };
 
+
+  struct DescriptorParams
+  {
+    /** default constructor */
+    DescriptorParams( int octave_offset=0 ) : octave_offset_(octave_offset)
+    {
+    }
+
+    int octave_offset_;
+  };
+
+
   /** Constructor
    * @param detector_params parameters to use
    */
-  DAFT(const DetectorParams & detector_params = DetectorParams());
+  DAFT(const DetectorParams & detector_params = DetectorParams(), const DescriptorParams & desc_params=DescriptorParams() );
 
   ~DAFT();
 
@@ -122,7 +145,8 @@ private:
       Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map );
 
   /** Parameters tuning RgbdFeatures */
-  DetectorParams params_;
+  DetectorParams det_params_;
+  DescriptorParams desc_params_;
 };
 
 }

@@ -40,7 +40,7 @@ struct PtGradient
 
 float dominantOri( std::vector< PtGradient >& gradients );
 
-Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K );
+Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K, float size_mult = 1.0 );
 
 void computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc );
 
@@ -83,11 +83,6 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
   smoothed_img.convertTo( tmp, CV_8U, 255, 0 );
   cvtColor( tmp, display_img, CV_GRAY2RGB );
 #endif
-
-  //const Point2f& pt
-  float angle = kp.affine_angle;
-  float major = kp.affine_major*0.5;
-  float minor = kp.affine_minor*0.5;
 
   // camera params
   float f_inv = 1.0 / K(0,0);
@@ -281,9 +276,6 @@ template< int DescPatchSize >
 inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K )
 {
   static const float nan = std::numeric_limits<float>::quiet_NaN();
-
-  // compute exact normal unsing pca
-  kp.normal = getNormal(kp, depth_map, K );
 
   // get gradients from larger scale
   std::vector<PtInfo> pt_infos_ori;

@@ -25,7 +25,7 @@ void smoothDepth( const Mat1f &scale_map,
     float base_scale,
     Mat1f &depth_out )
 {
-  //float nan = std::numeric_limits<float>::quiet_NaN();
+  float nan = std::numeric_limits<float>::quiet_NaN();
   depth_out.create( ii_depth_map.rows-1, ii_depth_map.cols-1 );
   for ( int y = 0; y < ii_depth_map.rows-1; y++ )
   {
@@ -37,8 +37,9 @@ void smoothDepth( const Mat1f &scale_map,
       const int s_floor = s;
       const float t = s - s_floor;
 
-      if ( !checkBounds( ii_depth_map, x, y, s_floor+1 )
+      if ( !checkBounds( ii_depth_map, x, y, s_floor+1 ) )
       {
+        depth_out(y,x) = nan;
         continue;
       }
       depth_out(y,x) = (1.0-t) * meanDepth( ii_depth_map, ii_depth_count, x, y, s_floor )
