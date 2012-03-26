@@ -38,6 +38,12 @@ public:
 private:
   void readBagFile();
 
+  void readDataFiles();
+
+  bool fileExists(const std::string & fileName);
+
+  bool readMatrix(const std::string & fileName, cv::Matx33f& K);
+
   void extractAllKeypoints();
 
   typedef boost::function< std::vector<cv::KeyPoint3D> ( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t ) > GetKpFunc;
@@ -48,7 +54,6 @@ private:
 
   void splitFileName(const std::string& str);
 
-  rosbag::Bag bag_;
   cv::Matx33f K_;
 
   std::string file_path_;
@@ -61,13 +66,8 @@ private:
 
   struct ImageData
   {
-    boost::shared_ptr<cv_bridge::CvImage> rgb_image;
-    boost::shared_ptr<cv_bridge::CvImage> depth_image;
-
-    bool isComplete()
-    {
-      return rgb_image.get() && depth_image.get();
-    }
+    cv::Mat rgb_image;
+    cv::Mat depth_image;
   };
 
   std::vector< ImageData > image_store_;

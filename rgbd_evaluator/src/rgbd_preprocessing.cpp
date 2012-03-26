@@ -114,6 +114,8 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
                          cam_info.at(3), cam_info.at(4), cam_info.at(5),
                          cam_info.at(6), cam_info.at(7), cam_info.at(8));
 
+        writeIntrinsicMatToFile(K_);
+
         got_cam_info = true;
       }
 
@@ -712,6 +714,31 @@ void RgbdEvaluatorPreprocessing::writeHomographyToFile(cv::Matx33f homography, u
   file.close();
 }
 
+void RgbdEvaluatorPreprocessing::writeIntrinsicMatToFile(cv::Matx33f K)
+{
+  uint32_t i,j;
+  std::fstream file;
+
+  // create filepath
+  std::string intrinsicMatName;
+  intrinsicMatName.append(file_created_folder_);
+  intrinsicMatName.append("/");
+  intrinsicMatName.append("K_");
+
+  file.open(intrinsicMatName.c_str(), std::ios::out);
+
+  for(i=0; i<3; i++)
+  {
+    for(j=0;j<3;j++)
+    {
+      file << K(i,j) << "\t";
+    }
+    file << std::endl;
+  }
+
+  file.close();
+}
+
 void RgbdEvaluatorPreprocessing::writeVectorToFile( std::vector<float> vec, std::string filename )
 {
   uint32_t i;
@@ -886,7 +913,7 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> <bagfileName> .." << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> .." << std::endl;
     return -1;
   }
 
