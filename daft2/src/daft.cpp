@@ -21,7 +21,7 @@
 namespace cv {
 namespace daft2 {
 
-#define SHOW_DEBUG_WIN
+//#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
@@ -198,6 +198,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       } else {
         convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,
             max_px_scale, smoothed_img);
+        computeDepthGrad( scale_map, depth_map, scale, depth_grad );
       }
       break;
     case DetectorParams::DET_LAPLACE:
@@ -207,6 +208,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       } else {
         convolve<gauss>(ii, scale_map, scale, det_params_.min_px_scale_,
             max_px_scale, smoothed_img);
+        computeDepthGrad( scale_map, depth_map, scale, depth_grad );
 
         //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
         //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;

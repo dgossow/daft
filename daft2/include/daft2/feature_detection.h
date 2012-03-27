@@ -42,6 +42,37 @@ void convolve( const Mat1d &ii,
     Mat1f &img_out );
 
 /*!
+ Compute the kernel response for every pixel of the given image.
+ The kernel size and shape will be a local affine transformation.
+ The template argument specifies the filter kernel.
+ * @param ii            The Integral Image
+ * @param scale_map     The scale map (scale multiplier per pixel)
+ * @param ii_depth_map  The integral depth map (im meters)
+ * @param ii_depth_countIntegral of the number of valid depth pixels
+ * @param camera_matrix Camera intrinsics
+ * @param base_scale    The global scale multiplier
+ * @param min_px_scale  Minimal scale in pixels
+ * @param max_px_scale  Maximal scale in pixels
+ * @param img_out       The output image
+ */
+template <float (*F)( const Mat1d &ii, Vec2f &grad,
+    int x, int y, float sp, float sw, float min_sp )>
+void convolveAffine( const Mat1d &ii,
+    const Mat1f &scale_map,
+    const Mat1f &depth_map,
+    float sw,
+    float min_px_scale,
+    float max_px_scale,
+    Mat1f &img_out,
+    Mat2f& depth_grad );
+
+void computeDepthGrad(
+		const Mat1f &scale_map,
+    const Mat1f &depth_map,
+    float sw,
+    Mat2f& depth_grad );
+
+/*!
  Find the local maxima in the given image with a minimal value of thresh,
  The width & height of the local neighbourhood searched is
  scale_map(x,y) * base_scale.
@@ -144,20 +175,6 @@ void convolve( const Mat1d &ii,
   }
 }
 
-/*!
- Compute the kernel response for every pixel of the given image.
- The kernel size and shape will be a local affine transformation.
- The template argument specifies the filter kernel.
- * @param ii            The Integral Image
- * @param scale_map     The scale map (scale multiplier per pixel)
- * @param ii_depth_map  The integral depth map (im meters)
- * @param ii_depth_countIntegral of the number of valid depth pixels
- * @param camera_matrix Camera intrinsics
- * @param base_scale    The global scale multiplier
- * @param min_px_scale  Minimal scale in pixels
- * @param max_px_scale  Maximal scale in pixels
- * @param img_out       The output image
- */
 template <float (*F)( const Mat1d &ii, Vec2f &grad,
     int x, int y, float sp, float sw, float min_sp )>
 void convolveAffine( const Mat1d &ii,
@@ -198,6 +215,7 @@ void convolveAffine( const Mat1d &ii,
     }
   }
 }
+
 
 template <float (*F)(const Mat1d&, int, int, float)>
 void filterKpKernel( const Mat1d& ii,
