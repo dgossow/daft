@@ -24,7 +24,7 @@
 namespace rgbd_evaluator
 {
 
-const int num_kp = 750;
+const int num_kp = 500;
 int img_count = 0;
 
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_order)
@@ -95,7 +95,7 @@ void ExtractDetectorFile::readDataFiles()
   image_depth_name.append( "/" );
   image_depth_name.append( "depth" );
 
-  image_store_.push_back( ImageData() );
+  ImageData img_data;
 
   // read rgb and depth images
   for( i = 0; i < numberOfImages; i++ )
@@ -129,17 +129,20 @@ void ExtractDetectorFile::readDataFiles()
 
     // read rgb and depth image and store data
     cv::Mat image_rgb = cv::imread(tmp_rgb_name);
-    image_store_.back().rgb_image = cv::Mat(image_rgb);
+    img_data.rgb_image = cv::Mat(image_rgb);
 
-    cv::Mat image_depth = cv::imread(tmp_depth_name);
-    image_store_.back().depth_image = cv::Mat(image_depth);
+    // with read depth image
+    cv::Mat1f depth_image;
+    readDepth(tmp_depth_name, depth_image);
 
-    image_store_.push_back( ImageData() );
+    img_data.depth_image = depth_image;
+
+    image_store_.push_back( img_data );
   }
 
 }
 
-bool ExtractDetectorFile::fileExists(const std::string & fileName)
+bool ExtractDetectorFile::fileExists( const std::string & fileName )
 {
   std::ifstream fileTest(fileName.c_str());
 
@@ -149,7 +152,7 @@ bool ExtractDetectorFile::fileExists(const std::string & fileName)
   return true;
 }
 
-bool ExtractDetectorFile::readMatrix(const std::string & fileName, cv::Matx33f& K)
+bool ExtractDetectorFile::readMatrix( const std::string & fileName, cv::Matx33f& K )
 {
   static const uint32_t MATRIX_DIM = 3;
 
@@ -157,23 +160,79 @@ bool ExtractDetectorFile::readMatrix(const std::string & fileName, cv::Matx33f& 
   if( !fileExists( fileName ) ) return false;
 
   // start reading data
-  std::ifstream data( fileName.c_str() );
+  std::ifstream infile( fileName.c_str() );
 
   K_ = cv::Matx33f( MATRIX_DIM, MATRIX_DIM );
 
-  for( uint32_t i = 0; i < MATRIX_DIM; i++ )
+  for( uint32_t y = 0; y < MATRIX_DIM; y++ )
   {
-    uint32_t pos = 0;
-    float_t n;
-
-    while( data >> n )
+    for ( uint32_t x=0; x < MATRIX_DIM; x++ )
     {
+      if (infile.eof())
+      {
+        std::cout << "ERROR: end-of-file reached too early!" << std::endl;
+        exit(-1);
+      }
+      float n;
+      infile >> n;
       // write values to matrix
-      K_( i, pos++ ) = n;
+      K_( y, x ) = n;
     }
   }
 
-  data.close();
+  infile.close();
+  return true;
+}
+
+bool ExtractDetectorFile::readDepth( const std::string & fileName, cv::Mat1f& depth_img )
+{
+  uint32_t depth_rows = 0, depth_cols = 0;
+
+  std::string input_string;
+  std::ifstream infile;
+
+  infile.open( fileName.c_str() );
+  getline(infile, input_string); // Header1
+
+  if( input_string != "P2" )
+  {
+    std::cout << fileName << ": Wrong image Header ( " << input_string << " ) ..." << std::endl;
+    return false;
+  }
+
+  infile >> depth_cols;
+  infile >> depth_rows;
+
+  int maxval;
+  infile >> maxval;
+
+  std::cout << "depth_cols: " << depth_cols << "   depth_rows: " << depth_rows << std::endl;
+
+  depth_img = cv::Mat1f(depth_rows, depth_cols);
+
+  for( uint32_t y = 0; y < depth_rows; y++ )
+  {
+    for ( uint32_t x=0; x<depth_cols; x++ )
+    {
+      int n;
+      if (infile.eof())
+      {
+        std::cout << "ERROR: end-of-file reached too early!" << std::endl;
+        exit(-1);
+      }
+      infile >> n;
+      if ( n == 0 )
+      {
+        depth_img( y, x ) = std::numeric_limits<float>::quiet_NaN();
+      }
+      else
+      {
+        depth_img( y, x ) = float(n) * 0.001;
+      }
+    }
+  }
+
+  infile.close();
 
   return true;
 }
@@ -329,7 +388,10 @@ std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv
   std::vector<cv::KeyPoint3D> kp;
   p.det_threshold_ *= t;
   daft_ns::DAFT daft( p );
+  std::cout << "detecting" << std::endl;
   daft.detect( gray_img, depth_img, K, kp );
+
+  std::cout << "kp " << kp.size() << "\n";
   return kp;
 }
 
@@ -360,45 +422,22 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
   for (it = it_begin; it != it_end; it+=it_step)
   //it = it_begin;
   {
-    cv::Mat bag_rgb_img = it->rgb_image;
-    cv::Mat bag_depth_img = it->depth_image;
+    cv::Mat rgb_img = it->rgb_image;
+    cv::Mat1f depth_img = it->depth_image;
 
-    cv::Mat rgb_img = bag_rgb_img;
-    cv::Mat depth_img = bag_depth_img;
-
-    int scale_fac = bag_rgb_img.cols / bag_depth_img.cols;
-
-#if 1
-    // Resize depth to have the same width as rgb
-    cv::resize( bag_depth_img, depth_img, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
-
-    // Crop rgb so it has the same size as depth
-    rgb_img = cv::Mat( bag_rgb_img, cv::Rect( 0,0, depth_img.cols, depth_img.rows ) );
-#else
-    depth_img = bag_depth_img;
-    // make intensity image smaller to have the same aspect ratio and size as depth
-    cv::Mat tmp1 = cv::Mat( bag_rgb_img, cv::Rect( 0,0, depth_img.cols*scale_fac, depth_img.rows*scale_fac ) );
-    cv::resize( tmp1, rgb_img, cvSize(depth_img.cols, depth_img.rows) );
-
-    static bool b=0;
-    if ( !b )
-    {
-      K_(0,0)/=2.0;
-      K_(1,1)/=2.0;
-      K_(0,2)/=2.0;
-      K_(1,2)/=2.0;
-      b=1;
-    }
-#endif
+    cv::imshow("depth_image'",depth_img);
+    cv::imshow("depth_image",it->depth_image);
 
 #if 0
     double minval,maxval;
     cv::minMaxIdx( depth_img, &minval, &maxval );
 
-    cv::Mat tmp = depth_img.clone();
+    std::cout << "maxval "<<maxval << std::endl;
+
+    cv::Mat1f tmp = depth_img.clone();
     tmp -= minval;
     tmp *= 1.0/(maxval-minval);
-    cv::imshow( "Depth", tmp );
+    cv::imshow( "Depth norm", tmp );
     cv::waitKey(100);
 #endif
 
@@ -445,7 +484,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
         cv::Mat kp_img;
         cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        //cv::imshow("KP", kp_img);
+        cv::imshow("KP", kp_img);
         cv::waitKey(200);
 
         its++;
@@ -492,7 +531,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.min_px_scale_ = 3;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
-  p.det_threshold_ = 0.1;//115;
+  p.det_threshold_ = 0.01;//115;
   p.pf_threshold_ = 5;
 
   p.det_type_=p.DET_BOX;
@@ -513,10 +552,10 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_ = p.DET_9X9;
   p.max_search_algo_ = p.MAX_WINDOW;
   p.affine_ = true;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
   extractKeypoints( &getSurfKp, "SURF" );
-  extractKeypoints( &getSiftKp, "SIFT" );
+  //extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )

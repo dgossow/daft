@@ -104,7 +104,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       }
     }
 
-    if (!finite(min_scale_fac) || max_scale_fac == 0) {
+    if (!finite(min_scale_fac) || max_scale_fac == 0)
+    {
+      std::cout << "error: depth data invalid." << std::endl;
       return;
     }
 
@@ -143,8 +145,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
 #endif
 
-  imshow( "img", gray_image );
-  imshowNorm( "depth", depth_map, 0 );
+  //imshow( "img", gray_image );
+  //imshowNorm( "depth", depth_map, 0 );
 
   // all octaves that we need to compute
   std::set<int> octaves;
@@ -172,7 +174,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   	int octave = *it;
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
-    std::cout << "octave " << octave << "scale " << scale << std::endl;
+    //std::cout << "octave " << octave << "scale " << scale << std::endl;
 
     smoothed_imgs[octave] = Mat1f();
     smoothed_depth_maps[octave] = Mat1f();
@@ -227,6 +229,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       }
       break;
     default:
+      std::cout << "error: invalid detector type: " << det_params_.det_type_ << std::endl;
       return;
     }
 
@@ -263,7 +266,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   {
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
-    std::cout << "det octave " << octave << " scale " << scale << std::endl;
+    //std::cout << "det octave " << octave << " scale " << scale << std::endl;
     diff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
     Mat2f& depth_grad = depth_grads[octave];
 
@@ -307,10 +310,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
       break;
     default:
+      std::cout << "error: invalid max search type: " << det_params_.max_search_algo_ << std::endl;
       return;
     }
 
-    std::cout << kp.size()-kp_first << " keypoints found." << std::endl;
+    //std::cout << kp.size()-kp_first << " keypoints found." << std::endl;
 
     // assign octave
     for ( unsigned k=kp_first; k<kp.size(); k++ )

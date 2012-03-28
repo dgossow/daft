@@ -32,7 +32,7 @@ public:
 
     /** default constructor */
     DetectorParams(
-        float base_scale = AUTO,
+        float base_scale = 1,
         float scale_factor = 2.0,
         int scale_levels = AUTO,
         int min_px_scale = 3,

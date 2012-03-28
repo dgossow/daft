@@ -40,9 +40,11 @@ private:
 
   void readDataFiles();
 
-  bool fileExists(const std::string & fileName);
+  bool fileExists( const std::string & fileName );
 
-  bool readMatrix(const std::string & fileName, cv::Matx33f& K);
+  bool readMatrix( const std::string & fileName, cv::Matx33f& K );
+
+  bool readDepth( const std::string & fileName, cv::Mat1f& depth_img );
 
   void extractAllKeypoints();
 
@@ -67,7 +69,7 @@ private:
   struct ImageData
   {
     cv::Mat rgb_image;
-    cv::Mat depth_image;
+    cv::Mat1f depth_image;
   };
 
   std::vector< ImageData > image_store_;
