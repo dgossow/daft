@@ -46,11 +46,15 @@ public:
 
   std::vector<cv::Point2f> mouseKeypointsOrigin_;
   std::vector<cv::Point2f> mouseKeypointsImageX_;
+  std::vector<cv::Point2f> mousePointsROI_;
 
+  cv::Mat imageChooseROI_;
   cv::Mat keyPointImageOrigin_;
   cv::Mat keyPointImageCamX_;
 
   bool first_image_;
+  bool finishedROI_;
+  bool finishedKP_;
 
 private:
 
@@ -75,7 +79,8 @@ private:
 
   tf::StampedTransform calculateCoordinatesystem(cv::Mat& depth_img, std::vector<cv::Point2f> mouseKeypoints);
 
-  static void imgMouseCallback( int event, int x, int y, int flags, void* param );
+  static void imgMouseCallbackKP( int event, int x, int y, int flags, void* param );
+  static void imgMouseCallbackROI( int event, int x, int y, int flags, void* param );
 
   std::string file_path_;
   std::string file_name_;
