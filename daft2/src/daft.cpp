@@ -145,8 +145,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
 #endif
 
-  imshow( "img", gray_image );
-  imshowNorm( "depth", depth_map, 0 );
+  //imshow( "img", gray_image );
+  //imshowNorm( "depth", depth_map, 0 );
 
   // all octaves that we need to compute
   std::set<int> octaves;
