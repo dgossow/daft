@@ -99,6 +99,30 @@ inline float boxAffine( const Mat1d &ii, Vec2f &grad,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
+inline float felineAffineImpl( const Mat1d &ii, float major_len, float minor_len, float major_x, float major_y, int box_size, int x, int y)
+{
+  const int num_steps = 2.0*major_len/minor_len + 0.8;
+
+  if ( num_steps == 1 )
+  {
+    return integrate( ii, x-box_size, y-box_size, x+box_size, y+box_size ) / float(4*box_size*box_size) * 0.73469f;
+  }
+
+  float start_x = major_x * (major_len-minor_len);
+  float start_y = major_y * (major_len-minor_len);
+
+  float val = 0;
+  for ( int step=0; step<num_steps; step++ )
+  {
+    float t = float(step)/float(num_steps-1) * 2.0 - 1.0;
+    int x1 = x - t*start_x + 0.5;
+    int y1 = y - t*start_y + 0.5;
+    val += integrate( ii, x1-box_size, y1-box_size, x1+box_size, y1+box_size );
+  }
+
+  return val / ( float(num_steps) * 4*box_size*box_size ) * 0.73469f;
+}
+
 inline float felineAffine( const Mat1d &ii, Vec2f& grad, int x, int y, float sp, float sw, float min_sp )
 {
   float major_x,major_y,ratio;
@@ -106,29 +130,21 @@ inline float felineAffine( const Mat1d &ii, Vec2f& grad, int x, int y, float sp,
 
   const float major_len = sp;
   const float minor_len = ratio * major_len;
-  int box_size = minor_len * 0.886f + 0.5;
 
-  if ( box_size < min_sp )
+  if ( minor_len < min_sp )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
 
-  int num_steps = ratio+1;
+  float box_size = minor_len * 0.886f;
 
-  float start_x = major_x * (major_len-minor_len);
-  float start_y = major_y * (major_len-minor_len);
+  const int box_size_int = box_size;
+  float t1 = box_size - box_size_int;
 
+  float f1 = felineAffineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int, x, y );
+  float f2 = felineAffineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int+1, x, y );
 
-  float val = 0;
-  for ( int step=0; step<num_steps; step++ )
-  {
-    float t = float(step)/float(num_steps) * 2.0 - 1.0;
-    int x1 = x - t*start_x + 0.5;
-    int y1 = y - t*start_y + 0.5;
-    val += integrate( ii, x1-box_size, y1-box_size, x1+box_size, y1+box_size );
-  }
-
-  return val / ( float(num_steps) * 4*box_size*box_size ) * 0.73469f;
+  return (1.0-t1)*f1 + t1*f2;
 }
 
 /* Compute box mean with sub-integer scale interpolation */

@@ -27,11 +27,9 @@ namespace rgbd_evaluator
 const int num_kp = 500;
 int img_count = 0;
 
-ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_order)
+ExtractDetectorFile::ExtractDetectorFile(std::string file_path)
 {
   std::cout << "Starting extract_detector_file..." << std::endl;
-
-  reverse_order_ = reverse_order;
 
   splitFileName(file_path);
 
@@ -46,6 +44,8 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_ord
     std::cout << "--> check user permissions"  << std::endl;
     return;
   }
+
+  //system( "rm " );
 
   extra_folder_ = file_created_folder_ + "/extra";
 
@@ -95,9 +95,11 @@ void ExtractDetectorFile::readDataFiles()
     return;
   }
 
-  maskImage_ = cv::imread(maskImagePath);
-//  cv::imshow("MaskImage", maskImage_);
-//  cv::waitKey(50);
+  cv::Mat mask_tmp = cv::imread(maskImagePath);
+  //mask_tmp.convertTo(maskImage_,CV_BGR2GRAY);
+
+  maskImage_ = mask_tmp;
+  std::cout << maskImage_.type() << std::endl;
 
   // create image paths
   std::string image_rgb_name;
@@ -143,7 +145,11 @@ void ExtractDetectorFile::readDataFiles()
     ImageData img_data;
 
     // read homography
-    if( !readMatrix( file_created_folder_+"/H1top"+ss.str()+"p", img_data.hom ) )
+    if ( i==0 )
+    {
+      img_data.hom = cv::Matx33f::eye();
+    }
+    else if( !readMatrix( file_created_folder_+"/H1to"+ss.str()+"p", img_data.hom ) )
     {
       std::cout << path << " not found - aborting..." << std::endl;
       return;
@@ -161,7 +167,6 @@ void ExtractDetectorFile::readDataFiles()
 
     image_store_.push_back( img_data );
   }
-
 }
 
 bool ExtractDetectorFile::fileExists( const std::string & fileName )
@@ -179,12 +184,16 @@ bool ExtractDetectorFile::readMatrix( const std::string & fileName, cv::Matx33f&
   static const uint32_t MATRIX_DIM = 3;
 
   // check if file exists
-  if( !fileExists( fileName ) ) return false;
+  if( !fileExists( fileName ) )
+  {
+    std::cout << "ERROR: " << fileName << " not found!" << std::endl;
+    return false;
+  }
 
   // start reading data
   std::ifstream infile( fileName.c_str() );
 
-  K_ = cv::Matx33f( MATRIX_DIM, MATRIX_DIM );
+  K = cv::Matx33f( MATRIX_DIM, MATRIX_DIM );
 
   for( uint32_t y = 0; y < MATRIX_DIM; y++ )
   {
@@ -198,7 +207,7 @@ bool ExtractDetectorFile::readMatrix( const std::string & fileName, cv::Matx33f&
       float n;
       infile >> n;
       // write values to matrix
-      K_( y, x ) = n;
+      K( y, x ) = n;
     }
   }
 
@@ -419,24 +428,18 @@ std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv
 void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 {
   uint32_t count = 1;
-  static bool firstImage = false;
+  bool first_image = true;
+
+  cv::Mat first_kp_img;
 
   std::vector< ImageData >::iterator it;
 
   int it_step;
   std::vector< ImageData >::iterator it_end,it_begin;
-  if ( reverse_order_ )
-  {
-    it_step = -1;
-    it_begin = image_store_.end()-1;
-    it_end = image_store_.begin()-1;
-  }
-  else
-  {
-    it_step = 1;
-    it_begin = image_store_.begin();
-    it_end = image_store_.end();
-  }
+
+  it_step = 1;
+  it_begin = image_store_.begin();
+  it_end = image_store_.end();
 
   float t=1;
 
@@ -503,8 +506,8 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
         cv::Mat kp_img;
         cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        cv::imshow("KP", kp_img);
-        cv::waitKey(200);
+        //cv::imshow("KP", kp_img);
+        //cv::waitKey(200);
 
         its++;
         std::cout << std::endl;
@@ -518,17 +521,40 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
     std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
 
-    if(!firstImage)
+    if(first_image)
     {
       kp = filterKpMask(kp);
-      firstImage = true;
-    }
-    storeKeypoints(kp, s.str(), name, rgb_img );
+      first_image = false;
 
-#endif
+      cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+      storeKeypoints(kp, s.str(), name, rgb_img );
+    }
+    else
+    {
+      cv::Mat first_kp_img_warped = rgb_img.clone();
+      cv::warpPerspective( first_kp_img, first_kp_img_warped, cv::Mat(it->hom), cv::Size( rgb_img.cols, rgb_img.rows ) );
+
+      printMat(it->hom);
+
+      storeKeypoints(kp, s.str(), name, first_kp_img_warped );
+    }
 
   }
 }
+
+void ExtractDetectorFile::printMat( cv::Matx33f M )
+{
+  std::cout << std::setprecision( 3 ) << std::right << std::fixed;
+  for ( int row = 0; row < 3; ++ row )
+  {
+    for ( int col = 0; col < 3; ++ col )
+    {
+      std::cout << std::setw( 5 ) << (double)M( row, col ) << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
 
 std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::KeyPoint3D> kp )
 {
@@ -537,18 +563,16 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::K
 
   for(uint32_t i = 0; i < kp.size(); i++)
   {
+    //std::cout << int(maskImage_( kp.at(i).pt.y, kp.at(i).pt.x )) << " ";
     // check for black spots in maskimage
-    if( maskImage_.at<float>( kp.at(i).pt.y, kp.at(i).pt.x ) != 0)
+    if( maskImage_.at<cv::Vec3b>(int(kp[i].pt.y),int(kp[i].pt.x))[0] < 128 )
     {
-      //std::cout << "Filtered Keypoint: " << kp.at(i).pt.x << "   " << kp.at(i).pt.y << std::endl;
-      continue;
+      kp_filtered.push_back(kp[i]);
     }
-
-    kp_filtered.push_back(kp.at(i));
   }
 
-  std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
-  std::cout << std::endl;
+  //std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
+  //std::cout << std::endl;
   return kp_filtered;
 }
 
@@ -559,18 +583,18 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.min_px_scale_ = 3;
   //p.base_scale_ = 0.02;
   //p.scale_levels_ = 1;
-  p.det_threshold_ = 0.01;//115;
+  p.det_threshold_ = 0.0109759;
   p.pf_threshold_ = 5;
 
   p.det_type_=p.DET_BOX;
   p.affine_=false;
   p.max_search_algo_ = p.MAX_FAST;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
+  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
 
   p.det_type_=p.DET_BOX;
   p.affine_=true;
   p.max_search_algo_ = p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast Affine" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
   p.det_type_ = p.DET_9X9;
   p.max_search_algo_ = p.MAX_WINDOW;
@@ -609,7 +633,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   for ( it = keypoints.begin(); it != keypoints.end(); it++ )
   {
     //hack
-    it->affine_minor = it->affine_major;
+    //it->affine_minor = it->affine_major;
 
     ax = cos( it->affine_angle );
     ay = sin( it->affine_angle );
@@ -629,7 +653,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
     A = ( pow(ax,2) * pow(b_length,2) + pow(bx,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
 
-    B = 2 * ( ( ax * ay * pow(b_length,2) + bx * by * pow(a_length,2)) ) / (pow(a_length,2) * pow(b_length,2) );
+    B = ( ( ax * ay * pow(b_length,2) + bx * by * pow(a_length,2)) ) / (pow(a_length,2) * pow(b_length,2) );
 
     C = ( pow(ay,2) * pow(b_length,2) + pow(by,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
 
@@ -661,13 +685,13 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   // draw keypoints
   cv::Mat kp_img;
 
-  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
 
-  cv::imshow("kp", kp_img);
-  cv::waitKey(100);
+  //cv::imshow("kp", kp_img);
+  //cv::waitKey(100);
 
   std::stringstream s;
   s.width(3);
@@ -718,16 +742,11 @@ int main( int argc, char** argv )
     return -1;
   }
 
-  bool reverse_order = argc >= 2 && std::string(argv[1]) == "-r";
-  std::cout << "reverse_order " << reverse_order << std::endl;
-
-  int start_i = reverse_order ? 2 : 1;
-
-  for ( int i=start_i; i<argc; i++ )
+  for ( int i=1; i<argc; i++ )
   {
     rgbd_evaluator::img_count = 0;
     std::string file_name(argv[i]);
-    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name, reverse_order);
+    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name);
   }
 
   std::cout << "Exiting.." << std::endl;

@@ -100,8 +100,8 @@ private:
   static const uint32_t MIN_CORRESPONDENCES = 4;
   static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 10;
   static const uint32_t MAX_FEATURE_NUMBER = 200;
-  static const uint32_t SLIDING_WINDOW_SIZE = 20;
-  static const uint32_t SEARCH_WINDOW_SIZE = 100;
+  static const uint32_t SLIDING_WINDOW_SIZE = 30;
+  static const uint32_t SEARCH_WINDOW_SIZE = SLIDING_WINDOW_SIZE+20;
 
   static const float_t  NCC_MAX_VAL = 0.98;
 

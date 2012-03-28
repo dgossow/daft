@@ -135,8 +135,8 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
         if ( !isnan( patch[v][u] ) )
         {
           float s = 0.5 * kp.world_size * K(0,0) / depth_map(int(pixel.y),int(pixel.x));
-          Size2f bsize( s, minor/major*s );
-          cv::RotatedRect box(pixel, bsize, angle/M_PI*180.0 );
+          Size2f bsize( s, kp.affine_minor/kp.affine_major*s );
+          cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
           ellipse( display_img, box, cv::Scalar(0,0,255), 1, CV_AA );
         }
 #endif
@@ -229,7 +229,7 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
 
 #ifdef DESC_DEBUG_IMG
         Size2f bsize( float(PATCH_MUL)*weight,float(PATCH_MUL)*weight );
-        cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, angle/M_PI*180.0 );
+        cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, kp.affine_angle/M_PI*180.0 );
         ellipse( points3d_img, box, cv::Scalar(val*255,val*255,val*255),-1, CV_AA );
         //ellipse( points3d_img, box, cv::Scalar(128,0,0),1, CV_AA );
 
@@ -240,7 +240,7 @@ inline void getGradPatch( Mat1f& smoothed_img, const KeyPoint3D& kp,
         if ( !isnan( patch_dx[v][u] ) && !isnan( patch_dy[v][u] ) )
         {
           Size2f bsize( 3,3 );
-          cv::RotatedRect box(pixel, bsize, angle/M_PI*180.0 );
+          cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
           ellipse( display_img, box, cv::Scalar(0,255,0), 1, CV_AA );
         }
 #endif
@@ -282,7 +282,7 @@ inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
   float coverage;
   getGradPatch<DescPatchSize,2>( smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5 );
 
-  if ( coverage < 0.5 )
+  if ( coverage < 0.8 )
   {
     return false;
   }
@@ -316,7 +316,7 @@ inline bool getDesc( Mat1f& smoothed_img, Mat1f& smoothed_img2, KeyPoint3D& kp, 
   std::vector<PtInfo> pt_infos_desc;
   getGradPatch<DescPatchSize,1>( smoothed_img, kp, depth_map, K, pt_infos_desc, coverage, 1.0, kp_ori_rot );
 
-  if ( coverage < 0.5 )
+  if ( coverage < 0.8 )
   {
     return false;
   }

@@ -32,7 +32,7 @@ namespace rgbd_evaluator
 class ExtractDetectorFile
 {
 public:
-  ExtractDetectorFile(std::string file_path, bool reverse_order);
+  ExtractDetectorFile(std::string file_path);
   virtual ~ExtractDetectorFile();
 
 private:
@@ -58,6 +58,8 @@ private:
 
   void splitFileName(const std::string& str);
 
+  void printMat( cv::Matx33f M );
+
   cv::Matx33f K_;
   cv::Mat maskImage_;
 
@@ -66,8 +68,6 @@ private:
   std::string file_folder_;
   std::string file_created_folder_;
   std::string extra_folder_;
-
-  bool reverse_order_;
 
   struct ImageData
   {

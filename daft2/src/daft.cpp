@@ -429,7 +429,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
+#ifndef FIND_MAXKP
       if ( getDesc<20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
+#endif
       {
         kp2.push_back(kp[k]);
       }

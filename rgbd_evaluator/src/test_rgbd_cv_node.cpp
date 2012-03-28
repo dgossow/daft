@@ -57,24 +57,19 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   p1.base_scale_ = 0.01;
   p1.scale_levels_ = 1;
-  p1.min_px_scale_ = 1;
-  //p1.max_px_scale_ = 1000;
+  //p1.min_px_scale_ = 3;
+  p1.max_px_scale_ = 1000;
 
-  p1.det_type_=p1.DET_BOX;
+  p1.det_type_=p1.DET_FELINE;
   p1.affine_=true;
   p1.max_search_algo_ = p1.MAX_FAST;
-
   p1.det_threshold_ = 0.04;
 
-  p1.pf_type_ = p1.PF_PRINC_CURV_RATIO;
-  p1.pf_threshold_ = 5;
-
   p2 = p1;
-  //p1.det_type_=p1.DET_LAPLACE;
-  p2.affine_ = false;
-  p2.pf_type_ = p1.PF_NONE;
+  p1.det_type_=p1.DET_BOX;
+  p2.affine_ = true;
 
- cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
+  cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
   rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
   //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
@@ -96,7 +91,14 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   s << p1.det_type_;
   if ( keypoints1.size() != 0 )
   {
-    cv::imshow( "keypoints2=green", intensity_image1 );
+    cv::imshow( "keypoints1=green", intensity_image1 );
+  }
+
+  s.str("");
+  s << p2.det_type_;
+  if ( keypoints2.size() != 0 )
+  {
+    cv::imshow( "keypoints2=red", intensity_image2 );
   }
 
   /*
@@ -109,13 +111,6 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::imwrite( s.str(), intensity_image1 );
   f++;
   */
-
-  s.str("");
-  s << p2.det_type_;
-  if ( keypoints2.size() != 0 )
-  {
-    cv::imshow( "keypoints2=red", intensity_image2 );
-  }
 #endif
 
 #if 0

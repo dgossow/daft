@@ -241,7 +241,7 @@ inline bool computeGradient(
 {
   int sp_int = int(sp+0.5f);
 
-  if ( !checkBounds( depth_map, x, y, sp_int+100 ) )
+  if ( !checkBounds( depth_map, x, y, sp_int ) )
   {
     grad[0] = std::numeric_limits<float>::quiet_NaN();
     grad[1] = std::numeric_limits<float>::quiet_NaN();
@@ -324,10 +324,12 @@ inline void getMajorMinor( const Vec2f& grad, float sp, float sw, float& major_x
     ratio = 1;
   }
 
-  // compute the minor axis length
-  ratio = fastInverseSqrt( (grad[0]*grad[0] + grad[1]*grad[1]) / (sw*sw) + 1.0f );
+  const float grad_len_sqr = grad[0]*grad[0] + grad[1]*grad[1];
 
-  float grad_len_inv = fastInverseSqrt(grad[0]*grad[0] + grad[1]*grad[1]);
+  // compute the minor axis length
+  ratio = fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
+
+  const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
   major_x = -grad[1] * grad_len_inv;
   major_y = grad[0] * grad_len_inv;
 }

@@ -165,7 +165,7 @@ void RgbdEvaluatorPreprocessing::writeDepth( cv::Mat& depth_img_orig, std::strin
   cv::Mat1w depth_img;
   depth_img_orig.convertTo( depth_img, CV_16U, 1000.0, 0.0 );
 
-  std::ofstream fs( (file_created_folder_ + "/" + "depth" + count_str + ".pgm").c_str() );
+  std::ofstream fs( (file_created_folder_ + "/" + "depth" + count_str + ".ppm").c_str() );
 
   fs << "P2" << std::endl;
   fs << depth_img.cols << " " << depth_img.rows << std::endl;
@@ -274,23 +274,31 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       cv::waitKey(50);
     }
 
-    // connect first and last point
-    cv::line(imageChooseROI_, this->mousePointsROI_.at(0), this->mousePointsROI_.back(), CV_RGB(0, 255, 0));
-
-    // fill polynom
-    std::vector<cv::Point> pts;
-
-    for(uint32_t k = 0; k < mousePointsROI_.size(); k++)
+    cv::Mat maskImage;
+    if ( mousePointsROI_.size() < 3 )
     {
-      pts.push_back( mousePointsROI_.at(k) );
+      maskImage = cv::Mat::zeros(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U);
     }
+    else
+    {
+      // connect first and last point
+      cv::line(imageChooseROI_, this->mousePointsROI_.at(0), this->mousePointsROI_.back(), CV_RGB(0, 255, 0));
 
-    cv::Point *points;
-    points = &pts[0];
-    int nbtab = pts.size();
+      // fill polynom
+      std::vector<cv::Point> pts;
 
-    cv::Mat maskImage = cv::Mat::ones(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U)*255;
-    cv::fillPoly(maskImage, (const cv::Point **) &points, &nbtab, 1, CV_RGB(0,0,0));
+      for(uint32_t k = 0; k < mousePointsROI_.size(); k++)
+      {
+        pts.push_back( mousePointsROI_.at(k) );
+      }
+
+      cv::Point *points;
+      points = &pts[0];
+      int nbtab = pts.size();
+
+      maskImage = cv::Mat::ones(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U)*255;
+      cv::fillPoly(maskImage, (const cv::Point **) &points, &nbtab, 1, CV_RGB(0,0,0));
+    }
 
     cv::imshow("Mask", maskImage);
 
@@ -713,6 +721,7 @@ int32_t RgbdEvaluatorPreprocessing::calculateNCC(cv::Mat image_original, cv::Mat
       ( x_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.cols ||
       ( y_pos + round( SEARCH_WINDOW_SIZE / 2 )+1) > image_cam_x.rows )
   {
+    std::cout << "Error: control point outside of image boundaries" << std::endl;
     return -1;
   }
 
