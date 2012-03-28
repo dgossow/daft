@@ -186,10 +186,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
 
-    if ( !det_params_.affine_ )
-    {
-      computeDepthGrad( scale_map, depth_map, scale, depth_grad );
-    }
+    computeDepthGrad( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, depth_grad );
 
 #ifdef SHOW_DEBUG_WIN
     std::stringstream s; s<<"smooth_depth s="<<scale;
@@ -200,7 +197,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     switch (det_params_.det_type_) {
     case DetectorParams::DET_BOX:
       if (det_params_.affine_) {
-        convolveAffine<boxAffine>(ii, scale_map, smoothed_depth_map,
+        convolveAffine<boxAffine>(ii, scale_map, depth_map,
             scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,

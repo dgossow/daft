@@ -241,7 +241,7 @@ inline bool computeGradient(
 {
   int sp_int = int(sp+0.5f);
 
-  if ( !checkBounds( depth_map, x, y, sp_int ) )
+  if ( !checkBounds( depth_map, x, y, sp_int+100 ) )
   {
     grad[0] = std::numeric_limits<float>::quiet_NaN();
     grad[1] = std::numeric_limits<float>::quiet_NaN();

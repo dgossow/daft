@@ -70,6 +70,7 @@ private:
   {
     cv::Mat rgb_image;
     cv::Mat1f depth_image;
+    cv::Matx33f hom;
   };
 
   std::vector< ImageData > image_store_;

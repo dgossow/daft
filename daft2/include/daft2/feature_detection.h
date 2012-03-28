@@ -67,9 +67,10 @@ void convolveAffine( const Mat1d &ii,
     Mat2f& depth_grad );
 
 void computeDepthGrad(
-		const Mat1f &scale_map,
+        const Mat1f &scale_map,
     const Mat1f &depth_map,
     float sw,
+    float min_px_scale,
     Mat2f& depth_grad );
 
 /*!
@@ -188,22 +189,12 @@ void convolveAffine( const Mat1d &ii,
 {
   img_out.create( ii.rows-1, ii.cols-1 );
 
-  // determine if we need to compute the depth gradient
-  const bool compute_grad = ( depth_grad.rows != ii.rows-1 || depth_grad.cols != ii.cols-1 );
-  if ( compute_grad ) {
-    depth_grad.create( ii.rows-1, ii.cols-1 );
-  }
-
   static const float nan = std::numeric_limits<float>::quiet_NaN();
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
       const float sp = getScale(scale_map[y][x], sw);
-      if ( compute_grad )
-      {
-        computeGradient( depth_map, x, y, sp, depth_grad[y][x] );
-      }
 
       if ( isnan( depth_grad[y][x][0] ) || isnan( depth_grad[y][x][1] ) || sp < min_px_scale || sp > max_px_scale )
       {

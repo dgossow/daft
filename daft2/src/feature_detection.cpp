@@ -34,23 +34,32 @@ void computeDepthGrad(
 		const Mat1f &scale_map,
     const Mat1f &depth_map,
     float sw,
+    float min_px_scale,
     Mat2f& depth_grad )
 {
-	if ( depth_grad.rows != 0 )
-	{
-		// we already have an image, no need to compute
-		return;
-	}
+  if ( depth_grad.rows != 0 )
+  {
+      // we already have an image, no need to compute
+      return;
+  }
 
-	depth_grad.create( depth_map.rows, depth_map.cols );
+  depth_grad.create( depth_map.rows, depth_map.cols );
 
-  static const float nan = std::numeric_limits<float>::quiet_NaN();
+  const float nan = std::numeric_limits<float>::quiet_NaN();
   for ( int y = 0; y < depth_map.rows; y++ )
   {
     for ( int x = 0; x < depth_map.cols; ++x )
     {
       const float sp = getScale(scale_map[y][x], sw);
-      computeGradient( depth_map, x, y, sp, depth_grad[y][x] );
+      if ( isnan(sp) || sp < min_px_scale )
+      {
+        depth_grad[y][x][0] = nan;
+        depth_grad[y][x][1] = nan;
+      }
+      else
+      {
+        computeGradient( depth_map, x, y, sp, depth_grad[y][x] );
+      }
     }
   }
 }

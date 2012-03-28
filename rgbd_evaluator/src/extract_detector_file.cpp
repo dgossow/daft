@@ -95,8 +95,6 @@ void ExtractDetectorFile::readDataFiles()
   image_depth_name.append( "/" );
   image_depth_name.append( "depth" );
 
-  ImageData img_data;
-
   // read rgb and depth images
   for( i = 0; i < numberOfImages; i++ )
   {
@@ -124,6 +122,15 @@ void ExtractDetectorFile::readDataFiles()
     if( !fileExists( tmp_depth_name ) )
     {
       std::cout << tmp_depth_name << " not found! - aborting..." << std::endl;
+      return;
+    }
+
+    ImageData img_data;
+
+    // read homography
+    if( !readMatrix( file_created_folder_+"/H1top"+ss.str()+"p", img_data.hom ) )
+    {
+      std::cout << path << " not found - aborting..." << std::endl;
       return;
     }
 
@@ -425,9 +432,6 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     cv::Mat rgb_img = it->rgb_image;
     cv::Mat1f depth_img = it->depth_image;
 
-    cv::imshow("depth_image'",depth_img);
-    cv::imshow("depth_image",it->depth_image);
-
 #if 0
     double minval,maxval;
     cv::minMaxIdx( depth_img, &minval, &maxval );
@@ -496,26 +500,10 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     s << "img" << count;
     count++;
 
-#if 0
-    for ( int i=0; i<3; i++ )
-    {
-      daft.detect(gray_img, depth_img, K_, kp);
-    }
-    {
-      boost::timer timer;
-      timer.restart();
-      for ( int i=0; i<10; i++ )
-      {
-        daft.detect(gray_img, depth_img, K_, kp);
-      }
-      std::cout << name << " execution time [ms]: " << timer.elapsed()*100 << std::endl;
-    }
-#else
     std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
     std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
 
     storeKeypoints(kp, s.str(), name, rgb_img );
-#endif
 
 #if 0
     std::cout << "Press any Key to continue!" << std::endl;
@@ -537,7 +525,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.det_type_=p.DET_BOX;
   p.affine_=false;
   p.max_search_algo_ = p.MAX_FAST;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
+  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
 
   p.det_type_=p.DET_BOX;
   p.affine_=true;
@@ -554,7 +542,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   p.affine_ = true;
   //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
 
-  extractKeypoints( &getSurfKp, "SURF" );
+  //extractKeypoints( &getSurfKp, "SURF" );
   //extractKeypoints( &getSiftKp, "SIFT" );
 }
 
@@ -580,6 +568,9 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 
   for ( it = keypoints.begin(); it != keypoints.end(); it++ )
   {
+    //hack
+    it->affine_minor = it->affine_major;
+
     ax = cos( it->affine_angle );
     ay = sin( it->affine_angle );
     bx = -ay;
