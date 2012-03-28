@@ -54,9 +54,12 @@ private:
 
   void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img );
 
+  std::vector<cv::KeyPoint3D> filterKpMask( std::vector<cv::KeyPoint3D> kp );
+
   void splitFileName(const std::string& str);
 
   cv::Matx33f K_;
+  cv::Mat maskImage_;
 
   std::string file_path_;
   std::string file_name_;

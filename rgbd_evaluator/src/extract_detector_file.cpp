@@ -57,7 +57,6 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool reverse_ord
   }
 
   readDataFiles();
-
   extractAllKeypoints();
 }
 
@@ -83,6 +82,22 @@ void ExtractDetectorFile::readDataFiles()
     std::cout << path << " not found - aborting..." << std::endl;
     return;
   }
+
+  std::string maskImagePath;
+  maskImagePath.append(file_created_folder_);
+  maskImagePath.append("/");
+  maskImagePath.append("maskImage.ppm");
+
+  // read mask image
+  if ( !fileExists( maskImagePath ) )
+  {
+    std::cout << maskImagePath << " not found - aborting..." << std::endl;
+    return;
+  }
+
+  maskImage_ = cv::imread(maskImagePath);
+//  cv::imshow("MaskImage", maskImage_);
+//  cv::waitKey(50);
 
   // create image paths
   std::string image_rgb_name;
@@ -213,7 +228,7 @@ bool ExtractDetectorFile::readDepth( const std::string & fileName, cv::Mat1f& de
   int maxval;
   infile >> maxval;
 
-  std::cout << "depth_cols: " << depth_cols << "   depth_rows: " << depth_rows << std::endl;
+  //std::cout << "depth_cols: " << depth_cols << "   depth_rows: " << depth_rows << "   maxval: " << maxval << std::endl;
 
   depth_img = cv::Mat1f(depth_rows, depth_cols);
 
@@ -254,6 +269,7 @@ std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp )
   }
   return kp_3d;
 }
+
 std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp, cv::Mat1d descriptors )
 {
   std::vector<cv::KeyPoint3D> kp3d_vec;
@@ -285,6 +301,7 @@ class VecIns : public parallelsurf::KeyPointInsertor
   private:
     std::vector<parallelsurf::KeyPoint>& m_KeyPoints;
 };
+
 std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
   unsigned char** pixels = new unsigned char*[gray_img.rows];
@@ -395,16 +412,14 @@ std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv
   std::vector<cv::KeyPoint3D> kp;
   p.det_threshold_ *= t;
   daft_ns::DAFT daft( p );
-  std::cout << "detecting" << std::endl;
   daft.detect( gray_img, depth_img, K, kp );
-
-  std::cout << "kp " << kp.size() << "\n";
   return kp;
 }
 
 void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 {
   uint32_t count = 1;
+  static bool firstImage = false;
 
   std::vector< ImageData >::iterator it;
 
@@ -427,7 +442,6 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = it_begin; it != it_end; it+=it_step)
-  //it = it_begin;
   {
     cv::Mat rgb_img = it->rgb_image;
     cv::Mat1f depth_img = it->depth_image;
@@ -464,6 +478,7 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
       {
         last_kp_size = kp_size;
         std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
+        kp = filterKpMask(kp);
         kp_size = kp.size();
 
         std::cout << " t_" << its-1 << " = " << last_t << " f(t_n-1) " << last_kp_size << std::endl;
@@ -503,13 +518,38 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
     std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
 
+    if(!firstImage)
+    {
+      kp = filterKpMask(kp);
+      firstImage = true;
+    }
     storeKeypoints(kp, s.str(), name, rgb_img );
 
-#if 0
-    std::cout << "Press any Key to continue!" << std::endl;
-    getchar();
 #endif
+
   }
+}
+
+std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::KeyPoint3D> kp )
+{
+  // filter keypoints which dont fit the mask
+  std::vector<cv::KeyPoint3D> kp_filtered;
+
+  for(uint32_t i = 0; i < kp.size(); i++)
+  {
+    // check for black spots in maskimage
+    if( maskImage_.at<float>( kp.at(i).pt.y, kp.at(i).pt.x ) != 0)
+    {
+      //std::cout << "Filtered Keypoint: " << kp.at(i).pt.x << "   " << kp.at(i).pt.y << std::endl;
+      continue;
+    }
+
+    kp_filtered.push_back(kp.at(i));
+  }
+
+  std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
+  std::cout << std::endl;
+  return kp_filtered;
 }
 
 void ExtractDetectorFile::extractAllKeypoints()
