@@ -184,6 +184,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
 
+    if ( !det_params_.affine_ )
+    {
+      computeDepthGrad( scale_map, depth_map, scale, depth_grad );
+    }
+
 #ifdef SHOW_DEBUG_WIN
     std::stringstream s; s<<"smooth_depth s="<<scale;
     imshowNorm( s.str(), smoothed_depth_map, 0 );
@@ -191,24 +196,31 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     // compute filter response for all pixels
     switch (det_params_.det_type_) {
-    case DetectorParams::DET_DOB:
+    case DetectorParams::DET_BOX:
       if (det_params_.affine_) {
         convolveAffine<boxAffine>(ii, scale_map, smoothed_depth_map,
             scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,
             max_px_scale, smoothed_img);
-        computeDepthGrad( scale_map, depth_map, scale, depth_grad );
       }
       break;
-    case DetectorParams::DET_LAPLACE:
+    case DetectorParams::DET_FELINE:
+      if (det_params_.affine_) {
+        convolveAffine<felineAffine>(ii, scale_map, smoothed_depth_map,
+            scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
+      } else {
+        convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,
+            max_px_scale, smoothed_img);
+      }
+      break;
+    case DetectorParams::DET_9X9:
       if (det_params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, smoothed_depth_map,
               scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
       } else {
         convolve<gauss>(ii, scale_map, scale, det_params_.min_px_scale_,
             max_px_scale, smoothed_img);
-        computeDepthGrad( scale_map, depth_map, scale, depth_grad );
 
         //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
         //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;

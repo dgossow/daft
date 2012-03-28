@@ -82,10 +82,10 @@ inline float boxAffine( const Mat1d &ii, Vec2f &grad,
       return std::numeric_limits<float>::quiet_NaN();
     }
 
-    float i1 = integrate ( ii, x-sx1  , x, y-sy1  , y );
-    float i2 = integrate ( ii, x, x+sx2  , y-sy2  , y );
-    float i3 = integrate ( ii, x-sx2  , x, y,   y+sy2 );
-    float i4 = integrate ( ii, x, x+sx1  , y,   y+sy1 );
+    float i1 = integrate ( ii, x-sx1, y-sy1, x, y );
+    float i2 = integrate ( ii, x, y-sy2,     x+sx2, y );
+    float i3 = integrate ( ii, x-sx2, y,     x, y+sy2 );
+    float i4 = integrate ( ii, x, y,         x+sx1, y+sy1 );
 
     float val = i1+i2+i3+i4;
 
@@ -99,6 +99,37 @@ inline float boxAffine( const Mat1d &ii, Vec2f &grad,
   return std::numeric_limits<float>::quiet_NaN();
 }
 
+inline float felineAffine( const Mat1d &ii, Vec2f& grad, int x, int y, float sp, float sw, float min_sp )
+{
+  float major_x,major_y,ratio;
+  getMajorMinor( grad, sp, sw, major_x, major_y, ratio );
+
+  const float major_len = sp;
+  const float minor_len = ratio * major_len;
+  int box_size = minor_len * 0.886f + 0.5;
+
+  if ( box_size < min_sp )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  int num_steps = ratio+1;
+
+  float start_x = major_x * (major_len-minor_len);
+  float start_y = major_y * (major_len-minor_len);
+
+
+  float val = 0;
+  for ( int step=0; step<num_steps; step++ )
+  {
+    float t = float(step)/float(num_steps) * 2.0 - 1.0;
+    int x1 = x - t*start_x + 0.5;
+    int y1 = y - t*start_y + 0.5;
+    val += integrate( ii, x1-box_size, y1-box_size, x1+box_size, y1+box_size );
+  }
+
+  return val / ( float(num_steps) * 4*box_size*box_size ) * 0.73469f;
+}
 
 /* Compute box mean with sub-integer scale interpolation */
 inline float box( const Mat1d &ii, int x, int y, float s )
@@ -114,10 +145,12 @@ inline float box( const Mat1d &ii, int x, int y, float s )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
-  float v1 = integrate ( ii, x - si,  x + si, y - si, y + si ) / float(4*si*si);
-  float v2 = integrate ( ii, x - si1,  x + si1, y - si1, y + si1 ) / float(4*si1*si1);
+  float v1 = integrate ( ii, x - si,  y - si, x + si, y + si ) / float(4*si*si);
+  float v2 = integrate ( ii, x - si1,  y - si1, x + si1, y + si1 ) / float(4*si1*si1);
   return interpolateLinear(s - float(si), v1, v2) * NORM_1;
 }
+
+
 
 /** integer as parameter */
 inline float gaussAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )

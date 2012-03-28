@@ -24,7 +24,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_DOB=0, DET_LAPLACE=1 };
+    enum { DET_BOX=0, DET_9X9=1, DET_FELINE=2 };
     enum { PF_NONE=0, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
     enum { MAX_WINDOW=0, MAX_FAST=2, MAX_EVAL=3 };
 
@@ -37,7 +37,7 @@ public:
         int scale_levels = AUTO,
         int min_px_scale = 3,
         int max_px_scale = AUTO,
-        int detector_type = DET_DOB,
+        int detector_type = DET_BOX,
         float det_threshold = 0.02,
         int postfilter_type = PF_PRINC_CURV_RATIO,
         float pf_threshold = 5.0,

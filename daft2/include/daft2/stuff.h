@@ -129,7 +129,7 @@ void integral2( const cv::Mat_<T1>& m_in, cv::Mat_<T2>& m_out, T2 factor=1.0 )
 // Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
 // using the given integral image
 template<typename T>
-inline T integrate( const Mat_<T> &ii, int start_x, int end_x, int start_y, int end_y )
+inline T integrate( const Mat_<T> &ii, int start_x, int start_y, int end_x, int end_y )
 {
   assert( start_x>=0 );
   assert( end_x>start_x );
@@ -225,12 +225,12 @@ inline float meanDepth(const Mat1d &ii_depth_map,
     const cv::Mat_<uint64_t>& ii_depth_count,
     int x, int y, int sp_int )
 {
-  float nump = float(integrate( ii_depth_count, x-sp_int, x+sp_int, y-sp_int, y+sp_int ));
+  float nump = float(integrate( ii_depth_count, x-sp_int, y-sp_int, x+sp_int, y+sp_int ));
   if ( nump == 0 )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
-  return integrate( ii_depth_map, x-sp_int, x+sp_int, y-sp_int, y+sp_int ) / nump;
+  return integrate( ii_depth_map, x-sp_int, y-sp_int, x+sp_int, y+sp_int ) / nump;
 }
 
 /** compute depth gradient
@@ -310,6 +310,26 @@ inline bool getAffine(
   normal = normal * normal_length_inv;
 
   return true;
+}
+
+// sp : pixel scale
+// sw : world scale
+inline void getMajorMinor( const Vec2f& grad, float sp, float sw, float& major_x, float& major_y, float &ratio )
+{
+  // if the gradient is 0, make circle
+  if ( grad[0] == 0 && grad[1] == 0 )
+  {
+    major_x = 0;
+    major_y = 1;
+    ratio = 1;
+  }
+
+  // compute the minor axis length
+  ratio = fastInverseSqrt( (grad[0]*grad[0] + grad[1]*grad[1]) / (sw*sw) + 1.0f );
+
+  float grad_len_inv = fastInverseSqrt(grad[0]*grad[0] + grad[1]*grad[1]);
+  major_x = -grad[1] * grad_len_inv;
+  major_y = grad[0] * grad_len_inv;
 }
 
 /** Computes A*x^2 + B*x*y + C*y^2 form of ellipse from angle and major/minor axis length */

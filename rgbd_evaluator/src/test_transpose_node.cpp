@@ -63,7 +63,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.scale_levels_ = 1;
   p1.max_px_scale_ = 1000;
 
-  p1.det_type_=p1.DET_LAPLACE;
+  p1.det_type_=p1.DET_9X9;
   p1.affine_=true;
   p1.max_search_algo_ = p1.MAX_FAST;
 

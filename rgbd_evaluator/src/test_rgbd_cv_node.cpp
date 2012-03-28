@@ -44,18 +44,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   // Crop rgb so it has the same size as depth
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
 
-  /*
-  depth_image = orig_depth_image->image;
-
-  // make intensity image smaller
-  cv::Mat intensity_image_tmp = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols*scale_fac, depth_image.rows*scale_fac ) );
-
-  cv::resize( intensity_image_tmp, intensity_image, cvSize(depth_image.cols, depth_image.rows) );
-  */
-
-  //orig_depth_image->image
-
-  cv::Mat1f depth_image_closed,depth_image_smoothed;
+  cv::Mat1f depth_image_closed;
   cv::daft2::improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
 
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
@@ -71,7 +60,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.min_px_scale_ = 1;
   //p1.max_px_scale_ = 1000;
 
-  p1.det_type_=p1.DET_DOB;
+  p1.det_type_=p1.DET_BOX;
   p1.affine_=true;
   p1.max_search_algo_ = p1.MAX_FAST;
 
@@ -89,6 +78,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
   //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
+  //
 
   //ROS_INFO_STREAM( keypoints1.size() << " / " << keypoints2.size() << " keypoints detected." );
 
