@@ -54,7 +54,7 @@ inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
 Matx33f inline pointCovariance(const std::vector<Vec3f>& points)
 {
     float xx=0.0f, xy=0.0f, xz=0.0f, yy=0.0f, yz=0.0f, zz=0.0f;
-    for( typename std::vector<Vec3f>::const_iterator it=points.begin(); it!=points.end(); ++it)
+    for( std::vector<Vec3f>::const_iterator it=points.begin(); it!=points.end(); ++it)
     {
         const Vec3f& p = *it;
         float x = p[0];
