@@ -38,7 +38,6 @@ void convolve( const Mat1d &ii,
     const Mat1f &scale_map,
     float base_scale,
     float min_px_scale,
-    float max_px_scale,
     Mat1f &img_out );
 
 /*!
@@ -62,7 +61,6 @@ void convolveAffine( const Mat1d &ii,
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    float max_px_scale,
     Mat1f &img_out,
     Mat2f& depth_grad );
 
@@ -86,19 +84,26 @@ void computeDepthGrad(
 void findMaxima( const Mat1d &img,
      const Mat1d &scale_map,
      double base_scale,
+     double min_px_scale,
+     double max_px_scale,
      double thresh,
      std::vector< KeyPoint3D >& kp );
 
 void findMaximaAffine(
-    const cv::Mat1d &img,  const cv::Mat1d &scale_map,
+    const cv::Mat1d &img,
+    const cv::Mat1d &scale_map,
     const Mat2f &grad_map,
     double base_scale,
+    double min_px_scale,
+    double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp );
 
 void findMaximaMipMap( const Mat1d &img,
     const Mat1d &scale_map,
     double base_scale,
+    double min_px_scale,
+    double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp );
 
@@ -154,7 +159,6 @@ void convolve( const Mat1d &ii,
     const Mat1f &scale_map,
     float base_scale,
     float min_px_scale,
-    float max_px_scale,
     Mat1f &img_out )
 {
   float nan = std::numeric_limits<float>::quiet_NaN();
@@ -165,7 +169,7 @@ void convolve( const Mat1d &ii,
     {
       const float s = getScale(scale_map[y][x], base_scale);
 
-      if ( s < min_px_scale || s > max_px_scale )
+      if ( s < min_px_scale )
       {
         img_out(y,x) = nan;
         continue;
@@ -183,7 +187,6 @@ void convolveAffine( const Mat1d &ii,
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    float max_px_scale,
     Mat1f &img_out,
     Mat2f& depth_grad )
 {
@@ -196,7 +199,7 @@ void convolveAffine( const Mat1d &ii,
     {
       const float sp = getScale(scale_map[y][x], sw);
 
-      if ( isnan( depth_grad[y][x][0] ) || isnan( depth_grad[y][x][1] ) || sp < min_px_scale || sp > max_px_scale )
+      if ( isnan( depth_grad[y][x][0] ) || isnan( depth_grad[y][x][1] ) || sp < min_px_scale )
       {
         img_out(y,x) = nan;
         continue;

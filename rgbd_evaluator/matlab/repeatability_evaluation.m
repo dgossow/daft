@@ -60,7 +60,7 @@ x1 = min(x_vals(1), x_vals(num_img-1));
 x2 = max(x_vals(1), x_vals(num_img-1));
 
 figure(1)
-axis([x1 x2 30 100]);
+axis([x1 x2 0 100]);
 
 figure(2)
 axis([x1 x2 0 750]);

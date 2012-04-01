@@ -92,7 +92,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         cv::Mat depth_image, intensity_image;
 
         // Resize depth to have the same width as rgb
-        cv::resize( depth_image_orig, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_LINEAR );
+        cv::resize( depth_image_orig, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_NEAREST );
         // Crop rgb so it has the same size as depth
         intensity_image = cv::Mat( intensity_image_orig, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
 
@@ -1028,11 +1028,11 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <bagfileName> .." << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << "[-r] <bagfileName> .." << std::endl;
     return -1;
   }
 
-  bool reverse_order = argc > 2 && std::string(argv[2]) == "-r";
+  bool reverse_order = argc > 2 && std::string(argv[1]) == "-r";
   std::cout << "reverse_order " << reverse_order << std::endl;
 
   int start_i = reverse_order ? 2 : 1;

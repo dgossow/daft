@@ -27,8 +27,10 @@ namespace rgbd_evaluator
 const int num_kp = 500;
 int img_count = 0;
 
-ExtractDetectorFile::ExtractDetectorFile(std::string file_path)
+ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
 {
+  verbose_ = verbose;
+
   std::cout << "Starting extract_detector_file..." << std::endl;
 
   splitFileName(file_path);
@@ -47,7 +49,7 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path)
 
   //system( "rm " );
 
-  extra_folder_ = file_created_folder_ + "/extra";
+  extra_folder_ = file_created_folder_ + "/kp_images";
 
   if( system(("mkdir "+ extra_folder_).c_str()) < 0) // -1 on error
   {
@@ -416,11 +418,12 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
   return makeKp3d( kps, descriptors );
 }
 
-std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p, const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
+    const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
   std::vector<cv::KeyPoint3D> kp;
-  p.det_threshold_ *= t;
-  daft_ns::DAFT daft( p );
+  p_det.det_threshold_ *= t;
+  daft_ns::DAFT daft( p_det, p_desc );
   daft.detect( gray_img, depth_img, K, kp );
   return kp;
 }
@@ -504,10 +507,12 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
         if ( t < 0 ) t = 0;
         std::cout << " t_" << its+1 << " = " << t << std::endl;
 
+        /*
         cv::Mat kp_img;
         cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        //cv::imshow("KP", kp_img);
-        //cv::waitKey(200);
+        cv::imshow("KP", kp_img);
+        cv::waitKey(200);
+        */
 
         its++;
         std::cout << std::endl;
@@ -539,8 +544,38 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
       storeKeypoints(kp, s.str(), name, first_kp_img_warped );
     }
 
+    if ( verbose_ )
+    {
+      std::cout << "Press any key to continue." << std::endl;
+      while ( cv::waitKey(100) == -1 );
+    }
   }
 }
+
+void ExtractDetectorFile::extractAllKeypoints()
+{
+  daft_ns::DAFT::DetectorParams det_p;
+  daft_ns::DAFT::DescriptorParams desc_p;
+  //p.max_px_scale_ = 800;
+  det_p.min_px_scale_ = 3;
+  //p.base_scale_ = 0.02;
+  //p.scale_levels_ = 1;
+  det_p.det_threshold_ = 0.0109759;
+  det_p.pf_threshold_ = 5;
+
+  det_p.det_type_=det_p.DET_FELINE;
+  det_p.affine_=true;
+  det_p.max_search_algo_ = det_p.MAX_WINDOW;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT" );
+
+  //det_p.min_px_scale_ = 4;
+  //desc_p.octave_offset_ = -1;
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
+
+  //extractKeypoints( &getSurfKp, "SURF" );
+  //extractKeypoints( &getSiftKp, "SIFT" );
+}
+
 
 void ExtractDetectorFile::printMat( cv::Matx33f M )
 {
@@ -571,44 +606,12 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::K
     }
   }
 
-  //std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
-  //std::cout << std::endl;
+  std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
+  std::cout << std::endl;
   return kp_filtered;
 }
 
-void ExtractDetectorFile::extractAllKeypoints()
-{
-  daft_ns::DAFT::DetectorParams p;
-  p.max_px_scale_ = 800;
-  p.min_px_scale_ = 3;
-  //p.base_scale_ = 0.02;
-  //p.scale_levels_ = 1;
-  p.det_threshold_ = 0.0109759;
-  p.pf_threshold_ = 5;
 
-  p.det_type_=p.DET_BOX;
-  p.affine_=false;
-  p.max_search_algo_ = p.MAX_FAST;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT-Fast" );
-
-  p.det_type_=p.DET_BOX;
-  p.affine_=true;
-  p.max_search_algo_ = p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
-
-  p.det_type_ = p.DET_9X9;
-  p.max_search_algo_ = p.MAX_WINDOW;
-  p.affine_ = false;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT" );
-
-  p.det_type_ = p.DET_9X9;
-  p.max_search_algo_ = p.MAX_WINDOW;
-  p.affine_ = true;
-  //extractKeypoints( boost::bind( &getDaftKp, p, _1,_2,_3,_4 ), "DAFT Affine" );
-
-  //extractKeypoints( &getSurfKp, "SURF" );
-  //extractKeypoints( &getSiftKp, "SIFT" );
-}
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
 {
@@ -690,16 +693,19 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
   cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
 
-  //cv::imshow("kp", kp_img);
-  //cv::waitKey(100);
+  if ( verbose_ )
+  {
+    cv::imshow("kp", kp_img);
+    cv::waitKey(50);
+  }
 
   std::stringstream s;
   s.width(3);
   s.fill('0');
   s << img_count;
 
-  //std::string img_file_name = extra_folder_ + "/" + extension + " " + img_name + ".ppm";
-  std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
+  std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name + ".ppm";
+  //std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
 
   std::cout << "Writing " << img_file_name << std::endl;
 
@@ -738,15 +744,23 @@ int main( int argc, char** argv )
 {
   if(argc < 2)
   {
-    std::cout << "Wrong usage, Enter: " << argv[0] << " <folderName> .." << std::endl;
+    std::cout << "Wrong usage, Enter: " << argv[0] << "[-v] <folderName> .." << std::endl;
     return -1;
   }
+
+  bool verbose = argc > 2 && std::string(argv[1]) == "-v";
+  std::cout << "verbose " << verbose << std::endl;
+
+  int start_i = verbose ? 2 : 1;
+
+  for ( int i=start_i; i<argc; i++ )
+
 
   for ( int i=1; i<argc; i++ )
   {
     rgbd_evaluator::img_count = 0;
     std::string file_name(argv[i]);
-    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name);
+    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name,verbose);
   }
 
   std::cout << "Exiting.." << std::endl;

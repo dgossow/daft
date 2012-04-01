@@ -177,7 +177,7 @@ inline double area(int start_x, int end_x, int start_y, int end_y)
 template<typename T>
 inline bool checkBounds ( const Mat_<T> &ii, int x, int y, int s )
 {
-  return ( (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
+  return ( (s > 0) && (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
 }
 
 // compute 3d point from pixel position, depth and camera intrinsics
@@ -225,12 +225,20 @@ inline float meanDepth(const Mat1d &ii_depth_map,
     const cv::Mat_<uint64_t>& ii_depth_count,
     int x, int y, int sp_int )
 {
-  float nump = float(integrate( ii_depth_count, x-sp_int, y-sp_int, x+sp_int, y+sp_int ));
+  int x_left = x-sp_int;
+  int x_right = x+sp_int;
+  int y_top = y-sp_int;
+  int y_bottom = y+sp_int;
+  if ( x_left < 0 ) x_left = 0;
+  if ( y_top < 0 ) y_top = 0;
+  if ( x_right >= ii_depth_map.cols ) x_right = ii_depth_map.cols-1;
+  if ( y_bottom >= ii_depth_map.rows ) y_bottom = ii_depth_map.rows-1;
+  float nump = float(integrate( ii_depth_count, x_left, y_top, x_right, y_bottom ));
   if ( nump == 0 )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
-  return integrate( ii_depth_map, x-sp_int, y-sp_int, x+sp_int, y+sp_int ) / nump;
+  return integrate( ii_depth_map, x_left, y_top, x_right, y_bottom ) / nump;
 }
 
 /** compute depth gradient

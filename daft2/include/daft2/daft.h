@@ -26,7 +26,7 @@ public:
   {
     enum { DET_BOX=0, DET_9X9=1, DET_FELINE=2 };
     enum { PF_NONE=0, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
-    enum { MAX_WINDOW=0, MAX_FAST=2, MAX_EVAL=3 };
+    enum { MAX_WINDOW=0, MAX_FAST=2 };
 
     enum { AUTO=-1 };
 
@@ -35,8 +35,8 @@ public:
         float base_scale = 1,
         float scale_factor = 2.0,
         int scale_levels = AUTO,
-        int min_px_scale = 3,
-        int max_px_scale = AUTO,
+        float min_px_scale = 3,
+        float max_px_scale = AUTO,
         int detector_type = DET_BOX,
         float det_threshold = 0.02,
         int postfilter_type = PF_PRINC_CURV_RATIO,
@@ -77,8 +77,8 @@ public:
     /** The number of levels in the scale pyramid */
     int scale_levels_;
 
-    int min_px_scale_;
-    int max_px_scale_;
+    float min_px_scale_;
+    float max_px_scale_;
 
     /** Which detector to use */
     int det_type_;
@@ -103,10 +103,18 @@ public:
   struct DescriptorParams
   {
     /** default constructor */
-    DescriptorParams( int octave_offset=0 ) : octave_offset_(octave_offset)
+    DescriptorParams(
+        int patch_size=20,
+        int octave_offset=0 ) :
+          patch_size_(patch_size),
+          octave_offset_(octave_offset)
     {
     }
 
+    /** For the descriptor computation, take patch_size*patch_size samples */
+    int patch_size_;
+
+    /** Sampling for the descriptor is done on the scale level 2^octave_offset_ * keypoint.world_size */
     int octave_offset_;
   };
 

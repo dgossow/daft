@@ -49,9 +49,13 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   int n_octaves = det_params_.scale_levels_;
 
-  int max_px_scale =
-      det_params_.max_px_scale_ == det_params_.AUTO ?
-          std::min(image.rows, image.cols) / 10 : det_params_.max_px_scale_;
+  float max_px_scale = std::min(image.rows, image.cols) / 5 / pow(2.0,desc_params_.octave_offset_);
+  if ( det_params_.max_px_scale_ != det_params_.AUTO )
+  {
+    max_px_scale = std::min( max_px_scale, det_params_.max_px_scale_ );
+  }
+
+  std::cout << "max_px_scale" << max_px_scale << std::endl;
 
   const float f = K(0, 0);
 
@@ -78,6 +82,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
   }
 
+#ifdef SHOW_DEBUG_WIN
+  imshowNorm("ii_depth_map",ii_depth_map,0);
+  //imshowNorm("ii_depth_count",ii_depth_count,0);
+#endif
+
   // Compute scale map from depth map
   Mat1f scale_map(gray_image.rows, gray_image.cols);
   Mat1f::iterator scale_it = scale_map.begin();
@@ -91,8 +100,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     float min_scale_fac = std::numeric_limits<float>::infinity();
     float max_scale_fac = 0;
 
-    for (; scale_it != scale_map_end; ++scale_it, ++depth_it) {
-      if (finite(*depth_it)) {
+    for (; scale_it != scale_map_end; ++scale_it, ++depth_it)
+    {
+      if (finite(*depth_it))
+      {
         float s = f / *depth_it;
         *scale_it = s;
         if (s > max_scale_fac)
@@ -114,8 +125,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         / (max_scale_fac * det_params_.base_scale_);
     double delta_n_max = max_px_scale / (min_scale_fac * det_params_.base_scale_);
 
-    double n_min = std::ceil(log(delta_n_min) / log(det_params_.scale_step_));
-    double n_max = std::floor(log(delta_n_max) / log(det_params_.scale_step_));
+    double n_min = std::ceil(log(delta_n_min) / log(2.0));
+    double n_max = std::floor(log(delta_n_max) / log(2.0));
 
     min_octave = n_min;
     n_octaves = n_max - n_min + 1;
@@ -152,7 +163,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   std::set<int> octaves;
 
   // compute which octaves we need
-  for (int octave = min_octave; octave < n_octaves; octave++)
+  for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
   {
   	octaves.insert(octave);
   	octaves.insert(octave+1);
@@ -172,9 +183,9 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
   {
   	int octave = *it;
-  	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
+  	double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
 
-    //std::cout << "octave " << octave << "scale " << scale << std::endl;
+    std::cout << "octave " << octave << " scale " << scale << std::endl;
 
     smoothed_imgs[octave] = Mat1f();
     smoothed_depth_maps[octave] = Mat1f();
@@ -198,28 +209,25 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     case DetectorParams::DET_BOX:
       if (det_params_.affine_) {
         convolveAffine<boxAffine>(ii, scale_map, depth_map,
-            scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
+            scale, 1, smoothed_img, depth_grad );
       } else {
-        convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,
-            max_px_scale, smoothed_img);
+        convolve<box>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
     case DetectorParams::DET_FELINE:
       if (det_params_.affine_) {
         convolveAffine<felineAffine>(ii, scale_map, smoothed_depth_map,
-            scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
+            scale, 1, smoothed_img, depth_grad );
       } else {
-        convolve<box>(ii, scale_map, scale, det_params_.min_px_scale_,
-            max_px_scale, smoothed_img);
+        convolve<box>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
     case DetectorParams::DET_9X9:
       if (det_params_.affine_) {
           convolveAffine<gaussAffine>(ii, scale_map, smoothed_depth_map,
-              scale, det_params_.min_px_scale_, max_px_scale, smoothed_img, depth_grad );
+              scale, 1, smoothed_img, depth_grad );
       } else {
-        convolve<gauss>(ii, scale_map, scale, det_params_.min_px_scale_,
-            max_px_scale, smoothed_img);
+        convolve<gauss>(ii, scale_map, scale, 1, smoothed_img);
 
         //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
         //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;
@@ -259,12 +267,12 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   response_map.create(gray_image.rows, gray_image.cols);
 
   // compute difference of gaussians and detect extrema
-  for (int octave = min_octave; octave < n_octaves; octave++)
+  for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
   {
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
     //std::cout << "det octave " << octave << " scale " << scale << std::endl;
-    diff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
+  	response_map = smoothed_imgs[octave+1] - smoothed_imgs[octave];
     Mat2f& depth_grad = depth_grads[octave];
 
     // save index where new kps will be inserted
@@ -275,43 +283,27 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     case DetectorParams::MAX_WINDOW:
       if ( det_params_.affine_ ) {
         findMaximaAffine(response_map, scale_map, depth_grad,
-            scale, det_params_.det_threshold_, kp);
+            scale, det_params_.min_px_scale_, max_px_scale,
+            det_params_.det_threshold_, kp);
       }
       else {
-        findMaxima(response_map, scale_map, scale, det_params_.det_threshold_, kp);
+        findMaxima(response_map, scale_map, scale,
+            det_params_.min_px_scale_, max_px_scale,
+            det_params_.det_threshold_, kp);
       }
       break;
     case DetectorParams::MAX_FAST:
-      findMaximaMipMap(response_map, scale_map, scale, det_params_.det_threshold_,
-          kp);
-      break;
-    case DetectorParams::MAX_EVAL: {
-      boost::timer timer;
-      timer.restart();
-      for (int i = 0; i < 100; i++) {
-        kp.clear();
-        kp.reserve(50000);
-        findMaximaMipMap(response_map, scale_map, scale, det_params_.det_threshold_,
-            kp);
-      }
-      std::cout << "findMaximaMipMap execution time [ms]: "
-          << timer.elapsed() * 10 << std::endl;
-      timer.restart();
-      for (int i = 0; i < 100; i++) {
-        kp.clear();
-        kp.reserve(50000);
-        findMaxima(response_map, scale_map, scale, det_params_.det_threshold_, kp);
-      }
-      std::cout << "findMaxima execution time [ms]: " << timer.elapsed() * 10
-          << std::endl;
-    }
+      findMaximaMipMap(response_map, scale_map, scale,
+          det_params_.min_px_scale_, max_px_scale,
+          det_params_.det_threshold_, kp);
       break;
     default:
       std::cout << "error: invalid max search type: " << det_params_.max_search_algo_ << std::endl;
       return;
     }
 
-    //std::cout << kp.size()-kp_first << " keypoints found." << std::endl;
+    std::cout << "octave " << octave << " scale " << scale << ": ";
+    std::cout << kp.size()-kp_first << " keypoints found." << std::endl;
 
     // assign octave
     for ( unsigned k=kp_first; k<kp.size(); k++ )
@@ -345,7 +337,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         }
       }
 
-//      cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
       std::ostringstream s;
       s << "frame # " << i;
@@ -366,6 +358,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
 #endif
   }
+
+  std::cout << kp.size() << " keypoints found in first stage." << std::endl;
 
   // filter found maxima by applying a threshold on a second kernel
   switch (det_params_.pf_type_) {
@@ -394,6 +388,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     return;
   }
 
+  std::cout << kp.size() << " keypoints left after post-filter." << std::endl;
+
   // assign 3d points, normals and local affine params
   float f_inv = 1.0 / f;
   float cx = K(0, 2);
@@ -402,7 +398,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   kp2.reserve(kp.size());
 
   // correct keypoint size according to given octave offset
-  float scale_fac = std::pow( det_params_.scale_step_, float(desc_params_.octave_offset_) );
+  float scale_fac = pow( 2.0, float(desc_params_.octave_offset_) );
 
   for (unsigned k = 0; k < kp.size(); k++) {
 
@@ -429,15 +425,16 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-#ifndef FIND_MAXKP
-      if ( getDesc<20>( smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
-#endif
+      if ( getDesc( desc_params_.patch_size_, smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
       {
         kp2.push_back(kp[k]);
       }
     }
   }
   kp.swap(kp2);
+
+  std::cout << kp.size() << " keypoints left after descriptor computation." << std::endl;
+
 
 #ifdef FIND_MAXKP
   cv::Mat1f patch1, patch2;
@@ -474,7 +471,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
     Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
 
-    getDesc<20>( smoothed_img, smoothed_img2, kp[k], smoothed_depth_map, K );
+    getDesc( desc_params_.patch_size_, smoothed_img, smoothed_img2, kp[k], smoothed_depth_map, K, true );
   }
 
   imshow( "rgb", display_image );

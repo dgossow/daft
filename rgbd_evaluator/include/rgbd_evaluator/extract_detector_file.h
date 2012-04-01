@@ -32,7 +32,7 @@ namespace rgbd_evaluator
 class ExtractDetectorFile
 {
 public:
-  ExtractDetectorFile(std::string file_path);
+  ExtractDetectorFile(std::string file_path,bool verbose);
   virtual ~ExtractDetectorFile();
 
 private:
@@ -68,6 +68,8 @@ private:
   std::string file_folder_;
   std::string file_created_folder_;
   std::string extra_folder_;
+
+  bool verbose_;
 
   struct ImageData
   {

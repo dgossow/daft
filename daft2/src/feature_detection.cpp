@@ -18,18 +18,6 @@ namespace daft2
 {
 
 
-void diff( const cv::Mat1f& l1, const cv::Mat1f& l2, cv::Mat1f& out )
-{
-  static const float center_factor = 1.0f;
-  for ( int y = 0; y < l1.rows; y++ )
-  {
-    for ( int x = 0; x < l1.cols; ++x )
-    {
-      out[y][x] = std::abs(l2[y][x] - center_factor*l1[y][x]);
-    }
-  }
-}
-
 void computeDepthGrad(
 		const Mat1f &scale_map,
     const Mat1f &depth_map,
@@ -68,6 +56,8 @@ void computeDepthGrad(
 void findMaxima( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
+    double min_px_scale,
+    double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
@@ -83,7 +73,7 @@ void findMaxima( const cv::Mat1d &img,
 
       double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
 
-      if ( x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
+      if ( s < min_px_scale || s > max_px_scale || x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
       {
         continue;
       }
@@ -139,6 +129,8 @@ void findMaximaAffine(
     const cv::Mat1d &img,  const cv::Mat1d &scale_map,
     const Mat2f &grad_map,
     double base_scale,
+    double min_px_scale,
+    double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
@@ -156,7 +148,7 @@ void findMaximaAffine(
 
       double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
 
-      if ( x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
+      if ( s < min_px_scale || s > max_px_scale || x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
       {
         continue;
       }
@@ -178,7 +170,7 @@ void findMaximaAffine(
       Point3f normal;
       bool ok = getAffine(grad_map[y][x], x, y, s, base_scale,angle, major, minor, normal);
       // break if gradient can not be computed
-      if(!ok) {
+      if(!ok || minor < min_px_scale ) {
         continue;
       }
 
@@ -330,6 +322,8 @@ inline bool isLocalMax( float cv, const T& max_map,
 void findMaximaMipMap( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
+    double min_px_scale,
+    double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
@@ -415,7 +409,7 @@ void findMaximaMipMap( const cv::Mat1d &img,
           // check for local maximum
           double s = (reinterpret_cast<double*>(scale_map.data))[next_max_map[i_next].idx] * base_scale;
 
-          if ( s <= s_thresh )
+          if ( s <= s_thresh && s > min_px_scale && s < max_px_scale )
           {
 #ifdef DGB_F
             int old_window = s*0.5; //(s+0.5) / 2.0 - 0.5;
