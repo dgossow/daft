@@ -17,27 +17,16 @@ int main(int argc, char **argv)
   ros::NodeHandle comm_nh(""); // for topics, services
   ros::NodeHandle param_nh("~");
 
-  RecordBagfile recordData(comm_nh, param_nh);
-
-  Rate spin_rate(1);
-
-  while (ros::ok())
+  if ( argc < 2 )
   {
-    if ( !recordData.isSubscribed() )
-    {
-      ROS_INFO( "Press enter to record an image or 'q'+enter to quit." );
-      if ( getchar() == 'q' )
-      {
-        ros::shutdown();
-      }
-      else
-      {
-        recordData.subscribe();
-      }
-    }
-
-    spinOnce();
+    std::cout << "Usage: " << argv[0] << " <bagfile_name.bag>" << std::endl;
+    return -1;
   }
+
+  RecordBagfile recordData(argv[1],comm_nh, param_nh);
+  recordData.subscribe();
+
+  ros::spin();
 
   std::cout << "Exiting..." << std::endl;
 }

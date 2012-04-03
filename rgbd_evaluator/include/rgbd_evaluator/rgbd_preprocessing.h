@@ -38,7 +38,7 @@ class RgbdEvaluatorPreprocessing
 {
 public:
 
-  RgbdEvaluatorPreprocessing(std::string, bool reverse_order);
+  RgbdEvaluatorPreprocessing(std::string, bool reverse_order, int start_img);
   virtual ~RgbdEvaluatorPreprocessing();
 
   void createTestFiles();
@@ -61,7 +61,7 @@ private:
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
   cv::Matx33f calculateInitialHomography( cv::Mat& img1, cv::Mat& img2 );
 
-  int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC);
+  int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC, int i);
 
   void printMat(cv::Matx33f M);
 
@@ -88,6 +88,7 @@ private:
   std::string file_created_folder_;
 
   bool reverse_order_;
+  int start_img_;
 
   rosbag::Bag bag_;
 
@@ -100,7 +101,7 @@ private:
   static const uint32_t MIN_CORRESPONDENCES = 4;
   static const uint32_t MIN_FEATURE_NEIGHBOUR_DIST = 10;
   static const uint32_t MAX_FEATURE_NUMBER = 200;
-  static const uint32_t SLIDING_WINDOW_SIZE = 30;
+  static const uint32_t SLIDING_WINDOW_SIZE = 40;
   static const uint32_t SEARCH_WINDOW_SIZE = SLIDING_WINDOW_SIZE+20;
 
   static const float_t  NCC_MAX_VAL = 0.98;

@@ -37,7 +37,7 @@ const int SIFT::Scales = 3;
 
 const float SIFT::InitSigma = 1.6;
 
-const int SIFT::BorderDist = 5;
+const int SIFT::BorderDist = 20;
 
 float SIFT::PeakThreshInit = 0.01;
 

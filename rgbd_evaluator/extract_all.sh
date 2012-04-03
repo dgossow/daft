@@ -1,5 +1,9 @@
 #!/bin/bash
 
+bin/extract_detector /work/gossow/bags/frosties/*.bag
+
+bin/extract_detector /work/gossow/bags/granada/*.bag
+
 bin/extract_detector /work/gossow/bags/tum_poster/viewpoint.bag
 bin/extract_detector /work/gossow/bags/tum_poster/rotate.bag
 bin/extract_detector /work/gossow/bags/tum_poster/scale.bag

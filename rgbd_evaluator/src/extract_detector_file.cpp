@@ -24,7 +24,7 @@
 namespace rgbd_evaluator
 {
 
-const int num_kp = 500;
+const int num_kp = 250;
 int img_count = 0;
 
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
@@ -71,7 +71,6 @@ ExtractDetectorFile::~ExtractDetectorFile()
 void ExtractDetectorFile::readDataFiles()
 {
   uint32_t i = 0;
-  uint32_t numberOfImages = 12;
 
   std::string path;
   path.append(file_created_folder_);
@@ -88,7 +87,7 @@ void ExtractDetectorFile::readDataFiles()
   std::string maskImagePath;
   maskImagePath.append(file_created_folder_);
   maskImagePath.append("/");
-  maskImagePath.append("maskImage.ppm");
+  maskImagePath.append("mask.pgm");
 
   // read mask image
   if ( !fileExists( maskImagePath ) )
@@ -115,7 +114,7 @@ void ExtractDetectorFile::readDataFiles()
   image_depth_name.append( "depth" );
 
   // read rgb and depth images
-  for( i = 0; i < numberOfImages; i++ )
+  for( i = 0; i < 1000; i++ )
   {
     std::cout << "Processing image: " << i+1 << std::endl;
 
@@ -130,7 +129,7 @@ void ExtractDetectorFile::readDataFiles()
     std::string tmp_depth_name;
     tmp_depth_name.append( image_depth_name );
     tmp_depth_name.append( ss.str() );
-    tmp_depth_name.append( ".pgm" );
+    tmp_depth_name.append( ".ppm" );
 
     if( !fileExists( tmp_rgb_name ) )
     {
@@ -421,11 +420,22 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
 std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
     const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
-  std::vector<cv::KeyPoint3D> kp;
   p_det.det_threshold_ *= t;
-  daft_ns::DAFT daft( p_det, p_desc );
-  daft.detect( gray_img, depth_img, K, kp );
-  return kp;
+
+  std::vector<cv::KeyPoint3D> kp1;
+  daft_ns::DAFT daft1( p_det, p_desc );
+  daft1.detect( gray_img, depth_img, K, kp1 );
+
+  p_det.base_scale_ *= sqrt(2);
+
+  std::vector<cv::KeyPoint3D> kp2;
+  daft_ns::DAFT daft2( p_det, p_desc );
+  daft2.detect( gray_img, depth_img, K, kp2 );
+
+  std::vector<cv::KeyPoint3D> kp;
+  std::copy( kp1.begin(), kp1.end(), std::back_inserter(kp2) );
+
+  return kp2;
 }
 
 void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
@@ -504,6 +514,13 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
           last_t = t;
           t = t_next;
         }
+
+        if ( isnan(t) )
+        {
+          std::cout << "ERROR: cannot find enough keypoints!" << std::endl;
+          exit(-1);
+        }
+
         if ( t < 0 ) t = 0;
         std::cout << " t_" << its+1 << " = " << t << std::endl;
 
@@ -557,9 +574,9 @@ void ExtractDetectorFile::extractAllKeypoints()
   daft_ns::DAFT::DetectorParams det_p;
   daft_ns::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  det_p.min_px_scale_ = 3;
-  //p.base_scale_ = 0.02;
-  //p.scale_levels_ = 1;
+  det_p.min_px_scale_ = 2.5;
+  //det_p.base_scale_ = 0.125;
+  //det_p.scale_levels_ = 1;
   det_p.det_threshold_ = 0.0109759;
   det_p.pf_threshold_ = 5;
 
@@ -568,12 +585,15 @@ void ExtractDetectorFile::extractAllKeypoints()
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT" );
 
+  det_p.det_type_=det_p.DET_BOX;
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
+
   //det_p.min_px_scale_ = 4;
   //desc_p.octave_offset_ = -1;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
-  //extractKeypoints( &getSurfKp, "SURF" );
-  //extractKeypoints( &getSiftKp, "SIFT" );
+  extractKeypoints( &getSurfKp, "SURF" );
+  extractKeypoints( &getSiftKp, "SIFT" );
 }
 
 
@@ -600,7 +620,7 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::K
   {
     //std::cout << int(maskImage_( kp.at(i).pt.y, kp.at(i).pt.x )) << " ";
     // check for black spots in maskimage
-    if( maskImage_.at<cv::Vec3b>(int(kp[i].pt.y),int(kp[i].pt.x))[0] < 128 )
+    if( maskImage_.at<cv::Vec3b>(int(kp[i].pt.y),int(kp[i].pt.x))[0] > 128 )
     {
       kp_filtered.push_back(kp[i]);
     }
@@ -617,7 +637,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
 {
   if ( keypoints.size() == 0 )
   {
-    throw;
+    return;
   }
   std::vector< cv::KeyPoint3D >::iterator it;
   double_t ax, bx, ay, by, a_length, b_length, alpha_a, alpha_b;

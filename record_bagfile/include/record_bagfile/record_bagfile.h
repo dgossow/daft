@@ -21,7 +21,7 @@ using namespace sensor_msgs;
 class RecordBagfile {
 
 public:
-    RecordBagfile(ros::NodeHandle comm_nh, ros::NodeHandle param_nh);
+    RecordBagfile(std::string bagfile_name, ros::NodeHandle comm_nh, ros::NodeHandle param_nh);
 
     ~RecordBagfile();
 

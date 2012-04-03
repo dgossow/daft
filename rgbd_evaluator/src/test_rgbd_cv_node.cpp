@@ -165,8 +165,8 @@ int main( int argc, char** argv )
 
   ros::NodeHandle comm_nh(""); // for topics, services
 
-  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "/camera/rgb/image_rect", 1);
-  message_filters::Subscriber<sensor_msgs::Image> depth_img_sub(comm_nh, "/camera/depth_registered/image_rect", 1);
+  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "/camera/rgb/image", 1);
+  message_filters::Subscriber<sensor_msgs::Image> depth_img_sub(comm_nh, "/camera/depth_registered/image", 1);
   message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub(comm_nh, "/camera/rgb/camera_info", 1);
 
   message_filters::Synchronizer<RgbdSyncPolicy> rgbd_sync(

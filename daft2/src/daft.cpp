@@ -83,7 +83,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
 
 #ifdef SHOW_DEBUG_WIN
-  imshowNorm("ii_depth_map",ii_depth_map,0);
+  //imshowNorm("ii_depth_map",ii_depth_map,0);
   //imshowNorm("ii_depth_count",ii_depth_count,0);
 #endif
 
@@ -111,7 +111,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         if (s < min_scale_fac)
           min_scale_fac = s;
       } else {
-        *scale_it = -1.0f;
+        *scale_it = std::numeric_limits<float>::quiet_NaN();//-1.0f;
       }
     }
 
@@ -134,11 +134,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   else
   {
     for (; scale_it != scale_map_end; ++scale_it, ++depth_it) {
-      if (isnan(*depth_it)) {
-        *scale_it = -1.0f;
-      } else {
+      //if (isnan(*depth_it)) {
+        //*scale_it = -1.0f;
+      //} else {
         *scale_it = f / *depth_it;
-      }
+      //}
     }
   }
 
@@ -156,8 +156,10 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
 #endif
 
-  //imshow( "img", gray_image );
-  //imshowNorm( "depth", depth_map, 0 );
+#ifdef SHOW_DEBUG_WIN
+  imshow( "img", gray_image );
+  imshowNorm( "depth", depth_map, 0 );
+#endif
 
   // all octaves that we need to compute
   std::set<int> octaves;
@@ -200,8 +202,15 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     computeDepthGrad( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, depth_grad );
 
 #ifdef SHOW_DEBUG_WIN
-    std::stringstream s; s<<"smooth_depth s="<<scale;
-    imshowNorm( s.str(), smoothed_depth_map, 0 );
+    {
+    std::stringstream s; s<<" s="<<scale;
+
+    imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
+    std::vector<cv::Mat> depth_grads;
+    cv::split(depth_grad,depth_grads);
+    imshowNorm( "depth grad.x" + s.str(), depth_grads[0], 0 );
+    imshowNorm( "depth grad.y" + s.str(), depth_grads[0], 0 );
+    }
 #endif
 
     // compute filter response for all pixels
@@ -324,7 +333,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
 
-        Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
+        //Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
         Vec2f depth_grad = depth_grads[kp[k].octave](kp_y,kp_x);
 
         if ( getAffine( depth_grad, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,

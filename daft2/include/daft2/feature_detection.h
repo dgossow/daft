@@ -149,11 +149,6 @@ inline float interpolateKernel( const Mat1d &ii,
   return (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
 }
 
-inline float getScale( float fac, float base_scale )
-{
-  return fac*base_scale;
-}
-
 template <float (*F)(const Mat1d&, int, int, float)>
 void convolve( const Mat1d &ii,
     const Mat1f &scale_map,

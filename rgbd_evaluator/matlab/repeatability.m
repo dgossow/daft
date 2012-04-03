@@ -1,4 +1,4 @@
-function [erro,repeat,corresp, match_score,matches, twi]=myrepeatability(file1,file2,Hom,imf1,imf2, common_part)
+function [erro,repeat,corresp, match_score,matches, twi]=myrepeatability(file1,file2,Hom,imf1,imf2,maskf,common_part)
 %
 %
 %Computes repeatability and overlap score between two lists of features
@@ -37,6 +37,7 @@ function [erro,repeat,corresp, match_score,matches, twi]=myrepeatability(file1,f
 
 
 fprintf(1,'Reading and sorting the regions...\n');
+
 
 [f1 s1 dimdesc1]=loadFeatures(file1);
 [f2 s2 dimdesc2]=loadFeatures(file2);
@@ -82,8 +83,8 @@ fprintf(1,'Projecting 1 to 2...');
 fprintf(1,'and 2 to 1...\n');
 [feat2 feat2t scales2]=project_regions(feat2',H);
 
-fprintf(1,'size_x %f %f\n',feat1(1,8), feat1t(1,8));
-fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
+%fprintf(1,'size_x %f %f\n',feat1(1,8), feat1t(1,8));
+%fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
 
 %find((feat1t(:,6)<4))
 
@@ -94,8 +95,9 @@ fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if common_part==1
 fprintf(1,'Removing features from outside of the common image part...\n');
-im1=imread(imf1);
+mask=imread(maskf);
 im2=imread(imf2);
+im1=imread(imf1);
 im1x=size(im1);
 im1y=im1x(1);
 im1x=im1x(2);
@@ -104,22 +106,33 @@ im2y=im2x(1);
 im2x=im2x(2);
 
 ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
-%ind=find( (feat2t(:,7)>12) & (feat2t(:,7)>12) & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
-
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
+
 ind=find((feat1t(:,1)+feat1t(:,8))<im2x & (feat1t(:,1)-feat1t(:,8))>0 & (feat1t(:,2)+feat1t(:,9))<im2y & (feat1t(:,2)-feat1t(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
-scales1=scales1(ind);
+
+ind=find_unmasked_regions( feat1, im1, mask );
+feat1=feat1(ind,:);
+feat1t=feat1t(ind,:);
+
+%scales1=scales1(ind);
 
 ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);
+
 ind=find((feat2t(:,1)+feat2t(:,8))<im1x & (feat2t(:,1)-feat2t(:,8))>0 & (feat2t(:,2)+feat2t(:,9))<im1y & (feat2t(:,2)-feat2t(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);
-scales2=scales2(ind);
+
+ind=find_unmasked_regions( feat2t, im1, mask );
+feat2=feat2(ind,:);
+feat2t=feat2t(ind,:);
+
+
+%scales2=scales2(ind);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf(1,'nb of regions in common part in image1 %d.\n',size(feat1,1));

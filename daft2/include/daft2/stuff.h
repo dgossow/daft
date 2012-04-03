@@ -14,6 +14,8 @@ namespace cv
 namespace daft2
 {
 
+const float nan = std::numeric_limits<float>::quiet_NaN();
+
 /*
 inline void imshow( std::string win_title, cv::Mat img )
 {
@@ -180,6 +182,11 @@ inline bool checkBounds ( const Mat_<T> &ii, int x, int y, int s )
   return ( (s > 0) && (x > s) && (x + s < ii.cols) && (y > s) && (y + s < ii.rows) );
 }
 
+inline float getScale( float fac, float base_scale )
+{
+  return fac*base_scale;
+}
+
 // compute 3d point from pixel position, depth and camera intrinsics
 // @param f_inv: 1/f
 // @param cx,cy optical center
@@ -251,13 +258,12 @@ inline bool computeGradient(
 
   if ( !checkBounds( depth_map, x, y, sp_int ) )
   {
-    grad[0] = std::numeric_limits<float>::quiet_NaN();
-    grad[1] = std::numeric_limits<float>::quiet_NaN();
+    grad[0] = grad[1] = nan;
     return false;
   }
 
   // get depth values from image
-  float d_center = depth_map(y,x);// meanDepth( ii_depth_map, ii_depth_count, x, y, sp_int);
+  float d_center = depth_map(y,x);
   float d_xp = depth_map(y,x+sp_int);
   float d_yp = depth_map(y+sp_int,x);
   float d_xn = depth_map(y,x-sp_int);
@@ -265,17 +271,19 @@ inline bool computeGradient(
 
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
+    grad[0] = grad[1] = nan;
     return false;
   }
 
   float dxx = d_xp - 2*d_center + d_xn;
   float dyy = d_yp - 2*d_center + d_yn;
 
-  const float MaxCurvature = 4.0f;
+  const float MaxCurvature = 1.0f;
   // test for local planarity
   // TODO note: this does not check for the case of a saddle
   if ( std::abs(dxx + dyy) > MaxCurvature )
   {
+    grad[0] = grad[1] = nan;
     return false;
   }
 
