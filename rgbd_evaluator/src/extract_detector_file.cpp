@@ -223,14 +223,15 @@ bool ExtractDetectorFile::readDepth(const std::string & fileName,
   int maxval;
   infile >> maxval;
 
-  //std::cout << "depth_cols: " << depth_cols << "   depth_rows: " << depth_rows << "   maxval: " << maxval << std::endl;
-
   depth_img = cv::Mat1f(depth_rows, depth_cols);
 
-  for (uint32_t y = 0; y < depth_rows; y++) {
-    for (uint32_t x = 0; x < depth_cols; x++) {
+  for( uint32_t y = 0; y < depth_rows; y++ )
+  {
+    for ( uint32_t x = 0; x < depth_cols; x++ )
+    {
       int n;
-      if (infile.eof()) {
+      if ( infile.eof() )
+      {
         std::cout << "ERROR: end-of-file reached too early!" << std::endl;
         exit(-1);
       }

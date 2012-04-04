@@ -61,6 +61,8 @@ private:
   cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
   cv::Matx33f calculateInitialHomography( cv::Mat& img1, cv::Mat& img2 );
 
+  bool checkBoarderKP( cv::Mat image, float_t x_pos, float_t y_pos );
+
   int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC, int i);
 
   void printMat(cv::Matx33f M);
@@ -77,7 +79,11 @@ private:
 
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
 
-  tf::StampedTransform calculateCoordinatesystem(cv::Mat& depth_img, std::vector<cv::Point2f> mouseKeypoints);
+  tf::StampedTransform calculateCoordinatesystem( cv::Mat& depth_img, std::vector<cv::Point2f> mouseKeypoints );
+
+  static std::string int2str( uint32_t i );
+
+  static void insertKeypoints( cv::Point2f keypoint, std::vector<cv::Point2f>& vec );
 
   static void imgMouseCallbackKP( int event, int x, int y, int flags, void* param );
   static void imgMouseCallbackROI( int event, int x, int y, int flags, void* param );
@@ -105,6 +111,8 @@ private:
   static const uint32_t MAX_FEATURE_NUMBER = 200;
   static const uint32_t SLIDING_WINDOW_SIZE = 40;
   static const uint32_t SEARCH_WINDOW_SIZE = SLIDING_WINDOW_SIZE+20;
+  static const uint32_t KP_NEIGHBOURHOOD_WINDOW = 35;
+  static const uint32_t KP_TEXT_PIXEL_OFFSET = 10;
 
   static const float_t  NCC_MAX_VAL = 0.98;
 
