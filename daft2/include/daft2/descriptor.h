@@ -343,7 +343,7 @@ inline bool getDesc( int patch_size, Mat1f& smoothed_img, Mat1f& smoothed_img2, 
 
   if ( coverage < 0.5 )
   {
-    std::cout << "descriptor coverage: " << coverage << std::endl;
+    //std::cout << "descriptor coverage: " << coverage << std::endl;
     return false;
   }
 

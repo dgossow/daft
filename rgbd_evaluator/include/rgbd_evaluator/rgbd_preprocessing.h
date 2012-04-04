@@ -82,6 +82,8 @@ private:
   static void imgMouseCallbackKP( int event, int x, int y, int flags, void* param );
   static void imgMouseCallbackROI( int event, int x, int y, int flags, void* param );
 
+  float getAspect( std::vector< cv::Point2f > pts );
+
   std::string file_path_;
   std::string file_name_;
   std::string file_folder_;

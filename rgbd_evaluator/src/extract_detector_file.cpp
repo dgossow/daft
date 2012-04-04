@@ -21,15 +21,12 @@
 
 #define daft_ns cv::daft2
 
-namespace rgbd_evaluator
-{
+namespace rgbd_evaluator {
 
-const int num_kp = 250;
-int img_count = 0;
-
-ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
-{
+ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool verbose,
+    int num_kp) {
   verbose_ = verbose;
+  target_num_kp_ = num_kp;
 
   std::cout << "Starting extract_detector_file..." << std::endl;
 
@@ -40,10 +37,10 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
   makeFolder.append("mkdir ");
   makeFolder.append(file_created_folder_);
 
-  if( system(makeFolder.c_str()) < 0) // -1 on error
-  {
-    std::cout << "Error when executing: " << makeFolder  << std::endl;
-    std::cout << "--> check user permissions"  << std::endl;
+  if (system(makeFolder.c_str()) < 0) // -1 on error
+      {
+    std::cout << "Error when executing: " << makeFolder << std::endl;
+    std::cout << "--> check user permissions" << std::endl;
     return;
   }
 
@@ -51,10 +48,11 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
 
   extra_folder_ = file_created_folder_ + "/kp_images";
 
-  if( system(("mkdir "+ extra_folder_).c_str()) < 0) // -1 on error
-  {
-    std::cout << "Error when executing: " << "mkdir "+ extra_folder_  << std::endl;
-    std::cout << "--> check user permissions"  << std::endl;
+  if (system(("mkdir " + extra_folder_).c_str()) < 0) // -1 on error
+      {
+    std::cout << "Error when executing: " << "mkdir " + extra_folder_
+        << std::endl;
+    std::cout << "--> check user permissions" << std::endl;
     return;
   }
 
@@ -62,14 +60,12 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path,bool verbose)
   extractAllKeypoints();
 }
 
-ExtractDetectorFile::~ExtractDetectorFile()
-{
+ExtractDetectorFile::~ExtractDetectorFile() {
   std::cout << "Stopping extract_detector_file..." << std::endl;
   cv::destroyAllWindows();
 }
 
-void ExtractDetectorFile::readDataFiles()
-{
+void ExtractDetectorFile::readDataFiles() {
   uint32_t i = 0;
 
   std::string path;
@@ -78,8 +74,7 @@ void ExtractDetectorFile::readDataFiles()
   path.append("K_");
 
   // read intrinsic matrix K once
-  if( !readMatrix( path, K_ ) )
-  {
+  if (!readMatrix(path, K_)) {
     std::cout << path << " not found - aborting..." << std::endl;
     return;
   }
@@ -90,8 +85,7 @@ void ExtractDetectorFile::readDataFiles()
   maskImagePath.append("mask.pgm");
 
   // read mask image
-  if ( !fileExists( maskImagePath ) )
-  {
+  if (!fileExists(maskImagePath)) {
     std::cout << maskImagePath << " not found - aborting..." << std::endl;
     return;
   }
@@ -104,41 +98,38 @@ void ExtractDetectorFile::readDataFiles()
 
   // create image paths
   std::string image_rgb_name;
-  image_rgb_name.append( file_created_folder_ );
-  image_rgb_name.append( "/" );
-  image_rgb_name.append( "img" );
+  image_rgb_name.append(file_created_folder_);
+  image_rgb_name.append("/");
+  image_rgb_name.append("img");
 
   std::string image_depth_name;
-  image_depth_name.append( file_created_folder_ );
-  image_depth_name.append( "/" );
-  image_depth_name.append( "depth" );
+  image_depth_name.append(file_created_folder_);
+  image_depth_name.append("/");
+  image_depth_name.append("depth");
 
   // read rgb and depth images
-  for( i = 0; i < 1000; i++ )
-  {
-    std::cout << "Processing image: " << i+1 << std::endl;
+  for (i = 0; i < 1000; i++) {
+    std::cout << "Processing image: " << i + 1 << std::endl;
 
     std::stringstream ss;
-    ss << i+1;
+    ss << i + 1;
 
     std::string tmp_rgb_name;
-    tmp_rgb_name.append( image_rgb_name );
-    tmp_rgb_name.append( ss.str() );
-    tmp_rgb_name.append( ".ppm" );
+    tmp_rgb_name.append(image_rgb_name);
+    tmp_rgb_name.append(ss.str());
+    tmp_rgb_name.append(".ppm");
 
     std::string tmp_depth_name;
-    tmp_depth_name.append( image_depth_name );
-    tmp_depth_name.append( ss.str() );
-    tmp_depth_name.append( ".ppm" );
+    tmp_depth_name.append(image_depth_name);
+    tmp_depth_name.append(ss.str());
+    tmp_depth_name.append(".pgm");
 
-    if( !fileExists( tmp_rgb_name ) )
-    {
+    if (!fileExists(tmp_rgb_name)) {
       std::cout << tmp_rgb_name << " not found! - aborting..." << std::endl;
       return;
     }
 
-    if( !fileExists( tmp_depth_name ) )
-    {
+    if (!fileExists(tmp_depth_name)) {
       std::cout << tmp_depth_name << " not found! - aborting..." << std::endl;
       return;
     }
@@ -146,12 +137,10 @@ void ExtractDetectorFile::readDataFiles()
     ImageData img_data;
 
     // read homography
-    if ( i==0 )
-    {
+    if (i == 0) {
       img_data.hom = cv::Matx33f::eye();
-    }
-    else if( !readMatrix( file_created_folder_+"/H1to"+ss.str()+"p", img_data.hom ) )
-    {
+    } else if (!readMatrix(file_created_folder_ + "/H1to" + ss.str() + "p",
+        img_data.hom)) {
       std::cout << path << " not found - aborting..." << std::endl;
       return;
     }
@@ -166,49 +155,45 @@ void ExtractDetectorFile::readDataFiles()
 
     img_data.depth_image = depth_image;
 
-    image_store_.push_back( img_data );
+    image_store_.push_back(img_data);
   }
 }
 
-bool ExtractDetectorFile::fileExists( const std::string & fileName )
-{
+bool ExtractDetectorFile::fileExists(const std::string & fileName) {
   std::ifstream fileTest(fileName.c_str());
 
-  if(!fileTest) return false;
+  if (!fileTest)
+    return false;
 
   fileTest.close();
   return true;
 }
 
-bool ExtractDetectorFile::readMatrix( const std::string & fileName, cv::Matx33f& K )
-{
+bool ExtractDetectorFile::readMatrix(const std::string & fileName,
+    cv::Matx33f& K) {
   static const uint32_t MATRIX_DIM = 3;
 
   // check if file exists
-  if( !fileExists( fileName ) )
-  {
+  if (!fileExists(fileName)) {
     std::cout << "ERROR: " << fileName << " not found!" << std::endl;
     return false;
   }
 
   // start reading data
-  std::ifstream infile( fileName.c_str() );
+  std::ifstream infile(fileName.c_str());
 
-  K = cv::Matx33f( MATRIX_DIM, MATRIX_DIM );
+  K = cv::Matx33f(MATRIX_DIM, MATRIX_DIM);
 
-  for( uint32_t y = 0; y < MATRIX_DIM; y++ )
-  {
-    for ( uint32_t x=0; x < MATRIX_DIM; x++ )
-    {
-      if (infile.eof())
-      {
+  for (uint32_t y = 0; y < MATRIX_DIM; y++) {
+    for (uint32_t x = 0; x < MATRIX_DIM; x++) {
+      if (infile.eof()) {
         std::cout << "ERROR: end-of-file reached too early!" << std::endl;
         exit(-1);
       }
       float n;
       infile >> n;
       // write values to matrix
-      K( y, x ) = n;
+      K(y, x) = n;
     }
   }
 
@@ -216,19 +201,19 @@ bool ExtractDetectorFile::readMatrix( const std::string & fileName, cv::Matx33f&
   return true;
 }
 
-bool ExtractDetectorFile::readDepth( const std::string & fileName, cv::Mat1f& depth_img )
-{
+bool ExtractDetectorFile::readDepth(const std::string & fileName,
+    cv::Mat1f& depth_img) {
   uint32_t depth_rows = 0, depth_cols = 0;
 
   std::string input_string;
   std::ifstream infile;
 
-  infile.open( fileName.c_str() );
+  infile.open(fileName.c_str());
   getline(infile, input_string); // Header1
 
-  if( input_string != "P2" )
-  {
-    std::cout << fileName << ": Wrong image Header ( " << input_string << " ) ..." << std::endl;
+  if (input_string != "P2") {
+    std::cout << fileName << ": Wrong image Header ( " << input_string
+        << " ) ..." << std::endl;
     return false;
   }
 
@@ -242,24 +227,18 @@ bool ExtractDetectorFile::readDepth( const std::string & fileName, cv::Mat1f& de
 
   depth_img = cv::Mat1f(depth_rows, depth_cols);
 
-  for( uint32_t y = 0; y < depth_rows; y++ )
-  {
-    for ( uint32_t x=0; x<depth_cols; x++ )
-    {
+  for (uint32_t y = 0; y < depth_rows; y++) {
+    for (uint32_t x = 0; x < depth_cols; x++) {
       int n;
-      if (infile.eof())
-      {
+      if (infile.eof()) {
         std::cout << "ERROR: end-of-file reached too early!" << std::endl;
         exit(-1);
       }
       infile >> n;
-      if ( n == 0 )
-      {
-        depth_img( y, x ) = std::numeric_limits<float>::quiet_NaN();
-      }
-      else
-      {
-        depth_img( y, x ) = float(n) * 0.001;
+      if (n == 0) {
+        depth_img(y, x) = std::numeric_limits<float>::quiet_NaN();
+      } else {
+        depth_img(y, x) = float(n) * 0.001;
       }
     }
   }
@@ -269,29 +248,25 @@ bool ExtractDetectorFile::readDepth( const std::string & fileName, cv::Mat1f& de
   return true;
 }
 
-std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp )
-{
+std::vector<cv::KeyPoint3D> makeKp3d(std::vector<cv::KeyPoint> kp) {
   std::vector<cv::KeyPoint3D> kp_3d;
-  kp_3d.reserve( kp.size() );
-  for ( size_t i=0; i < kp.size(); i++ )
-  {
-    kp_3d.push_back( kp[i] );
+  kp_3d.reserve(kp.size());
+  for (size_t i = 0; i < kp.size(); i++) {
+    kp_3d.push_back(kp[i]);
   }
   return kp_3d;
 }
 
-std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp, cv::Mat1d descriptors )
-{
+std::vector<cv::KeyPoint3D> makeKp3d(std::vector<cv::KeyPoint> kp,
+    cv::Mat1d descriptors) {
   std::vector<cv::KeyPoint3D> kp3d_vec;
-  kp3d_vec.reserve( kp.size() );
-  for ( size_t k=0; k < kp.size(); k++ )
-  {
+  kp3d_vec.reserve(kp.size());
+  for (size_t k = 0; k < kp.size(); k++) {
     cv::KeyPoint3D kp3d = kp[k];
-    for ( int i=0; i<descriptors.cols; i++ )
-    {
-      kp3d.desc.push_back( descriptors[k][i] );
+    for (int i = 0; i < descriptors.cols; i++) {
+      kp3d.desc.push_back(descriptors[k][i]);
     }
-    kp3d_vec.push_back( kp3d );
+    kp3d_vec.push_back(kp3d);
   }
   return kp3d_vec;
 }
@@ -300,44 +275,43 @@ std::vector<cv::KeyPoint3D> makeKp3d( std::vector<cv::KeyPoint> kp, cv::Mat1d de
 // for a given threshold
 
 //define insertor class which collects keypoints in a vector
-class VecIns : public parallelsurf::KeyPointInsertor
-{
-  public:
-    VecIns ( std::vector<parallelsurf::KeyPoint>& keyPoints ) : m_KeyPoints ( keyPoints ) {};
-    inline virtual void operator() ( const parallelsurf::KeyPoint &keyPoint )
-    {
-      m_KeyPoints.push_back ( keyPoint );
-    }
-  private:
-    std::vector<parallelsurf::KeyPoint>& m_KeyPoints;
+class VecIns: public parallelsurf::KeyPointInsertor {
+public:
+  VecIns(std::vector<parallelsurf::KeyPoint>& keyPoints) :
+      m_KeyPoints(keyPoints) {
+  }
+  ;
+  inline virtual void operator()(const parallelsurf::KeyPoint &keyPoint) {
+    m_KeyPoints.push_back(keyPoint);
+  }
+private:
+  std::vector<parallelsurf::KeyPoint>& m_KeyPoints;
 };
 
-std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
-{
+std::vector<cv::KeyPoint3D> getSurfKp(const cv::Mat& gray_img,
+    const cv::Mat& depth_img, cv::Matx33f& K, float t) {
   unsigned char** pixels = new unsigned char*[gray_img.rows];
-  for ( int y=0; y<gray_img.rows; y++ )
-  {
+  for (int y = 0; y < gray_img.rows; y++) {
     pixels[y] = new unsigned char[gray_img.cols];
-    for ( int x=0; x<gray_img.cols; x++ )
-    {
-      pixels[y][x] = gray_img.at<uchar>(y,x);
+    for (int x = 0; x < gray_img.cols; x++) {
+      pixels[y][x] = gray_img.at<uchar>(y, x);
     }
   }
-  parallelsurf::Image intImage ( (const unsigned char**)pixels, gray_img.cols, gray_img.rows );
+  parallelsurf::Image intImage((const unsigned char**) pixels, gray_img.cols,
+      gray_img.rows);
 
   parallelsurf::KeyPointDetector detector;
-  detector.setScoreThreshold( 0.1 * t );
+  detector.setScoreThreshold(0.1 * t);
 
-  parallelsurf::KeyPointDescriptor descriptor ( intImage, false );
+  parallelsurf::KeyPointDescriptor descriptor(intImage, false);
   std::vector<parallelsurf::KeyPoint> surf_kps;
-  VecIns insertor( surf_kps );
+  VecIns insertor(surf_kps);
 
-  detector.detectKeyPoints( intImage, insertor );
-  descriptor.assignOrientations ( surf_kps.begin(), surf_kps.end() );
-  descriptor.makeDescriptors ( surf_kps.begin(), surf_kps.end() );
+  detector.detectKeyPoints(intImage, insertor);
+  descriptor.assignOrientations(surf_kps.begin(), surf_kps.end());
+  descriptor.makeDescriptors(surf_kps.begin(), surf_kps.end());
 
-  if ( surf_kps.size() == 0 )
-  {
+  if (surf_kps.size() == 0) {
     return std::vector<cv::KeyPoint3D>();
   }
 
@@ -345,49 +319,44 @@ std::vector<cv::KeyPoint3D> getSurfKp( const cv::Mat& gray_img, const cv::Mat& d
   int num_kp = surf_kps.size();
 
   std::vector<cv::KeyPoint> kps;
-  cv::Mat1d descriptors( num_kp, desc_len );
+  cv::Mat1d descriptors(num_kp, desc_len);
 
-  for ( int i=0; i<num_kp; i++ )
-  {
+  for (int i = 0; i < num_kp; i++) {
     cv::KeyPoint kp;
     parallelsurf::KeyPoint &surf_kp = surf_kps[i];
 
     kp.angle = surf_kp._ori;
     kp.class_id = 0;
     kp.octave = 0;
-    kp.pt = cv::Point2f( surf_kp._x, surf_kp._y );
+    kp.pt = cv::Point2f(surf_kp._x, surf_kp._y);
     kp.response = surf_kp._score;
-    kp.size = surf_kp._scale * 1.3595559868917 * 4.0;
+    kp.size = surf_kp._scale * 7.768891354;
     kps.push_back(kp);
 
-    for ( int j=0; j<desc_len; j++ )
-    {
+    for (int j = 0; j < desc_len; j++) {
       descriptors[i][j] = surf_kp._vec[j];
     }
   }
 
-  return makeKp3d( kps, descriptors );
+  return makeKp3d(kps, descriptors);
 }
 
-std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
-{
+std::vector<cv::KeyPoint3D> getSiftKp(const cv::Mat& gray_img,
+    const cv::Mat& depth_img, cv::Matx33f& K, float t) {
   Lowe::SIFT sift;
   sift.PeakThreshInit = 0.01 * t;
 
   Lowe::SIFT::KeyList lowe_kps;
-  Lowe::SIFT::Image lowe_img( gray_img.rows, gray_img.cols );
+  Lowe::SIFT::Image lowe_img(gray_img.rows, gray_img.cols);
 
-  for ( int y=0; y<gray_img.rows; y++ )
-  {
-    for ( int x=0; x<gray_img.cols; x++ )
-    {
-      lowe_img.pixels[y][x] = gray_img.at<uchar>(y,x) / 255.0;
+  for (int y = 0; y < gray_img.rows; y++) {
+    for (int x = 0; x < gray_img.cols; x++) {
+      lowe_img.pixels[y][x] = gray_img.at<uchar>(y, x) / 255.0;
     }
   }
 
-  lowe_kps = sift.getKeypoints( lowe_img );
-  if ( lowe_kps.size() == 0 )
-  {
+  lowe_kps = sift.getKeypoints(lowe_img);
+  if (lowe_kps.size() == 0) {
     return std::vector<cv::KeyPoint3D>();
   }
 
@@ -395,29 +364,27 @@ std::vector<cv::KeyPoint3D> getSiftKp( const cv::Mat& gray_img, const cv::Mat& d
   int num_kp = lowe_kps.size();
 
   std::vector<cv::KeyPoint> kps;
-  cv::Mat1d descriptors( num_kp, desc_len );
+  cv::Mat1d descriptors(num_kp, desc_len);
 
-  for ( int i=0; i<num_kp; i++ )
-  {
+  for (int i = 0; i < num_kp; i++) {
     cv::KeyPoint kp;
     Lowe::SIFT::Key& lowe_kp = lowe_kps[i];
     kp.angle = 0;
     kp.class_id = 0;
     kp.octave = 0;
-    kp.pt = cv::Point2f( lowe_kp.col, lowe_kp.row );
+    kp.pt = cv::Point2f(lowe_kp.col, lowe_kp.row);
     kp.response = lowe_kp.strength;
-    kp.size = lowe_kp.scale * 1.3595559868917 * 4.0;
+    kp.size = lowe_kp.scale * 6.14;
     kps.push_back(kp);
-    for ( int j=0; j<desc_len; j++ )
-    {
+    for (int j = 0; j < desc_len; j++) {
       descriptors[i][j] = lowe_kp.ivec[j];
     }
   }
 
-  return makeKp3d( kps, descriptors );
+  return makeKp3d(kps, descriptors);
 }
 
-std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
+std::vector<cv::KeyPoint3D> getDaftKp(daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
     const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
   p_det.det_threshold_ *= t;
@@ -426,39 +393,40 @@ std::vector<cv::KeyPoint3D> getDaftKp( daft_ns::DAFT::DetectorParams p_det, daft
   daft_ns::DAFT daft1( p_det, p_desc );
   daft1.detect( gray_img, depth_img, K, kp1 );
 
-  p_det.base_scale_ *= sqrt(2);
+  return kp1;
+  /*
 
-  std::vector<cv::KeyPoint3D> kp2;
-  daft_ns::DAFT daft2( p_det, p_desc );
-  daft2.detect( gray_img, depth_img, K, kp2 );
+   p_det.base_scale_ *= sqrt(2);
 
-  std::vector<cv::KeyPoint3D> kp;
-  std::copy( kp1.begin(), kp1.end(), std::back_inserter(kp2) );
+   std::vector<cv::KeyPoint3D> kp2;
+   daft_ns::DAFT daft2( p_det, p_desc );
+   daft2.detect( gray_img, depth_img, K, kp2 );
 
-  return kp2;
+   std::copy( kp1.begin(), kp1.end(), std::back_inserter(kp2) );
+
+   return kp2;
+   */
 }
 
-void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
-{
+void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
   uint32_t count = 1;
   bool first_image = true;
 
   cv::Mat first_kp_img;
 
-  std::vector< ImageData >::iterator it;
+  std::vector<ImageData>::iterator it;
 
   int it_step;
-  std::vector< ImageData >::iterator it_end,it_begin;
+  std::vector<ImageData>::iterator it_end, it_begin;
 
   it_step = 1;
   it_begin = image_store_.begin();
   it_end = image_store_.end();
 
-  float t=1;
+  float t = 1;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
-  for (it = it_begin; it != it_end; it+=it_step)
-  {
+  for (it = it_begin; it != it_end; it += it_step) {
     cv::Mat rgb_img = it->rgb_image;
     cv::Mat1f depth_img = it->depth_image;
 
@@ -476,60 +444,59 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
 #endif
 
     cv::Mat gray_img;
-    cv::cvtColor( rgb_img, gray_img, CV_BGR2GRAY );
+    cv::cvtColor(rgb_img, gray_img, CV_BGR2GRAY);
 
     cv::Mat mask;
 
     std::cout << name << std::endl;
 
-    if ( it == it_begin )
-    {
+    if (it == it_begin) {
       // find optimal thresholds by secant method
-      float last_t=1;
+      float last_t = 1;
       int last_kp_size = 0;
-      int its=0;
+      int its = 0;
       int kp_size = 0;
 
-      while ( ( kp_size == 0 ) || ( std::abs(kp_size - num_kp) > 10 ) )
-      {
+      while ((kp_size == 0) || (std::abs(kp_size - target_num_kp_) > 10)) {
         last_kp_size = kp_size;
-        std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
+        std::vector<cv::KeyPoint3D> kp = getKp(gray_img, depth_img, K_, t);
         kp = filterKpMask(kp);
         kp_size = kp.size();
 
-        std::cout << " t_" << its-1 << " = " << last_t << " f(t_n-1) " << last_kp_size << std::endl;
-        std::cout << " t_" << its << " = " << t << " f(t_n)=" << kp_size << std::endl;
+        std::cout << " t_" << its - 1 << " = " << last_t << " f(t_n-1) "
+            << last_kp_size << std::endl;
+        std::cout << " t_" << its << " = " << t << " f(t_n)=" << kp_size
+            << std::endl;
 
         // first iteration: guess step width
-        if ( its == 0 )
-        {
-          float ratio = float(kp_size) / float(num_kp);
+        if (its == 0) {
+          float ratio = float(kp_size) / float(target_num_kp_);
           last_t = t;
-          t *= 1.0 + 0.5 * (ratio-1.0);
-        }
-        else
-        {
+          t *= 1.0 + 0.5 * (ratio - 1.0);
+        } else {
           // compute zero crossing of secant
-          float t_next = t - ( float(t-last_t) / float(kp_size-last_kp_size) * float(kp_size-num_kp) );
+          float t_next = t
+              - (float(t - last_t) / float(kp_size - last_kp_size)
+                  * float(kp_size - target_num_kp_));
           last_t = t;
           t = t_next;
         }
 
-        if ( isnan(t) )
-        {
+        if (isnan(t)) {
           std::cout << "ERROR: cannot find enough keypoints!" << std::endl;
           exit(-1);
         }
 
-        if ( t < 0 ) t = 0;
-        std::cout << " t_" << its+1 << " = " << t << std::endl;
+        if (t < 0)
+          t = 0;
+        std::cout << " t_" << its + 1 << " = " << t << std::endl;
 
         /*
-        cv::Mat kp_img;
-        cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        cv::imshow("KP", kp_img);
-        cv::waitKey(200);
-        */
+         cv::Mat kp_img;
+         cv::drawKeypoints3D(rgb_img, kp, kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+         cv::imshow("KP", kp_img);
+         cv::waitKey(200);
+         */
 
         its++;
         std::cout << std::endl;
@@ -540,42 +507,40 @@ void ExtractDetectorFile::extractKeypoints( GetKpFunc getKp, std::string name )
     s << "img" << count;
     count++;
 
-    std::vector<cv::KeyPoint3D> kp = getKp( gray_img, depth_img, K_, t );
+    std::vector<cv::KeyPoint3D> kp = getKp(gray_img, depth_img, K_, t);
     std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
 
-    if(first_image)
-    {
+    if (first_image) {
       kp = filterKpMask(kp);
       first_image = false;
 
-      cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-      storeKeypoints(kp, s.str(), name, rgb_img );
-    }
-    else
-    {
+      cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0, 0, 255),
+          cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+      storeKeypoints(kp, s.str(), name, rgb_img);
+    } else {
       cv::Mat first_kp_img_warped = rgb_img.clone();
-      cv::warpPerspective( first_kp_img, first_kp_img_warped, cv::Mat(it->hom), cv::Size( rgb_img.cols, rgb_img.rows ) );
+      cv::warpPerspective(first_kp_img, first_kp_img_warped, cv::Mat(it->hom),
+          cv::Size(rgb_img.cols, rgb_img.rows));
 
       printMat(it->hom);
 
-      storeKeypoints(kp, s.str(), name, first_kp_img_warped );
+      storeKeypoints(kp, s.str(), name, first_kp_img_warped);
     }
 
-    if ( verbose_ )
-    {
+    if (verbose_) {
       std::cout << "Press any key to continue." << std::endl;
-      while ( cv::waitKey(100) == -1 );
+      while (cv::waitKey(100) == -1)
+        ;
     }
   }
 }
 
-void ExtractDetectorFile::extractAllKeypoints()
-{
+void ExtractDetectorFile::extractAllKeypoints() {
   daft_ns::DAFT::DetectorParams det_p;
   daft_ns::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  det_p.min_px_scale_ = 2.5;
-  //det_p.base_scale_ = 0.125;
+  det_p.min_px_scale_ = 3;
+  //det_p.base_scale_ = 0.05;
   //det_p.scale_levels_ = 1;
   det_p.det_threshold_ = 0.0109759;
   det_p.pf_threshold_ = 5;
@@ -596,75 +561,66 @@ void ExtractDetectorFile::extractAllKeypoints()
   extractKeypoints( &getSiftKp, "SIFT" );
 }
 
-
-void ExtractDetectorFile::printMat( cv::Matx33f M )
-{
-  std::cout << std::setprecision( 3 ) << std::right << std::fixed;
-  for ( int row = 0; row < 3; ++ row )
-  {
-    for ( int col = 0; col < 3; ++ col )
-    {
-      std::cout << std::setw( 5 ) << (double)M( row, col ) << " ";
+void ExtractDetectorFile::printMat(cv::Matx33f M) {
+  std::cout << std::setprecision(3) << std::right << std::fixed;
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      std::cout << std::setw(5) << (double) M(row, col) << " ";
     }
     std::cout << std::endl;
   }
 }
 
-
-std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask( std::vector<cv::KeyPoint3D> kp )
-{
+std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask(
+    std::vector<cv::KeyPoint3D> kp) {
   // filter keypoints which dont fit the mask
   std::vector<cv::KeyPoint3D> kp_filtered;
 
-  for(uint32_t i = 0; i < kp.size(); i++)
-  {
+  for (uint32_t i = 0; i < kp.size(); i++) {
     //std::cout << int(maskImage_( kp.at(i).pt.y, kp.at(i).pt.x )) << " ";
     // check for black spots in maskimage
-    if( maskImage_.at<cv::Vec3b>(int(kp[i].pt.y),int(kp[i].pt.x))[0] > 128 )
-    {
+    if (maskImage_.at<cv::Vec3b>(int(kp[i].pt.y), int(kp[i].pt.x))[0] > 128) {
       kp_filtered.push_back(kp[i]);
     }
   }
 
-  std::cout << "Filtered Keypoints: " << kp_filtered.size() << "   Standard Keypoints: " << kp.size() << std::endl;
+  std::cout << "Filtered Keypoints: " << kp_filtered.size()
+      << "   Standard Keypoints: " << kp.size() << std::endl;
   std::cout << std::endl;
   return kp_filtered;
 }
 
-
-
-void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img )
-{
-  if ( keypoints.size() == 0 )
-  {
+void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
+    std::string img_name, std::string extension, cv::Mat& rgb_img) {
+  if (keypoints.size() == 0) {
     return;
   }
-  std::vector< cv::KeyPoint3D >::iterator it;
+  std::vector<cv::KeyPoint3D>::iterator it;
   double_t ax, bx, ay, by, a_length, b_length, alpha_a, alpha_b;
   double_t A, B, C;
 
-  std::string filePath = file_created_folder_ +  "/" + img_name + "." +extension;
+  std::string filePath = file_created_folder_ + "/" + img_name + "."
+      + extension;
 
   // open file
   std::fstream file;
   file.open(filePath.c_str(), std::ios::out);
 
   // header
-  file << keypoints[0].desc.size()+1 << std::endl;
+  file << keypoints[0].desc.size() + 1 << std::endl;
   file << keypoints.size() << std::endl;
 
-  for ( it = keypoints.begin(); it != keypoints.end(); it++ )
-  {
+  for (it = keypoints.begin(); it != keypoints.end(); it++) {
     //hack
     //it->affine_minor = it->affine_major;
 
-    ax = cos( it->affine_angle );
-    ay = sin( it->affine_angle );
+    ax = cos(it->affine_angle);
+    ay = sin(it->affine_angle);
     bx = -ay;
     by = ax;
 
-    alpha_a = atan2(ay,ax);
-    alpha_b = atan2(by,bx);
+    alpha_a = atan2(ay, ax);
+    alpha_b = atan2(by, bx);
 
     a_length = it->affine_major;
     b_length = it->affine_minor;
@@ -674,32 +630,31 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
     ay = sin(alpha_a);
     by = sin(alpha_b);
 
-    A = ( pow(ax,2) * pow(b_length,2) + pow(bx,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
+    A = (pow(ax, 2) * pow(b_length, 2) + pow(bx, 2) * pow(a_length, 2))
+        / (pow(a_length, 2) * pow(b_length, 2));
 
-    B = ( ( ax * ay * pow(b_length,2) + bx * by * pow(a_length,2)) ) / (pow(a_length,2) * pow(b_length,2) );
+    B = ((ax * ay * pow(b_length, 2) + bx * by * pow(a_length, 2)))
+        / (pow(a_length, 2) * pow(b_length, 2));
 
-    C = ( pow(ay,2) * pow(b_length,2) + pow(by,2) * pow(a_length,2)) / (pow(a_length,2) * pow(b_length,2) );
+    C = (pow(ay, 2) * pow(b_length, 2) + pow(by, 2) * pow(a_length, 2))
+        / (pow(a_length, 2) * pow(b_length, 2));
 
     file << it->pt.x << "  " << it->pt.y << "  " << A << "  " << B << "  " << C;
 
     // write world scale as "feature component"
     // so keypoints of different size don't get matched
-    if ( it->world_size != 0 )
-    {
-      float s_log = log2( it->world_size );
-      file << " " << s_log*100;
-    }
-    else
-    {
+    if (it->world_size != 0) {
+      float s_log = log2(it->world_size);
+      file << " " << s_log * 100;
+    } else {
       file << " 0.0";
     }
 
-    for ( unsigned i=0; i<it->desc.size(); i++ )
-    {
+    for (unsigned i = 0; i < it->desc.size(); i++) {
       file << " " << it->desc[i];
     }
 
-    file  << std::endl;
+    file << std::endl;
 
   }
 
@@ -708,42 +663,46 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, 
   // draw keypoints
   cv::Mat kp_img;
 
-  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255, 255, 255),
+      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-  cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 5, CV_AA );
-  cv::putText( kp_img, extension, cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2, CV_AA );
+  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
+      cv::Scalar(0, 0, 0), 5, CV_AA);
+  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
+      cv::Scalar(255, 255, 255), 2, CV_AA);
 
-  if ( verbose_ )
-  {
+  if (verbose_) {
     cv::imshow("kp", kp_img);
     cv::waitKey(50);
   }
 
-  std::stringstream s;
-  s.width(3);
-  s.fill('0');
-  s << img_count;
+  /*
+   std::stringstream s;
+   s.width(3);
+   s.fill('0');
+   s << img_count;
+   std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
+   img_count++;
+   */
 
-  std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name + ".ppm";
-  //std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
+  std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name
+      + ".ppm";
 
   std::cout << "Writing " << img_file_name << std::endl;
 
-  cv::imwrite( img_file_name, kp_img);
-  img_count++;
+  cv::imwrite(img_file_name, kp_img);
 }
 
-void ExtractDetectorFile::splitFileName(const std::string& str)
-{
+void ExtractDetectorFile::splitFileName(const std::string& str) {
   size_t found;
   std::cout << "Splitting: " << str << std::endl;
-  found=str.find_last_of("/\\");
+  found = str.find_last_of("/\\");
 
-  file_path_ = str.substr(0,found);
-  file_name_ = str.substr(found+1);
+  file_path_ = str.substr(0, found);
+  file_name_ = str.substr(found + 1);
 
   found = file_name_.find_last_of(".");
-  file_folder_ = file_name_.substr(0,found);
+  file_folder_ = file_name_.substr(0, found);
 
   file_created_folder_.append(file_path_);
   file_created_folder_.append("/");
@@ -757,30 +716,37 @@ void ExtractDetectorFile::splitFileName(const std::string& str)
 
 } /* namespace rgbd_evaluator */
 
-
-
-
-int main( int argc, char** argv )
-{
-  if(argc < 2)
-  {
-    std::cout << "Wrong usage, Enter: " << argv[0] << "[-v] <folderName> .." << std::endl;
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cout << "Wrong usage, Enter: " << argv[0]
+        << "[-v] [-k num_kp] <bagfile1> <bagfile2> .." << std::endl;
     return -1;
   }
 
-  bool verbose = argc > 2 && std::string(argv[1]) == "-v";
-  std::cout << "verbose " << verbose << std::endl;
+  bool verbose = false;
+  int num_kp = 500;
+  std::vector<std::string> bagfiles;
 
-  int start_i = verbose ? 2 : 1;
+  for (int i = 1; i < argc; i++) {
+    std::string arg = std::string(argv[i]);
+    if (arg == "-v") {
+      std::cout << "verbose on" << std::endl;
+      verbose = true;
+    } else if (i < argc - 1 && arg == "-k") {
+      num_kp = atoi(argv[i + 1]);
+      std::cout << "num_kp = " << num_kp << std::endl;
+      i++;
+    } else {
+      bagfiles.push_back(arg);
+      std::cout << "using bagfile: " << arg << std::endl;
+    }
+  }
 
-  for ( int i=start_i; i<argc; i++ )
+  std::cout << "num_kp = " << num_kp << std::endl;
 
-
-  for ( int i=1; i<argc; i++ )
-  {
-    rgbd_evaluator::img_count = 0;
-    std::string file_name(argv[i]);
-    rgbd_evaluator::ExtractDetectorFile extract_detector_file(file_name,verbose);
+  for (unsigned i = 0; i < bagfiles.size(); i++) {
+    rgbd_evaluator::ExtractDetectorFile extract_detector_file(bagfiles[i],
+        verbose, num_kp);
   }
 
   std::cout << "Exiting.." << std::endl;

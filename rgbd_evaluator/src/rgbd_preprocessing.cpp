@@ -85,30 +85,6 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
   {
       rosbag::MessageInstance& m = *it;
 
-      // if the current image data is complete, go to next one
-      if ( image_data.isComplete() )
-      {
-        cv::Mat depth_image_orig = image_data.depth_image;
-        cv::Mat intensity_image_orig = image_data.rgb_image;
-
-        int scale_fac =   intensity_image_orig.cols / depth_image_orig.cols;
-
-        cv::Mat depth_image, intensity_image;
-
-        // Resize depth to have the same width as rgb
-        cv::resize( depth_image_orig, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_NEAREST );
-        // Crop rgb so it has the same size as depth
-        intensity_image = cv::Mat( intensity_image_orig, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
-
-        image_data.rgb_image = intensity_image;
-        image_data.depth_image = depth_image;
-
-        image_store_.push_back( image_data );
-        image_data = ImageData();
-        std::cout << "Storing dataset #" << count << std::endl;
-        count++;
-      }
-
       // load cam_info
       sensor_msgs::CameraInfo::ConstPtr p_cam_info = m.instantiate<sensor_msgs::CameraInfo>();
       if(( p_cam_info != NULL ) && ( got_cam_info == false ))
@@ -161,6 +137,30 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
         // store data in vectorImageData
         image_data.depth_image = ptr->image;
       }
+
+      // if the current image data is complete, go to next one
+      if ( image_data.isComplete() )
+      {
+        cv::Mat depth_image_orig = image_data.depth_image;
+        cv::Mat intensity_image_orig = image_data.rgb_image;
+
+        int scale_fac =   intensity_image_orig.cols / depth_image_orig.cols;
+
+        cv::Mat depth_image, intensity_image;
+
+        // Resize depth to have the same width as rgb
+        cv::resize( depth_image_orig, depth_image, cvSize(0,0), scale_fac, scale_fac, cv::INTER_NEAREST );
+        // Crop rgb so it has the same size as depth
+        intensity_image = cv::Mat( intensity_image_orig, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
+
+        image_data.rgb_image = intensity_image;
+        image_data.depth_image = depth_image;
+
+        image_store_.push_back( image_data );
+        image_data = ImageData();
+        std::cout << "Storing dataset #" << count << std::endl;
+        count++;
+      }
   }
 }
 
@@ -171,7 +171,7 @@ void RgbdEvaluatorPreprocessing::writeDepth( cv::Mat& depth_img_orig, std::strin
   cv::Mat1w depth_img;
   depth_img_orig.convertTo( depth_img, CV_16U, 1000.0, 0.0 );
 
-  std::ofstream fs( (file_created_folder_ + "/" + "depth" + count_str + ".ppm").c_str() );
+  std::ofstream fs( (file_created_folder_ + "/" + "depth" + count_str + ".pgm").c_str() );
 
   fs << "P2" << std::endl;
   fs << depth_img.cols << " " << depth_img.rows << std::endl;
@@ -185,6 +185,21 @@ void RgbdEvaluatorPreprocessing::writeDepth( cv::Mat& depth_img_orig, std::strin
     }
     fs << std::endl;
   }
+}
+
+float RgbdEvaluatorPreprocessing::getAspect( std::vector< cv::Point2f > pts )
+{
+  cv::Point2f minp(100000,100000),maxp(0,0);
+  uint32_t k;
+  for(k = 0; k < pts.size(); k++)
+  {
+    maxp.x = std::max ( pts[k].x, maxp.x );
+    maxp.y = std::max ( pts[k].y, maxp.y );
+    minp.x = std::min ( pts[k].x, minp.x );
+    minp.y = std::min ( pts[k].y, minp.y );
+  }
+
+  return (maxp.x/minp.x) / (maxp.y/minp.y);
 }
 
 void RgbdEvaluatorPreprocessing::calculateHomography()
@@ -209,6 +224,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   btVector3 xvec_orig;
   btVector3 zvec_orig;
   float dist_orig = 0.0;
+  float aspect_orig = 0.0;
 
   tf::StampedTransform transform_original;
 
@@ -283,7 +299,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     cv::Mat1b mask_img;
     if ( mousePointsROI_.size() < 3 )
     {
-      mask_img = cv::Mat::zeros(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U);
+      mask_img = cv::Mat::ones(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U);
     }
     else
     {
@@ -390,10 +406,13 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       // Calculate angle_orig, dist_orig, rotation_orig
       transform_original = calculateCoordinatesystem(it->depth_image, mouseKeypointsOrigin_);
 
+      aspect_orig = getAspect( mouseKeypointsOrigin_ );
+
       zvec_orig = transform_original.getBasis() * btVector3(0,0,1);
       xvec_orig = transform_original.getBasis() * btVector3(1,0,0);
       dist_orig = transform_original.getOrigin().length();
 
+      std::cout << "aspect_orig " << aspect_orig << std::endl;
       std::cout << "angle_orig " << zvec_orig.angle( btVector3(0,0,-1) ) / M_PI*180.0 << std::endl;
       std::cout << "dist_orig " << dist_orig << std::endl;
 
@@ -1025,19 +1044,27 @@ void RgbdEvaluatorPreprocessing::imgMouseCallbackKP( int event, int x, int y, in
 
 void RgbdEvaluatorPreprocessing::imgMouseCallbackROI( int event, int x, int y, int flags, void* param )
 {
-    switch( event )
-    {
-      case  CV_EVENT_LBUTTONDOWN:
-        ((RgbdEvaluatorPreprocessing*) param)->mousePointsROI_.push_back(cv::Point2f(x,y));
-        break;
+  if ( !param )
+  {
+    std::cout << "ERROR: NULL pointer received!" << std::endl;
+    throw;
+  }
 
-      case  CV_EVENT_RBUTTONDOWN:
-        ((RgbdEvaluatorPreprocessing*) param)->finishedROI_ = true;
-        break;
+  RgbdEvaluatorPreprocessing* rgb_processing = static_cast<RgbdEvaluatorPreprocessing*>( param );
 
-      default:
-        break;
-    }
+  switch( event )
+  {
+    case  CV_EVENT_LBUTTONDOWN:
+      rgb_processing->mousePointsROI_.push_back(cv::Point2f(x,y));
+      break;
+
+    case  CV_EVENT_RBUTTONDOWN:
+      rgb_processing->finishedROI_ = true;
+      break;
+
+    default:
+      break;
+  }
 }
 
 } // end namespace
