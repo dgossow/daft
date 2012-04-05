@@ -105,6 +105,7 @@ im2x=size(im2);
 im2y=im2x(1);
 im2x=im2x(2);
 
+%.. scales1'>9 & ..
 ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
@@ -219,12 +220,11 @@ d2=(1/sqrt(e1(4)));
 sc1=sqrt(d1*d2);
 feat(c1,6)=d1;
 feat(c1,7)=d2; 
-scales(c1)=sqrt(feat(c1,6)*feat(c1,7));
+%scales(c1)=sqrt(feat(c1,6)*feat(c1,7));
 
 %bounding box
 feat(c1,8) = sqrt(feat(c1,5)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
 feat(c1,9) = sqrt(feat(c1,3)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
-
 
 Aff=getAff(feat(c1,1),feat(c1,2),sc1, H);
 
@@ -242,6 +242,10 @@ featp(c1,3:5)=[BMB(1) BMB(2) BMB(4)];
 %bounding box in image 2
 featp(c1,8) = sqrt(featp(c1,5)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
 featp(c1,9) = sqrt(featp(c1,3)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
+
+% surface area
+scales(c1)=sqrt(featp(c1,6)*featp(c1,7));
+
 end
 %end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

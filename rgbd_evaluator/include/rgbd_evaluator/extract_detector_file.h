@@ -68,6 +68,7 @@ private:
   std::string file_folder_;
   std::string file_created_folder_;
   std::string extra_folder_;
+  std::string kp_folder_;
 
   int target_num_kp_;
 

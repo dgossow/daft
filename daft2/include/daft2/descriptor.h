@@ -308,7 +308,7 @@ inline bool getDesc( int patch_size, Mat1f& smoothed_img, Mat1f& smoothed_img2, 
 
   if ( coverage < 0.5 * 0.86 )
   {
-    std::cout << "orientation coverage: " << coverage << std::endl;
+    //std::cout << "orientation coverage: " << coverage << std::endl;
     return false;
   }
 

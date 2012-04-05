@@ -21,7 +21,7 @@
 namespace cv {
 namespace daft2 {
 
-//#define SHOW_DEBUG_WIN
+#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
@@ -281,7 +281,8 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
     //std::cout << "det octave " << octave << " scale " << scale << std::endl;
-  	response_map = smoothed_imgs[octave+1] - smoothed_imgs[octave];
+  	cv::absdiff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
+
     Mat2f& depth_grad = depth_grads[octave];
 
     // save index where new kps will be inserted

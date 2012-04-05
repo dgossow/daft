@@ -263,11 +263,65 @@ inline bool computeGradient(
   }
 
   // get depth values from image
-  float d_center = depth_map(y,x);
-  float d_xp = depth_map(y,x+sp_int);
-  float d_yp = depth_map(y+sp_int,x);
-  float d_xn = depth_map(y,x-sp_int);
-  float d_yn = depth_map(y-sp_int,x);
+  const float d_center = depth_map(y,x);
+  const float d_xp = depth_map(y,x+sp_int);
+  const float d_yp = depth_map(y+sp_int,x);
+  const float d_xn = depth_map(y,x-sp_int);
+  const float d_yn = depth_map(y-sp_int,x);
+
+  /*
+  float d_right = d_xp;
+  float d_left = d_xn;
+  float d_top = d_yn;
+  float d_bottom = d_yp;
+
+  float x_fac = 0.5*sp/float(sp_int);
+  float y_fac = 0.5*sp/float(sp_int);
+
+  if (isnan(d_xp))
+  {
+    if ( isnan(d_center) || isnan(d_xn) )
+    {
+      grad[0] = grad[1] = nan;
+      return false;
+    }
+    d_right = d_center;
+    x_fac *= 0.5;
+  }
+  if (isnan(d_xn))
+  {
+    if ( isnan(d_center) || isnan(d_xp) )
+    {
+      grad[0] = grad[1] = nan;
+      return false;
+    }
+    d_left = d_center;
+    x_fac *= 0.5;
+  }
+  if (isnan(d_yp))
+  {
+    if ( isnan(d_center) || isnan(d_yn) )
+    {
+      grad[0] = grad[1] = nan;
+      return false;
+    }
+    d_bottom = d_center;
+    y_fac *= 0.5;
+  }
+  if (isnan(d_yn))
+  {
+    if ( isnan(d_center) || isnan(d_yp) )
+    {
+      grad[0] = grad[1] = nan;
+      return false;
+    }
+    d_top = d_center;
+    y_fac *= 0.5;
+  }
+  grad[0] = (d_right - d_left)*x_fac;
+  grad[1] = (d_bottom - d_top)*y_fac;
+  return true;
+  */
 
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
@@ -275,6 +329,7 @@ inline bool computeGradient(
     return false;
   }
 
+  /*
   float dxx = d_xp - 2*d_center + d_xn;
   float dyy = d_yp - 2*d_center + d_yn;
 
@@ -286,10 +341,12 @@ inline bool computeGradient(
     grad[0] = grad[1] = nan;
     return false;
   }
+  */
 
 // depth gradient between (x+sp) and (x-sp)
-  grad[0] = (d_xp - d_xn)*0.5*sp/float(sp_int);
-  grad[1] = (d_yp - d_yn)*0.5*sp/float(sp_int);
+  const float fac = 0.5*sp/float(sp_int);
+  grad[0] = (d_xp - d_xn)*fac;
+  grad[1] = (d_yp - d_yn)*fac;
   return true;
 }
 
@@ -366,7 +423,6 @@ inline void ellipseParameters(float angle, float major, float minor, float& A, f
   B = 2.0f * (ax*ay / a2 + bx*by / b2);
 
   C = ay*ay / a2 + by*by / b2;
-
 }
 
 /** Checks if a point (x,y) is contained in an ellipse of form A*x^2 + B*x*y + C*y^2 */

@@ -17,7 +17,6 @@ namespace cv
 namespace daft2
 {
 
-
 void findMaxima( const cv::Mat1d &img,
     const cv::Mat1d &scale_map,
     double base_scale,
@@ -423,7 +422,7 @@ void findMaximaMipMap( const cv::Mat1d &img,
                     finite( img[kp_y+1][kp_x+1] ))
                 {
                   // make keypoint
-                  kp.push_back( KeyPoint3D ( kp_x, kp_y, s*4, base_scale*4.0, -1, cv ) );
+                  kp.push_back( KeyPoint3D ( kp_x, kp_y, s*4.0, base_scale*4.0, -1, cv ) );
                 }
               }
             }

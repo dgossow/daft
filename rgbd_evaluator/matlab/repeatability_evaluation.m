@@ -10,37 +10,28 @@ fprintf(1,'Graph path: %s\n', graph_path);
 mkdir(data_path);
 mkdir(graph_path);
 
-%mark={'-rs';'--bp';'-kx';'--kv';':r+';'-.bp';'--b>'};
-mark={'-rp';'--ks';'-.kx';'--kv';':r+';'-.bp';'--b>'};
+mark=get_marks();
 
 num_det = size(det_suffix,1);
-x_vals = load( sprintf( '%s%s', data_path, x_val_file ) );
+[ x_label x_label_full x_unit x_vals ] = get_vals( data_path, x_val_file );
 num_img = size( x_vals, 2 ) + 1;
 
-sfigure(1);clf;
-axes('LineWidth',3);
-set(gca,'FontSize',35)
-grid on;
-ylabel('repeatability %')
-xlabel(x_val_file);
-set(gca,'YTick',[0.0 20.0 40.0 60.0 80.0 100.0]);
+
+setup_figure(1);
+ylabel('repeatability')
+xlabel(x_label_full);
+set(gca,'YTick',[0.0 0.2 0.4 0.6 0.8 1.0]);
 hold on;
 
-sfigure(2);clf;
-axes('LineWidth',3);
-set(gca,'FontSize',35)
-grid on;
+setup_figure(2);
 ylabel('nb of correspondences')
-xlabel(x_val_file);
+xlabel(x_label_full);
 hold on;
 
-sfigure(3);clf;
-axes('LineWidth',3);
-set(gca,'FontSize',35)
-grid on;
+setup_figure(3);
 ylabel('matching score')
-xlabel(x_val_file);
-set(gca,'YTick',[0.0 20.0 40.0 60.0 80.0 100.0]);
+xlabel(x_label_full);
+set(gca,'YTick',[0.0 0.2 0.4 0.6 0.8 1.0]);
 hold on;
 
 for d=1:num_det
@@ -51,8 +42,8 @@ for d=1:num_det
     
     for i=2:num_img
         
-        file1=sprintf('%simg1.%s',data_path,char(det_suffix(d)));
-        file2=sprintf('%simg%d.%s',data_path,i,char(det_suffix(d)));
+        file1=sprintf('%skeypoints/img1.%s',data_path,char(det_suffix(d)));
+        file2=sprintf('%skeypoints/img%d.%s',data_path,i,char(det_suffix(d)));
         Hom=sprintf('%sH1to%dp',data_path,i);
         imf1=sprintf('%simg1.ppm',data_path);
         imf2=sprintf('%simg%d.ppm',data_path,i);
@@ -64,31 +55,19 @@ for d=1:num_det
         seqmatchscore=[seqmatchscore match_score];
     end
     
-    mark{d}
-    sfigure(1);  plot(x_vals,seqrepeat,mark{d},'LineWidth',3);
-    sfigure(2);  plot(x_vals,seqcorresp,mark{d},'LineWidth',3);
-    sfigure(3);  plot(x_vals,seqmatchscore,mark{d},'LineWidth',3);
+    sfigure(1);  plot(x_vals,seqrepeat*0.01,mark{d},'LineWidth',4);
+    sfigure(2);  plot(x_vals,seqcorresp,mark{d},'LineWidth',4);
+    sfigure(3);  plot(x_vals,seqmatchscore*0.01,mark{d},'LineWidth',4);
 
 end
-
-fprintf('x axis: %f %f\n', x_vals(1), x_vals(num_img-1));
-
-x1 = min(x_vals(1), x_vals(num_img-1));
-x2 = max(x_vals(1), x_vals(num_img-1));
-
-sfigure(1)
-axis([x1 x2 0 100]);
-
-sfigure(2)
-axis([x1 x2 0 1]);
-axis 'auto y'
-
-sfigure(3)
-axis([x1 x2 0 100]);
 
 for f=1:3
-    figure(f);
+    sfigure(f);
+    setup_axes( x_vals, num_img, [0 1] );
 end
+
+sfigure(2);
+axis 'auto y'
 
 print(sfigure(1),'-dpdf',sprintf('%srepeatability.pdf',graph_path))
 print(sfigure(2),'-dpdf',sprintf('%snum_correspondences.pdf',graph_path))

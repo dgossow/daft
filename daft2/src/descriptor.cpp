@@ -271,7 +271,8 @@ bool computeDesc( const vector<PtInfo>& ptInfos, std::vector<float>& desc, bool 
   {
     for ( unsigned i=0; i<4; i++ )
     {
-      if ( !entries[j][i].normalize() )
+      // disallow 4 central bins to be empty
+      if ( !entries[j][i].normalize() )// && i>=1 && i<=2 && j>=1 && j<=2 )
       {
         return false;
       }

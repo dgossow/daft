@@ -228,22 +228,16 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
   tf::StampedTransform transform_original;
 
-  int it_step;
-  std::vector< ImageData >::iterator it_end,it_begin;
   if ( reverse_order_ )
   {
-    it_step = -1;
-    it_begin = image_store_.end()-1-start_img_;
-    it_end = image_store_.begin();
-  }
-  else
-  {
-    it_step = 1;
-    it_begin = image_store_.begin()+start_img_;
-    it_end = image_store_.end();
+    std::reverse( image_store_.begin(), image_store_.end() );
   }
 
-  for (it = it_begin; it != it_end; it+=it_step, count++)
+  std::vector< ImageData >::iterator it_end,it_begin;
+  it_begin = image_store_.begin()+start_img_;
+  it_end = image_store_.end();
+
+  for (it = it_begin; it != it_end; it++, count++)
   {
     // convert integer to string
     std::string count_str = int2str(count);

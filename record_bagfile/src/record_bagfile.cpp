@@ -167,12 +167,12 @@ void RecordBagfile::recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img_m
       cv::Point2f(depth_img.cols/2-w,depth_img.rows/2),
       cv::Point2f(depth_img.cols/2+w,depth_img.rows/2),
       cv::Scalar(0,255,0),
-      1 );
+      3 );
   cv::line( bgr_img,
       cv::Point2f(depth_img.cols/2,depth_img.rows/2-w),
       cv::Point2f(depth_img.cols/2,depth_img.rows/2+w),
       cv::Scalar(0,255,0),
-      1 );
+      3 );
 
   std::vector<cv::Point2f> img_pos;
   img_pos.push_back( cv::Point2f(depth_img.cols/2+w,depth_img.rows/2-w) );

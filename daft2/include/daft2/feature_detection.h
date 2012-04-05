@@ -133,8 +133,6 @@ void filterKpNeighbours( const Mat1d& response,
     double center_fac,
     std::vector< KeyPoint3D >& kp );
 
-void diff( const Mat1f& l1, const Mat1f& l2, Mat1f& out );
-
 
 // ----------------------------------------------------
 // -- Implementation ----------------------------------

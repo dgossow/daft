@@ -23,6 +23,18 @@
 
 namespace rgbd_evaluator {
 
+void sysCmd( std::string cmd )
+{
+  std::cout << "Executing system command: " << cmd << std::endl;
+
+  if (system(cmd.c_str()) < 0) // -1 on error
+  {
+    std::cout << "Error when executing: " << cmd << std::endl;
+    std::cout << "--> check user permissions" << std::endl;
+    exit(-1);
+  }
+}
+
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool verbose,
     int num_kp) {
   verbose_ = verbose;
@@ -32,29 +44,14 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool verbose,
 
   splitFileName(file_path);
 
-  // create folder to store detector file
-  std::string makeFolder;
-  makeFolder.append("mkdir ");
-  makeFolder.append(file_created_folder_);
-
-  if (system(makeFolder.c_str()) < 0) // -1 on error
-      {
-    std::cout << "Error when executing: " << makeFolder << std::endl;
-    std::cout << "--> check user permissions" << std::endl;
-    return;
-  }
-
-  //system( "rm " );
-
   extra_folder_ = file_created_folder_ + "/kp_images";
+  kp_folder_ = file_created_folder_ + "/keypoints";
 
-  if (system(("mkdir " + extra_folder_).c_str()) < 0) // -1 on error
-      {
-    std::cout << "Error when executing: " << "mkdir " + extra_folder_
-        << std::endl;
-    std::cout << "--> check user permissions" << std::endl;
-    return;
-  }
+  sysCmd("mkdir "+extra_folder_);
+  sysCmd("mkdir "+kp_folder_);
+
+  sysCmd("rm "+extra_folder_+"/*.*");
+  sysCmd("rm "+kp_folder_+"/*.*");
 
   readDataFiles();
   extractAllKeypoints();
@@ -451,46 +448,77 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
     std::cout << name << std::endl;
 
-    if (it == it_begin) {
+    if (it == it_begin)
+    {
       // find optimal thresholds by secant method
-      float last_t = 1;
-      int last_kp_size = 0;
+      float t_left = 1;
+      float t_right = 10;
+
+      int y_left = filterKpMask( getKp(gray_img, depth_img, K_, t_left) ).size() - target_num_kp_;
+      int y_right = filterKpMask( getKp(gray_img, depth_img, K_, t_right) ).size() - target_num_kp_;
+
       int its = 0;
-      int kp_size = 0;
 
-      while ((kp_size == 0) || (std::abs(kp_size - target_num_kp_) > 10)) {
-        last_kp_size = kp_size;
-        std::vector<cv::KeyPoint3D> kp = getKp(gray_img, depth_img, K_, t);
-        kp = filterKpMask(kp);
-        kp_size = kp.size();
+      while (true)
+      {
 
-        std::cout << " t_" << its - 1 << " = " << last_t << " f(t_n-1) "
-            << last_kp_size << std::endl;
-        std::cout << " t_" << its << " = " << t << " f(t_n)=" << kp_size
-            << std::endl;
-
-        // first iteration: guess step width
-        if (its == 0) {
-          float ratio = float(kp_size) / float(target_num_kp_);
-          last_t = t;
-          t *= 1.0 + 0.5 * (ratio - 1.0);
-        } else {
+        float t_new;
+        if ( y_right == -target_num_kp_ )
+        {
+          // if we've reached zero keypoints, take
+          // middle
+          t_new = (t_right + t_left) / 2;
+        }
+        else
+        {
           // compute zero crossing of secant
-          float t_next = t
-              - (float(t - last_t) / float(kp_size - last_kp_size)
-                  * float(kp_size - target_num_kp_));
-          last_t = t;
-          t = t_next;
+          t_new = t_right - (float(t_right - t_left) / float(y_right - y_left) * float(y_right));
         }
 
-        if (isnan(t)) {
+        int y_new = filterKpMask( getKp(gray_img, depth_img, K_, t_new) ).size() - target_num_kp_;
+
+        if ( std::abs(y_new) < 5 )
+        {
+          t = t_new;
+          break;
+        }
+
+        std::cout << " y_left " << y_left << " y_right " << y_right << " y_new " << y_new << std::endl;
+        std::cout << " t_left " << t_left << " t_right " << t_right << " t_new " << t_new << std::endl;
+
+        if ( y_new > y_left )
+        {
+          y_right = y_left;
+          y_left = y_new;
+          t_right = t_left;
+          t_left = t_new;
+        }
+        else if ( y_new >= y_right )
+        {
+          // we know that y_left < 0 and y_right > 0 !
+          if ( y_new < 0 )
+          {
+            y_right = y_new;
+            t_right = t_new;
+          }
+          else
+          {
+            y_left = y_new;
+            t_left = t_new;
+          }
+        }
+        else
+        {
+          y_left = y_right;
+          y_right = y_new;
+          t_left = t_right;
+          t_right = t_new;
+        }
+
+        if (t_right < 0) {
           std::cout << "ERROR: cannot find enough keypoints!" << std::endl;
           exit(-1);
         }
-
-        if (t < 0)
-          t = 0;
-        std::cout << " t_" << its + 1 << " = " << t << std::endl;
 
         /*
          cv::Mat kp_img;
@@ -498,9 +526,6 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
          cv::imshow("KP", kp_img);
          cv::waitKey(200);
          */
-
-        its++;
-        std::cout << std::endl;
       }
     }
 
@@ -540,10 +565,11 @@ void ExtractDetectorFile::extractAllKeypoints() {
   daft_ns::DAFT::DetectorParams det_p;
   daft_ns::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  det_p.min_px_scale_ = 3;
+  det_p.min_px_scale_ = 2.5;
   //det_p.base_scale_ = 0.05;
   //det_p.scale_levels_ = 1;
-  det_p.det_threshold_ = 0.0109759;
+  det_p.det_threshold_ = 0.05;
+  //det_p.pf_type_ = det_p.PF_NONE;
   det_p.pf_threshold_ = 5;
 
   det_p.det_type_=det_p.DET_FELINE;
@@ -551,7 +577,7 @@ void ExtractDetectorFile::extractAllKeypoints() {
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT" );
 
-  det_p.det_type_=det_p.DET_BOX;
+  //det_p.det_type_=det_p.DET_BOX;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
 
   //det_p.min_px_scale_ = 4;
@@ -585,8 +611,7 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask(
     }
   }
 
-  std::cout << "Filtered Keypoints: " << kp_filtered.size()
-      << "   Standard Keypoints: " << kp.size() << std::endl;
+  std::cout << kp_filtered.size() << "   of " << kp.size() << " keypoints within mask boundaries." << std::endl;
   std::cout << std::endl;
   return kp_filtered;
 }
@@ -600,7 +625,7 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
   double_t ax, bx, ay, by, a_length, b_length, alpha_a, alpha_b;
   double_t A, B, C;
 
-  std::string filePath = file_created_folder_ + "/" + img_name + "."
+  std::string filePath = kp_folder_ + "/" + img_name + "."
       + extension;
 
   // open file
