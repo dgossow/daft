@@ -58,14 +58,12 @@ public:
 
 private:
 
-  cv::Matx33f calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_original);
+  cv::Matx33f calculateInitialHomography( btTransform transform_camx_to_original, btTransform transform_original );
   cv::Matx33f calculateInitialHomography( cv::Mat& img1, cv::Mat& img2 );
 
   bool checkBoarderKP( cv::Mat image, float_t x_pos, float_t y_pos );
 
   int32_t calculateNCC(cv::Mat image_original, cv::Mat image_cam_x, cv::KeyPoint keypoint, cv::Point2f& keypointNCC, int i);
-
-  void printMat(cv::Matx33f M);
 
   void writeHomographyToFile(cv::Matx33f homography, uint32_t count);
 
@@ -75,20 +73,28 @@ private:
 
   void writeMaskPointsToFile( std::vector<cv::Point2f> maskPoints );
 
-  void splitFileName (const std::string& str);
 
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
 
+  void markMissingDepthInfo( cv::Mat& rgb_image, cv::Mat& depth_image );
+
+  void getKeypointsROI( cv::Mat& rgb_image, cv::Mat& depth_image );
+
   tf::StampedTransform calculateCoordinatesystem( cv::Mat& depth_img, std::vector<cv::Point2f> mouseKeypoints );
 
-  static std::string int2str( uint32_t i );
+  void printMat( cv::Matx33f M );
+  float getAspect( std::vector< cv::Point2f > pts );
+  void splitFileName ( const std::string& str );
+  void drawNumbers( cv::Mat& image, std::vector<cv::Point2f> keypoints );
+  void drawKeypoints( cv::Mat& image, std::vector<cv::Point2f>& keypoints );
 
+  static std::string int2str( uint32_t i );
   static void insertKeypoints( cv::Point2f keypoint, std::vector<cv::Point2f>& vec );
 
   static void imgMouseCallbackKP( int event, int x, int y, int flags, void* param );
   static void imgMouseCallbackROI( int event, int x, int y, int flags, void* param );
 
-  float getAspect( std::vector< cv::Point2f > pts );
+
 
   std::string file_path_;
   std::string file_name_;
