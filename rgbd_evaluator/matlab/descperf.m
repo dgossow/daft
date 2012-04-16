@@ -1,4 +1,4 @@
-function [cmatch_nn, tmatch_nn,cmatch_sim,tmatch_sim,cmatch_rn,tmatch_rn]=descperf(file1,file2,Hom,imf1,imf2,corresp_nn,twi)
+function [cmatch_nn, tmatch_nn,cmatch_sim,tmatch_sim,cmatch_rn,tmatch_rn]=descperf(file1,file2,make_circles,Hom,imf1,imf2,corresp_nn,twi)
 %
 %
 %Computes repeatability and overlap score between two lists of features
@@ -77,9 +77,9 @@ end
 HI=H(:, 1:3);
 H=inv(HI);
 fprintf(1,'Projecting 1 to 2...');
-[feat1 feat1t scales1]=project_regions(feat1',HI);
+[feat1 feat1t scales1]=project_regions(feat1',HI,make_circles);
 fprintf(1,'and 2 to 1...\n');
-[feat2 feat2t scales2]=project_regions(feat2',H);
+[feat2 feat2t scales2]=project_regions(feat2',H,make_circles);
 
 sf=min([size(feat1,1) size(feat2t,1)]);
 
@@ -200,89 +200,4 @@ fprintf(1,'\nnb correct match rn: ');
 fprintf(1,'%d ',cmatch_rn);
 fprintf(1,'\n');
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [feat,featp,scales]=project_regions(feat,H)
-
-s=size(feat);
-s1=s(1);
-
-featp=feat;
-scales=zeros(1,s1);
-
-for c1=1:s1,%%%%%%%%%%%%%%%%%
-%feat(c1,3:5)=(1/25)*feat(c1,3:5);
-Mi1=[feat(c1,3) feat(c1,4);feat(c1,4) feat(c1,5)];
-
-%compute affine transformation
-[v1 e1]=eig(Mi1);
-d1=(1/sqrt(e1(1))); 
-d2=(1/sqrt(e1(4))); 
-sc1=sqrt(d1*d2);
-feat(c1,6)=d1;
-feat(c1,7)=d2; 
-scales(c1)=sqrt(feat(c1,6)*feat(c1,7));
-
-%bounding box
-feat(c1,8) = sqrt(feat(c1,5)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
-feat(c1,9) = sqrt(feat(c1,3)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
-
-
-Aff=getAff(feat(c1,1),feat(c1,2),sc1, H);
-
-%project to image 2
-l1=[feat(c1,1),feat(c1,2),1];
-l1_2=H*l1';
-l1_2=l1_2/l1_2(3);
-featp(c1,1)=l1_2(1);
-featp(c1,2)=l1_2(2);
-BMB=inv(Aff*inv(Mi1)*Aff');
-[v1 e1]=eig(BMB);
-featp(c1,6)=(1/sqrt(e1(1)));
-featp(c1,7)=(1/sqrt(e1(4))); 
-featp(c1,3:5)=[BMB(1) BMB(2) BMB(4)];
-%bounding box in image 2
-featp(c1,8) = sqrt(featp(c1,5)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
-featp(c1,9) = sqrt(featp(c1,3)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
-end
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function Aff=getAff(x,y,sc,H)
-h11=H(1);
-h12=H(4);
-h13=H(7);
-h21=H(2);
-h22=H(5);
-h23=H(8);
-h31=H(3);
-h32=H(6);
-h33=H(9);
-fxdx=h11/(h31*x + h32*y +h33) - (h11*x + h12*y +h13)*h31/(h31*x + h32*y +h33)^2;
-fxdy=h12/(h31*x + h32*y +h33) - (h11*x + h12*y +h13)*h32/(h31*x + h32*y +h33)^2;
-
-fydx=h21/(h31*x + h32*y +h33) - (h21*x + h22*y +h23)*h31/(h31*x + h32*y +h33)^2;
-fydy=h22/(h31*x + h32*y +h33) - (h21*x + h22*y +h23)*h32/(h31*x + h32*y +h33)^2;
-
-          Aff=[fxdx fxdy;fydx fydy];
-end
-
-
-function [feat nb dim]=loadFeatures(file)
-fid = fopen(file, 'r');
-dim=fscanf(fid, '%f',1);
-if dim==1
-dim=0;
-end
-nb=fscanf(fid, '%d',1);
-feat = fscanf(fid, '%f', [5+dim, inf]);
-fclose(fid);
 end

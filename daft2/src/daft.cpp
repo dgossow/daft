@@ -21,7 +21,7 @@
 namespace cv {
 namespace daft2 {
 
-#define SHOW_DEBUG_WIN
+//#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
