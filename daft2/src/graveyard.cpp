@@ -19,7 +19,6 @@
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-
 /*!
  Compute the kernel response for every pixel of the given image.
  The kernel size and shape will be a local affine transformation.

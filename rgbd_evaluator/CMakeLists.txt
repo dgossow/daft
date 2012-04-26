@@ -14,6 +14,11 @@ rosbuild_check_for_sse ()
 # Find OpenCV
 find_package(OpenCV REQUIRED)
 
+# Find Eigen
+find_package(Eigen REQUIRED)
+include_directories(${EIGEN_INCLUDE_DIRS})
+add_definitions(${EIGEN_DEFINITIONS})
+
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
@@ -30,34 +35,34 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3  -march=native ${SSE_FLAGS
 #add_definitions(${EIGEN_DEFINITIONS})
 
 # Make OpenCV test node
-rosbuild_add_executable (test_rgbd_cv
-src/test_rgbd_cv_node.cpp
-)
-rosbuild_link_boost(test_rgbd_cv signals)
-target_link_libraries(test_rgbd_cv ${OpenCV_LIBS})
+#rosbuild_add_executable (test_rgbd_cv
+#src/test_rgbd_cv_node.cpp
+#)
+#rosbuild_link_boost(test_rgbd_cv signals)
+#target_link_libraries(test_rgbd_cv ${OpenCV_LIBS})
 
 # Make OpenCV test node
-rosbuild_add_executable (test_transpose
-src/test_transpose_node.cpp
-)
-target_link_libraries(test_transpose ${OpenCV_LIBS})
+#rosbuild_add_executable (test_transpose
+#src/test_transpose_node.cpp
+#)
+#target_link_libraries(test_transpose ${OpenCV_LIBS})
 
 # Make preprocessing app
-rosbuild_add_executable (rgbd_preprocessing 
-src/rgbd_preprocessing.cpp
-)
-target_link_libraries(rgbd_preprocessing  ${OpenCV_LIBS})
+#rosbuild_add_executable (rgbd_preprocessing 
+#src/rgbd_preprocessing.cpp
+#)
+#target_link_libraries(rgbd_preprocessing  ${OpenCV_LIBS})
 
 # Make extract_detector_file app
-rosbuild_add_executable (extract_detector 
-src/extract_detector_file.cpp
+rosbuild_add_executable (extract_features 
+src/extract_features.cpp
 src/sift/Sift.cpp
 src/parallelsurf/Image.cpp
 src/parallelsurf/KeyPointDescriptor.cpp
 src/parallelsurf/KeyPointDetector.cpp
 src/parallelsurf/MathStuff.cpp  
 )
-target_link_libraries(extract_detector ${OpenCV_LIBS})
+target_link_libraries(extract_features ${OpenCV_LIBS})
 
 # Make apply blur noise app
 rosbuild_add_executable (apply_blur_noise 

@@ -9,7 +9,7 @@
   <author>David Gossow</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  
+ 
   <depend package="opencv_extra"/>
   
   <export> 

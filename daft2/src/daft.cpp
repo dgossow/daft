@@ -39,7 +39,8 @@ DAFT::~DAFT() {
 
 
 void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
-    cv::Matx33f K, std::vector<KeyPoint3D> & kp ) {
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp )
+{
   if (image.size != depth_map_orig.size) {
     return;
   }
@@ -202,8 +203,20 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     computeDepthGrad( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, depth_grad );
 
 #ifdef SHOW_DEBUG_WIN
+<<<<<<< HEAD
     std::stringstream s; s<<"smooth_depth s="<<scale;
     imshowNorm( s.str(), smoothed_depth_map, 0 );
+=======
+    {
+    std::stringstream s; s<<" s="<<scale;
+
+    imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
+    std::vector<cv::Mat> depth_grads;
+    cv::split(depth_grad,depth_grads);
+    imshowNorm( "depth grad.x" + s.str(), depth_grads[0], 0 );
+    imshowNorm( "depth grad.y" + s.str(), depth_grads[1], 0 );
+    }
+>>>>>>> 289f2fce799708b7e2bb1a5966db7f10801326b9
 #endif
 
     // compute filter response for all pixels
