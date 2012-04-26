@@ -27,6 +27,7 @@ static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar&
     {
       Size2f bsize( p.affine_major, p.affine_minor );
       cv::RotatedRect box( p.pt, bsize, p.affine_angle/M_PI*180.0 );
+      ellipse( img, box, cv::Scalar(0,0,0), 2, 16 );
       ellipse( img, box, color, 1, 16 );
     }
     else

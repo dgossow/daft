@@ -247,23 +247,23 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
 
         if ( show_win )
         {
-          //Size2f bsize( float(PATCH_MUL)*weight,float(PATCH_MUL)*weight );
-          Size2f bsize( float(PATCH_MUL)*1.0,float(PATCH_MUL)*1.0 );
-          //Size2f bsize( float(PATCH_MUL),float(PATCH_MUL) );
-          cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, kp.affine_angle/M_PI*180.0 );
-          ellipse( points3d_img, box, cv::Scalar(val*255,val*255,val*255),-1, CV_AA );
-          //ellipse( points3d_img, box, cv::Scalar(128,0,0),1, CV_AA );
-
           patch_weights[v][u] = weight;
           patch_dx[v][u] = dx;
           patch_dy[v][u] = dy;
 
-          if ( !isnan( patch_dx[v][u] ) && !isnan( patch_dy[v][u] ) )
+          if (!isnan(val))
           {
-            Size2f bsize( 3,3 );
-            cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
-            ellipse( display_img, box, cv::Scalar(0,255,0), 1, CV_AA );
+            //Size2f bsize( float(PATCH_MUL)*weight,float(PATCH_MUL)*weight );
+            Size2f bsize( float(PATCH_MUL)*1.0,float(PATCH_MUL)*1.0 );
+            //Size2f bsize( float(PATCH_MUL),float(PATCH_MUL) );
+            cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, kp.affine_angle/M_PI*180.0 );
+            ellipse( points3d_img, box, cv::Scalar(val*255,val*255,val*255),-1, CV_AA );
+            //ellipse( points3d_img, box, cv::Scalar(128,0,0),1, CV_AA );
           }
+
+          Size2f bsize( 3,3 );
+          cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
+          ellipse( display_img, box, cv::Scalar(0,255,0), 1, CV_AA );
         }
       }
     }

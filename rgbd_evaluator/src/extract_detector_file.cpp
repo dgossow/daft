@@ -448,7 +448,7 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
     std::cout << name << std::endl;
 
-    if (it == it_begin)
+    if (it == it_begin && target_num_kp_ != 0)
     {
       // find optimal thresholds by secant method
       float t_left = 1;

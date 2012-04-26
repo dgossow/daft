@@ -16,7 +16,6 @@ namespace daft2
 
 const float nan = std::numeric_limits<float>::quiet_NaN();
 
-/*
 inline void imshow( std::string win_title, cv::Mat img )
 {
   cv::Mat img2 = img;
@@ -25,10 +24,11 @@ inline void imshow( std::string win_title, cv::Mat img )
     img.convertTo( img2, CV_8U, 255, 0.0);
   }
 
-  cv::imshow( "x"+ win_title, img2 );
-  cv::imwrite( "/tmp/img/"+win_title+".png", img2 );
+  //cv::imshow( "x"+ win_title, img2 );
+  std::string im_f = "/tmp/img/"+win_title+".png";
+  std::cout << "Writing " << im_f << std::endl;
+  cv::imwrite( im_f, img2 );
 }
-*/
 
 inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
 {

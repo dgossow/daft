@@ -1,4 +1,4 @@
-# Install script for directory: /work/gossow/rgbdfeatures/rgbdfeatures/opencv_extra
+# Install script for directory: /home/dgossow/rgbd-features/opencv_extra
 
 # Set the install prefix
 IF(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -38,7 +38,7 @@ ELSE(CMAKE_INSTALL_COMPONENT)
   SET(CMAKE_INSTALL_MANIFEST "install_manifest.txt")
 ENDIF(CMAKE_INSTALL_COMPONENT)
 
-FILE(WRITE "/work/gossow/rgbdfeatures/rgbdfeatures/opencv_extra/${CMAKE_INSTALL_MANIFEST}" "")
+FILE(WRITE "/home/dgossow/rgbd-features/opencv_extra/${CMAKE_INSTALL_MANIFEST}" "")
 FOREACH(file ${CMAKE_INSTALL_MANIFEST_FILES})
-  FILE(APPEND "/work/gossow/rgbdfeatures/rgbdfeatures/opencv_extra/${CMAKE_INSTALL_MANIFEST}" "${file}\n")
+  FILE(APPEND "/home/dgossow/rgbd-features/opencv_extra/${CMAKE_INSTALL_MANIFEST}" "${file}\n")
 ENDFOREACH(file)
