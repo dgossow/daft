@@ -83,6 +83,9 @@ fprintf(1,'Projecting 1 to 2...');
 fprintf(1,'and 2 to 1...\n');
 [feat2 feat2t scales2t]=project_regions(feat2',H,make_circles);
 
+scales1=sqrt(feat1(:,6).*feat1(:,7));
+scales2=sqrt(feat2(:,6).*feat2(:,7));
+
 %fprintf(1,'size_x %f %f\n',feat1(1,8), feat1t(1,8));
 %fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
 
@@ -108,8 +111,12 @@ im2x=size(im2);
 im2y=im2x(1);
 im2x=im2x(2);
 
+min([scales1;scales2])
+pause(2);
+
 %.. scales1'>9 & ..
 ind=find(scales1t'>6 & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+%ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
 
@@ -124,6 +131,7 @@ feat1t=feat1t(ind,:);
 %scales1=scales1(ind);
 
 ind=find(scales2t'>6 & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
+%ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);
 
@@ -146,7 +154,7 @@ end
 
 %sfigure(11);
 %display_projected_features(imf2,feat2',feat1t');
-%pause(1);
+%drawnow;
 
 sf=min([size(feat1,1) size(feat2t,1)]);
 

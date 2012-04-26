@@ -17,6 +17,8 @@
 #include <math.h>
 #include <boost/timer.hpp>
 
+#include <stdio.h>
+
 #include <sensor_msgs/image_encodings.h>
 
 #define daft_ns cv::daft2
@@ -382,6 +384,72 @@ std::vector<cv::KeyPoint3D> getSiftKp(const cv::Mat& gray_img,
   return makeKp3d(kps, descriptors);
 }
 
+std::vector<cv::KeyPoint3D> getOrbKp(const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+{
+  //cv::Mat gray_img_small;
+  //cv::resize( gray_img, gray_img_small, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR);
+  //cv::imshow("gray_img_small",gray_img_small);
+  //cv::waitKey(100);
+
+  cv::ORB::CommonParams p;
+  p.first_level_ = 0;
+  p.n_levels_ = 15;
+  p.scale_factor_ = 1.4;
+  cv::ORB orb( t, p );
+
+//  explicit ORB(int nfeatures = 500, float scaleFactor = 1.2f, int nlevels = 8, int edgeThreshold = 31,
+//                   int firstLevel = 0, int WTA_K=2, int scoreType=0, int patchSize=31 )
+
+  /*
+  int nfeatures = (int)(t);
+  float scaleFactor = 1.2f;
+  int nlevels = 30;
+  int edgeThreshold = 31;
+  int firstLevel = 0;
+  int WTA_K=2;
+  int scoreType=0;
+  int patchSize=31;
+
+  cv::ORB orb( nfeatures, scaleFactor, nlevels, edgeThreshold, firstLevel, WTA_K, scoreType, patchSize );
+  */
+
+  std::vector<cv::KeyPoint> kps;
+  cv::Mat1b desc;
+
+  orb.operator ()( gray_img, cv::Mat(), kps, desc, false );
+
+  std::cout << desc.type() << std::endl;
+  std::cout << desc.rows << std::endl;
+  std::cout << desc.cols << std::endl;
+  //std::cout << kps.size() << std::endl;
+
+  cv::Mat1d descriptors( desc.rows, desc.cols*8 );
+  for ( int i=0; i<desc.rows; i++ )
+  {
+    for ( int j=0; j<desc.cols; j++ )
+    {
+      //std::cout << int(desc(i,j)) << " = ";
+      for ( unsigned k=0; k<8; k++ )
+      {
+        //std::cout << ((desc(i,j) >> k) & 1 );
+        descriptors(i,j*8+k) = ((desc(i,j) >> k) & 1 );
+      }
+      //std::cout << std::endl;
+    }
+  }
+
+  for ( unsigned i=0; i<kps.size(); i++ )
+  {
+    //std::cout << kps[i].octave << std::endl;
+    kps[i].size = 6.0 * kps[i].octave;
+    //kps[i].size *= 12.0/(float)patchSize;
+    //kps[i].pt *= ;
+    //std::cout << kps[i].size << std::endl;
+  }
+
+  return makeKp3d(kps, descriptors);
+}
+
 std::vector<cv::KeyPoint3D> getDaftKp(daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
     const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
 {
@@ -406,7 +474,8 @@ std::vector<cv::KeyPoint3D> getDaftKp(daft_ns::DAFT::DetectorParams p_det, daft_
    */
 }
 
-void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
+void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, float t)
+{
   uint32_t count = 1;
   bool first_image = true;
 
@@ -420,8 +489,6 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
   it_step = 1;
   it_begin = image_store_.begin();
   it_end = image_store_.end();
-
-  float t = 1;
 
   // !!! -1 because of the initial push_back in createTestFiles() ... !!!
   for (it = it_begin; it != it_end; it += it_step) {
@@ -448,11 +515,11 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
     std::cout << name << std::endl;
 
-    if (it == it_begin)
+    if (target_num_kp_ != 0 && it == it_begin)
     {
       // find optimal thresholds by secant method
-      float t_left = 1;
-      float t_right = 10;
+      float t_left = t*0.5;
+      float t_right = t*2;
 
       int y_left = filterKpMask( getKp(gray_img, depth_img, K_, t_left) ).size() - target_num_kp_;
       int y_right = filterKpMask( getKp(gray_img, depth_img, K_, t_right) ).size() - target_num_kp_;
@@ -461,7 +528,6 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
       while (true)
       {
-
         float t_new;
         if ( y_left > 0 && y_right == -target_num_kp_ )
         {
@@ -473,6 +539,11 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
         {
           // compute zero crossing of secant
           t_new = t_right - (float(t_right - t_left) / float(y_right - y_left) * float(y_right));
+        }
+
+        if ( t_new < 0 )
+        {
+          t_new = 0;
         }
 
         int y_new = filterKpMask( getKp(gray_img, depth_img, K_, t_new) ).size() - target_num_kp_;
@@ -515,8 +586,9 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
           t_right = t_new;
         }
 
-        if (t_right < 0) {
+        if ( !finite(t_right) ) {
           std::cout << "ERROR: cannot find enough keypoints!" << std::endl;
+          getchar();
           exit(-1);
         }
 
@@ -527,6 +599,14 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
          cv::waitKey(200);
          */
       }
+
+      std::cout << std::endl;
+      std::cout << "----------------------------------------";
+      std::cout << std::endl;
+      std::cout << name << ": t = " << t << std::endl;
+      std::cout << std::endl;
+      std::cout << "----------------------------------------";
+      std::cout << std::endl;
     }
 
     std::stringstream s;
@@ -542,7 +622,7 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
       cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0, 0, 255),
           cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-      storeKeypoints(kp, s.str(), name, rgb_img);
+      storeKeypoints(kp, s.str(), name, rgb_img, rgb_img);
     } else {
       cv::Mat first_kp_img_warped = rgb_img.clone();
       cv::warpPerspective(first_kp_img, first_kp_img_warped, cv::Mat(it->hom),
@@ -550,7 +630,7 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
 
       printMat(it->hom);
 
-      storeKeypoints(kp, s.str(), name, first_kp_img_warped);
+      storeKeypoints(kp, s.str(), name, rgb_img, first_kp_img_warped);
     }
 
     if (verbose_) {
@@ -565,30 +645,30 @@ void ExtractDetectorFile::extractAllKeypoints() {
   daft_ns::DAFT::DetectorParams det_p;
   daft_ns::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  det_p.min_px_scale_ = 2.5;
-  //det_p.base_scale_ = 0.05;
+  //det_p.min_px_scale_ = 2.5;
+  //det_p.base_scale_ = 0.025;
   //det_p.scale_levels_ = 1;
-  det_p.det_threshold_ = 0.2;
   //det_p.pf_type_ = det_p.PF_NONE;
-  det_p.pf_threshold_ = 5;
+  //det_p.pf_threshold_ = 5;
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT" );
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT", 3.16326 );
 
-  //det_p.affine_=false;
-  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine" );
+  det_p.affine_=false;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine", 3.16326 );
 
-  det_p.det_type_=det_p.DET_BOX;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
+  //det_p.det_type_=det_p.DET_BOX;
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
 
   //det_p.min_px_scale_ = 4;
   //desc_p.octave_offset_ = -1;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
-  extractKeypoints( &getSurfKp, "SURF" );
-  extractKeypoints( &getSiftKp, "SIFT" );
+  //extractKeypoints( &getSurfKp, "SURF", 107.981 );
+  extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
+  extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
 
 void ExtractDetectorFile::printMat(cv::Matx33f M) {
@@ -620,7 +700,7 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask(
 }
 
 void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
-    std::string img_name, std::string extension, cv::Mat& rgb_img) {
+    std::string img_name, std::string extension, cv::Mat& rgb_img, cv::Mat& warped_img ) {
   if (keypoints.size() == 0) {
     return;
   }
@@ -690,18 +770,23 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
   file.close();
 
   // draw keypoints
-  cv::Mat kp_img;
+  cv::Mat kp_img,warped_kp_img;
 
+  cv::drawKeypoints3D(warped_img, keypoints, warped_kp_img, cv::Scalar(255, 255, 255),
+      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
   cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255, 255, 255),
       cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
+  /*
   cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
       cv::Scalar(0, 0, 0), 5, CV_AA);
   cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
       cv::Scalar(255, 255, 255), 2, CV_AA);
+  */
 
   if (verbose_) {
     cv::imshow("kp", kp_img);
+    cv::imshow("kp warped", warped_kp_img);
     cv::waitKey(50);
   }
 
@@ -716,10 +801,13 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
 
   std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name
       + ".ppm";
-
   std::cout << "Writing " << img_file_name << std::endl;
-
   cv::imwrite(img_file_name, kp_img);
+
+  std::string warped_img_file_name = extra_folder_ + "/warped " + extension + "_" + img_name
+      + ".ppm";
+  std::cout << "Writing " << warped_img_file_name << std::endl;
+  cv::imwrite(warped_img_file_name, warped_kp_img);
 }
 
 void ExtractDetectorFile::splitFileName(const std::string& str) {
@@ -753,7 +841,7 @@ int main(int argc, char** argv) {
   }
 
   bool verbose = false;
-  int num_kp = 500;
+  int num_kp = 0;
   std::vector<std::string> bagfiles;
 
   for (int i = 1; i < argc; i++) {

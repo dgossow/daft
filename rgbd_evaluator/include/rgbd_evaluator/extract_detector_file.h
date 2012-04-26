@@ -13,7 +13,7 @@
 #include <rosbag/view.h>
 #include <rosbag/message_instance.h>
 
-#include <cv_bridge/cv_bridge.h>
+//#include <cv_bridge/cv_bridge.h>
 
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -24,7 +24,7 @@
 #include <boost/foreach.hpp>
 
 #include <daft2/daft.h>
-#include <daft/daft.h>
+//#include <daft/daft.h>
 
 namespace rgbd_evaluator
 {
@@ -50,9 +50,10 @@ private:
 
   typedef boost::function< std::vector<cv::KeyPoint3D> ( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t ) > GetKpFunc;
 
-  void extractKeypoints( GetKpFunc getKp, std::string name );
+  void extractKeypoints( GetKpFunc getKp, std::string name, float t );
 
-  void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name, std::string extension, cv::Mat& rgb_img );
+  void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name,
+      std::string extension, cv::Mat& rgb_img, cv::Mat& warped_img );
 
   std::vector<cv::KeyPoint3D> filterKpMask( std::vector<cv::KeyPoint3D> kp );
 

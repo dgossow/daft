@@ -21,7 +21,7 @@ namespace daft2
 
 
 void computeDepthGrad(
-        const Mat1f &scale_map,
+    const Mat1f &scale_map,
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,

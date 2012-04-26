@@ -67,6 +67,7 @@ end
 
 sfigure(2);
 axis 'auto y'
+pause(0.1);
 
 print(sfigure(1),'-dpdf',sprintf('%srepeatability.pdf',graph_path))
 print(sfigure(2),'-dpdf',sprintf('%snum_correspondences.pdf',graph_path))

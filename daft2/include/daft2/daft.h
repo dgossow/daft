@@ -35,7 +35,7 @@ public:
         float base_scale = 1,
         float scale_factor = 2.0,
         int scale_levels = AUTO,
-        float min_px_scale = 3,
+        float min_px_scale = 2.5,
         float max_px_scale = AUTO,
         int detector_type = DET_BOX,
         float det_threshold = 0.02,

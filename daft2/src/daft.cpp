@@ -34,7 +34,8 @@ DAFT::~DAFT() {
 
 
 void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
-    cv::Matx33f K, std::vector<KeyPoint3D> & kp ) {
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp )
+{
   if (image.size != depth_map_orig.size) {
     return;
   }
@@ -209,7 +210,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     std::vector<cv::Mat> depth_grads;
     cv::split(depth_grad,depth_grads);
     imshowNorm( "depth grad.x" + s.str(), depth_grads[0], 0 );
-    imshowNorm( "depth grad.y" + s.str(), depth_grads[0], 0 );
+    imshowNorm( "depth grad.y" + s.str(), depth_grads[1], 0 );
     }
 #endif
 
