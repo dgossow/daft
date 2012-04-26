@@ -21,13 +21,8 @@
 namespace cv {
 namespace daft2 {
 
-<<<<<<< HEAD
-#define SHOW_DEBUG_WIN
-#define FIND_MAXKP
-=======
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
->>>>>>> 9b8d6740864c4e05852820872d35d52cf0b2944d
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
     det_params_(detector_params), desc_params_(descriptor_params) {
