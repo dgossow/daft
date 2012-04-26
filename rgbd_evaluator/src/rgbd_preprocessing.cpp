@@ -158,7 +158,7 @@ void RgbdEvaluatorPreprocessing::createTestFiles()
 
         image_store_.push_back( image_data );
         image_data = ImageData();
-        std::cout << "Storing dataset #" << count << std::endl;
+//        std::cout << "Storing dataset #" << count << std::endl;
         count++;
       }
   }
@@ -187,19 +187,105 @@ void RgbdEvaluatorPreprocessing::writeDepth( cv::Mat& depth_img_orig, std::strin
   }
 }
 
-float RgbdEvaluatorPreprocessing::getAspect( std::vector< cv::Point2f > pts )
+void RgbdEvaluatorPreprocessing::markMissingDepthInfo( cv::Mat& rgb_image, cv::Mat& depth_image )
 {
-  cv::Point2f minp(100000,100000),maxp(0,0);
-  uint32_t k;
-  for(k = 0; k < pts.size(); k++)
+  for(int32_t h = 0; h < rgb_image.cols; h++)
   {
-    maxp.x = std::max ( pts[k].x, maxp.x );
-    maxp.y = std::max ( pts[k].y, maxp.y );
-    minp.x = std::min ( pts[k].x, minp.x );
-    minp.y = std::min ( pts[k].y, minp.y );
+    for(int32_t t = 0; t < rgb_image.rows; t++)
+    {
+        if (std::isnan(depth_image.at<float>(t,h)))
+        {
+          rgb_image.col(h).row(t) = cv::Scalar(0,(((h+t)/2)%2),0);
+        }
+    }
+  }
+}
+
+void RgbdEvaluatorPreprocessing::getKeypointsROI(cv::Mat& rgb_image, cv::Mat& depth_image )
+{
+#define USED_COLOR CV_RGB(0, 0, 255)
+
+  // image for choosing area of interest
+  std::string windowNameROI = "Choose Area of interest";
+
+  if(!finishedROI_)
+  {
+    // image for choosing polygon with region of interest
+    imageChooseROI_ = rgb_image.clone();
+    markMissingDepthInfo(imageChooseROI_, depth_image);
+
+    cv::imshow( windowNameROI , imageChooseROI_ );
+    cv::waitKey(50);
+
+    // Set up the callback for choosing polygon
+    cv::setMouseCallback( windowNameROI, imgMouseCallbackROI, this);
   }
 
-  return (maxp.x/minp.x) / (maxp.y/minp.y);
+  std::vector<cv::KeyPoint> keypointsROI;
+  cv::Point2f lastPoint;
+
+  // wait for mouse events
+  while( !finishedROI_ )
+  {
+    // got at least two points
+    if( this->mousePointsROI_.size() > 1 )
+    {
+      // connect lines
+      cv::line(imageChooseROI_, lastPoint, this->mousePointsROI_.back(), USED_COLOR);
+    }
+    // at least one keypoint
+    if( this->mousePointsROI_.size() > 0 )
+    {
+      cv::KeyPoint::convert( mousePointsROI_, keypointsROI );
+      cv::drawKeypoints( imageChooseROI_, keypointsROI, imageChooseROI_, USED_COLOR );
+      markMissingDepthInfo(imageChooseROI_, depth_image);
+      cv::imshow( windowNameROI, imageChooseROI_ );
+
+      // store last point
+      lastPoint = this->mousePointsROI_.back();
+    }
+    cv::waitKey(50);
+  }
+
+  cv::Mat1b mask_img;
+
+  // not enough mouse clicks
+  if ( mousePointsROI_.size() < 3 )
+  {
+    mask_img = cv::Mat::ones(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U);
+    std::cout << "Not enough corner points to fill polygon!" << std::endl;
+  }
+  // draw polygon
+  else
+  {
+    // connect first and last point
+    cv::line(imageChooseROI_, this->mousePointsROI_.at(0), this->mousePointsROI_.back(), USED_COLOR);
+
+    // fill polynom
+    std::vector<cv::Point> pts;
+
+    for(uint32_t k = 0; k < mousePointsROI_.size(); k++)
+    {
+      pts.push_back( mousePointsROI_.at(k) );
+    }
+
+    cv::Point *points;
+    points = &pts[0];
+    int nbtab = pts.size();
+
+    mask_img = cv::Mat1b::zeros(imageChooseROI_.rows, imageChooseROI_.cols);
+    cv::fillPoly(mask_img, (const cv::Point **) &points, &nbtab, 1, CV_RGB(255,255,255));
+  }
+
+  cv::KeyPoint::convert( mousePointsROI_, keypointsROI );
+  cv::drawKeypoints( imageChooseROI_, keypointsROI, imageChooseROI_, USED_COLOR );
+  cv::imshow( windowNameROI, imageChooseROI_ );
+
+  std::string maskf = file_created_folder_ + "/" + "mask.pgm";
+  std::cout << "Writing " << maskf << std::endl;
+  cv::imwrite(maskf, mask_img);
+
+  cv::waitKey(20);
 }
 
 void RgbdEvaluatorPreprocessing::calculateHomography()
@@ -207,27 +293,23 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   uint32_t count = 1;
 
   std::vector< ImageData >::iterator it;
-  std::vector<cv::Point2f> feature_vector_img1;
+  std::vector<cv::Point2f> feature_vector_img1, maskPoints_vector;
   std::vector<cv::KeyPoint> kp_vec_img1;
-  std::vector<cv::Point2f> maskPoints_vector;
 
-  cv::Mat img1;
-  cv::Mat last_imgx;
+  cv::Mat img1, last_imgx;
 
   cv::Matx33f homography_final;
   cv::Matx33f homography_complete_last = cv::Matx33f::eye();
 
-  std::vector<float> scalings;
-  std::vector<float> rotations;
-  std::vector<float> angles;
+  std::vector<float> scalings, rotations, angles;
 
-  btVector3 xvec_orig;
-  btVector3 zvec_orig;
-  float dist_orig = 0.0;
-  float aspect_orig = 0.0;
+  btVector3 xvec_orig, zvec_orig;
+
+  float_t dist_orig = 0.0, aspect_orig = 0.0;
 
   tf::StampedTransform transform_original;
 
+  // check the order of the sequence to be processed
   if ( reverse_order_ )
   {
     std::reverse( image_store_.begin(), image_store_.end() );
@@ -246,83 +328,9 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     cv::Mat imgx = it->rgb_image;
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // image for choosing area of interest
-    std::string windowNameROI = "Choose Area of interest";
 
-    if(!finishedROI_)
-    {
-      // image for choosing polygon with region of interest
-      imageChooseROI_ = imgx.clone();
-
-      cv::imshow( windowNameROI , imageChooseROI_ );
-      cv::waitKey(50);
-
-      // Set up the callback for choosing polygon
-      cv::setMouseCallback( windowNameROI, imgMouseCallbackROI, this);
-    }
-
-    std::vector<cv::KeyPoint> tmpPointsROI;
-    cv::Point2f lastPoint;
-
-    // wait for mouse events
-    while( !finishedROI_ )
-    {
-      // got at least two points
-      if( this->mousePointsROI_.size() > 1 )
-      {
-        // connect lines
-        cv::line(imageChooseROI_, lastPoint, this->mousePointsROI_.back(), CV_RGB(0, 255, 0));
-      }
-
-      if( this->mousePointsROI_.size() > 0 )
-      {
-        cv::KeyPoint::convert( mousePointsROI_, tmpPointsROI );
-        cv::drawKeypoints( imageChooseROI_, tmpPointsROI, imageChooseROI_, CV_RGB(0, 255, 0) );
-        cv::imshow( windowNameROI, imageChooseROI_ );
-
-        // store last point
-        lastPoint = this->mousePointsROI_.back();
-      }
-
-      cv::waitKey(50);
-    }
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    cv::Mat1b mask_img;
-    if ( mousePointsROI_.size() < 3 )
-    {
-      mask_img = cv::Mat::ones(imageChooseROI_.rows, imageChooseROI_.cols, CV_8U);
-    }
-    else
-    {
-      // connect first and last point
-      cv::line(imageChooseROI_, this->mousePointsROI_.at(0), this->mousePointsROI_.back(), CV_RGB(0, 255, 0));
-
-      // fill polynom
-      std::vector<cv::Point> pts;
-
-      for(uint32_t k = 0; k < mousePointsROI_.size(); k++)
-      {
-        pts.push_back( mousePointsROI_.at(k) );
-      }
-
-      cv::Point *points;
-      points = &pts[0];
-      int nbtab = pts.size();
-
-      mask_img = cv::Mat1b::zeros(imageChooseROI_.rows, imageChooseROI_.cols);
-      cv::fillPoly(mask_img, (const cv::Point **) &points, &nbtab, 1, CV_RGB(255,255,255));
-    }
-
-    cv::KeyPoint::convert( mousePointsROI_, tmpPointsROI );
-    cv::drawKeypoints( imageChooseROI_, tmpPointsROI, imageChooseROI_, CV_RGB(0, 255, 0) );
-    cv::imshow( windowNameROI, imageChooseROI_ );
-
-    std::string maskf = file_created_folder_ + "/" + "mask.pgm";
-    std::cout << "Writing " << maskf << std::endl;
-    cv::imwrite(maskf, mask_img);
-
-    cv::waitKey(50);
+    // get mask for region of interest
+    getKeypointsROI(imgx, it->depth_image );
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -337,16 +345,8 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
     // Set up the callback
     cv::setMouseCallback( windowName, imgMouseCallbackKP, this);
 
-    for(int h = 0; h < keyPointImageOrigin_.cols; h++)
-    {
-      for(int t = 0; t < keyPointImageOrigin_.rows; t++)
-      {
-          if (std::isnan(it->depth_image.at<float>(t,h)))
-          {
-            keyPointImageOrigin_.col(h).row(t) = cv::Scalar(0,(((h+t)/2)%2),0);
-          }
-      }
-    }
+    // filter missing depth info
+    markMissingDepthInfo(keyPointImageOrigin_, it->depth_image);
 
     cv::imshow( windowName, keyPointImageOrigin_ );
 
@@ -367,16 +367,13 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
         if(this->mouseKeypointsOrigin_.size() > 0 )
         {
           keyPointImageOrigin_ = imgx.clone();
-          // draw keypoints
-          cv::KeyPoint::convert( mouseKeypointsOrigin_, tmpKeypoints );
-          cv::drawKeypoints(keyPointImageOrigin_, tmpKeypoints, keyPointImageOrigin_, CV_RGB(255,0,0));
 
+          // draw keypoints
+          drawKeypoints(keyPointImageOrigin_, mouseKeypointsOrigin_);
           // draw respective numbers
-          for( uint32_t i = 0; i < mouseKeypointsOrigin_.size(); i++)
-          {
-            cv::Point2f kp( mouseKeypointsOrigin_.at(i).x + KP_TEXT_PIXEL_OFFSET, mouseKeypointsOrigin_.at(i).y + KP_TEXT_PIXEL_OFFSET );
-            cv::putText(keyPointImageOrigin_, int2str(i+1), kp , cv::FONT_HERSHEY_PLAIN, 4, CV_RGB(255, 0, 0), 3);
-          }
+          drawNumbers( keyPointImageOrigin_, mouseKeypointsOrigin_ );
+          // mark missing depth information with color
+          markMissingDepthInfo(keyPointImageOrigin_, it->depth_image);
 
           cv::imshow(windowName, keyPointImageOrigin_);
           cv::imshow("Image Original", keyPointImageOrigin_);
@@ -387,21 +384,21 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       // reset flag
       finishedKP_ = false;
 
-      cv::KeyPoint::convert( mouseKeypointsOrigin_, tmpKeypoints );
-      cv::drawKeypoints(keyPointImageOrigin_, tmpKeypoints, keyPointImageOrigin_, CV_RGB(255,0,0));
+      drawKeypoints(keyPointImageOrigin_, mouseKeypointsOrigin_);
+
       cv::imshow(windowName, keyPointImageOrigin_);
       cv::imshow("Image Original", keyPointImageOrigin_);
       cv::waitKey(50);
-      // stop drawing
 
-      uint32_t k;
-      for(k = 0; k < mouseKeypointsOrigin_.size(); k++)
+      for(uint32_t k = 0; k < mouseKeypointsOrigin_.size(); k++)
       {
         maskPoints_vector.push_back(mouseKeypointsOrigin_.at(k));
       }
 
       // first image done, received at least 4 points
       std::cout << "First Image processed!" << std::endl;
+
+      /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       // Calculate angle_orig, dist_orig, rotation_orig
       transform_original = calculateCoordinatesystem(it->depth_image, mouseKeypointsOrigin_);
@@ -419,11 +416,6 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       // convert image to grayscale
       cv::Mat image_grayscale;
       cv::cvtColor( img1, image_grayscale, CV_RGB2GRAY );
-      /*
-      cv::goodFeaturesToTrack( image_grayscale, feature_vector_img1, MAX_FEATURE_NUMBER, 0.01,
-                               MIN_FEATURE_NEIGHBOUR_DIST, cv::noArray(), 3, true );
-      cv::KeyPoint::convert( feature_vector_img1, kp_vec_img1 );\
-      */
 
       // save mouse clicks as keypoints
       kp_vec_img1.clear();
@@ -434,6 +426,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
 
       cv::imwrite( file_created_folder_ + "/" + "img1.ppm", img1 );
 
+      // first image finished
       first_image_ = false;
 
     } // endif first img
@@ -448,16 +441,12 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
         if(mouseKeypointsImageX_.size() > 0 )
         {
            keyPointImageOrigin_ = imgx.clone();
-           // draw keypoints
-           cv::KeyPoint::convert( mouseKeypointsImageX_, tmpKeypoints );
-           cv::drawKeypoints(keyPointImageOrigin_, tmpKeypoints, keyPointImageOrigin_,CV_RGB(255,0,0));
-
+           // draw respective keypoints
+           drawKeypoints(keyPointImageOrigin_, mouseKeypointsImageX_);
            // draw respective numbers
-           for( uint32_t i = 0; i < mouseKeypointsImageX_.size(); i++)
-           {
-             cv::Point2f kp( mouseKeypointsImageX_.at(i).x + KP_TEXT_PIXEL_OFFSET, mouseKeypointsImageX_.at(i).y + KP_TEXT_PIXEL_OFFSET );
-             cv::putText(keyPointImageOrigin_, int2str(i+1), kp , cv::FONT_HERSHEY_PLAIN, 4, CV_RGB(255, 0, 0), 3);
-           }
+           drawNumbers( keyPointImageOrigin_, mouseKeypointsImageX_);
+           // mark missing depth information with color
+           markMissingDepthInfo(keyPointImageOrigin_, it->depth_image);
 
            cv::imshow(windowName, keyPointImageOrigin_);
         }
@@ -466,8 +455,8 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       // reset flag
       finishedKP_ = false;
 
-      cv::KeyPoint::convert( mouseKeypointsImageX_, tmpKeypoints );
-      cv::drawKeypoints(keyPointImageOrigin_, tmpKeypoints, keyPointImageOrigin_,CV_RGB(255,0,0));
+      drawKeypoints( keyPointImageOrigin_, mouseKeypointsImageX_ );
+
       cv::imshow(windowName, keyPointImageOrigin_);
       cv::waitKey(50);
 
@@ -481,7 +470,7 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
       std::cout << std::endl;
       std::cout << "Image_" << count_str << " processed!" << std::endl;
 
-      /**************************** calculate initial homography ***************************************************************/
+      //**************************** calculate initial homography ***************************************************************
 
       tf::StampedTransform transform_camx;
       transform_camx = calculateCoordinatesystem(it->depth_image, mouseKeypointsImageX_);
@@ -912,48 +901,6 @@ void RgbdEvaluatorPreprocessing::writeMaskPointsToFile( std::vector<cv::Point2f>
   file.close();
 }
 
-void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
-{
-  std::cout << std::setprecision( 3 ) << std::right << std::fixed;
-  for ( int row = 0; row < 3; ++ row )
-  {
-    for ( int col = 0; col < 3; ++ col )
-    {
-      std::cout << std::setw( 5 ) << (double)M( row, col ) << " ";
-    }
-    std::cout << std::endl;
-  }
-}
-
-void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
-{
-  size_t found;
-  std::cout << "Splitting: " << str << std::endl;
-  found=str.find_last_of("/\\");
-
-  file_path_ = str.substr(0,found);
-  file_name_ = str.substr(found+1);
-
-  found = file_name_.find_last_of(".");
-  file_folder_ = file_name_.substr(0,found);
-
-  file_created_folder_.append(file_path_);
-  file_created_folder_.append("/");
-  file_created_folder_.append(file_folder_);
-
-  /*
-  if ( reverse_order_ )
-  {
-    file_created_folder_.append("_reverse");
-  }
-  */
-
-  std::cout << " path: " << file_path_ << std::endl;
-  std::cout << " file: " << file_name_ << std::endl;
-  std::cout << " folder: " << file_folder_ << std::endl;
-  std::cout << " created folder: " << file_created_folder_ << std::endl;
-}
-
 btVector3 getPt3D( int u, int v, float z, float f_inv, float cx, float cy )
 {
   float zf = z*f_inv;
@@ -1031,6 +978,85 @@ tf::StampedTransform RgbdEvaluatorPreprocessing::calculateCoordinatesystem( cv::
 
 }
 
+void RgbdEvaluatorPreprocessing::printMat( cv::Matx33f M )
+{
+  std::cout << std::setprecision( 3 ) << std::right << std::fixed;
+  for ( int row = 0; row < 3; ++ row )
+  {
+    for ( int col = 0; col < 3; ++ col )
+    {
+      std::cout << std::setw( 5 ) << (double)M( row, col ) << " ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+float RgbdEvaluatorPreprocessing::getAspect( std::vector< cv::Point2f > pts )
+{
+  cv::Point2f minp(100000,100000),maxp(0,0);
+  uint32_t k;
+  for(k = 0; k < pts.size(); k++)
+  {
+    maxp.x = std::max ( pts[k].x, maxp.x );
+    maxp.y = std::max ( pts[k].y, maxp.y );
+    minp.x = std::min ( pts[k].x, minp.x );
+    minp.y = std::min ( pts[k].y, minp.y );
+  }
+
+  return (maxp.x/minp.x) / (maxp.y/minp.y);
+}
+
+void RgbdEvaluatorPreprocessing::splitFileName(const std::string& str)
+{
+  size_t found;
+  std::cout << "Splitting: " << str << std::endl;
+  found=str.find_last_of("/\\");
+
+  file_path_ = str.substr(0,found);
+  file_name_ = str.substr(found+1);
+
+  found = file_name_.find_last_of(".");
+  file_folder_ = file_name_.substr(0,found);
+
+  file_created_folder_.append(file_path_);
+  file_created_folder_.append("/");
+  file_created_folder_.append(file_folder_);
+  /*
+  if ( reverse_order_ )
+  {
+    file_created_folder_.append("_reverse");
+  }
+  */
+//  std::cout << " path: " << file_path_ << std::endl;
+//  std::cout << " file: " << file_name_ << std::endl;
+//  std::cout << " folder: " << file_folder_ << std::endl;
+//  std::cout << " created folder: " << file_created_folder_ << std::endl;
+}
+
+void RgbdEvaluatorPreprocessing::drawNumbers( cv::Mat& image, std::vector<cv::Point2f> keypoints )
+{
+  // draw respective numbers
+  for( uint32_t i = 0; i < keypoints.size(); i++)
+  {
+    cv::Point2f kp1( keypoints.at(i).x + KP_TEXT_PIXEL_OFFSET, keypoints.at(i).y + KP_TEXT_PIXEL_OFFSET );
+    cv::Point2f kp2( keypoints.at(i).x + KP_TEXT_PIXEL_OFFSET, keypoints.at(i).y + KP_TEXT_PIXEL_OFFSET );
+    cv::putText( image, int2str(i+1), kp2 , cv::FONT_HERSHEY_PLAIN, 4, CV_RGB(0, 0, 255), 4 );
+    cv::putText( image, int2str(i+1), kp1 , cv::FONT_HERSHEY_PLAIN, 4, CV_RGB(0, 255, 0), 2 );
+  }
+}
+
+void RgbdEvaluatorPreprocessing::drawKeypoints( cv::Mat& image, std::vector<cv::Point2f>& keypoints )
+{
+  std::vector<cv::KeyPoint> tmpKeypoints;
+  cv::KeyPoint::convert( keypoints, tmpKeypoints );
+
+  for(uint32_t i = 0; i < tmpKeypoints.size(); i++)
+  {
+    cv::circle(image, cv::Point( tmpKeypoints.at(i).pt.x * 2, tmpKeypoints.at(i).pt.y *2 ), 5, CV_RGB(0 , 0, 255), 2,1,1);
+    cv::circle(image, cv::Point( tmpKeypoints.at(i).pt.x * 2, tmpKeypoints.at(i).pt.y *2 ), 3, CV_RGB(0 , 255, 0), 2,1,1);
+  }
+}
+
 std::string RgbdEvaluatorPreprocessing::int2str(uint32_t i)
 {
   std::stringstream s;
@@ -1059,7 +1085,7 @@ void RgbdEvaluatorPreprocessing::insertKeypoints(cv::Point2f keypoint, std::vect
   }
 }
 
-// Implement mouse callback
+// Implement mouse callback for Keypoints
 void RgbdEvaluatorPreprocessing::imgMouseCallbackKP( int event, int x, int y, int flags, void* param )
 {
     static uint32_t numberKP = MIN_CORRESPONDENCES;
@@ -1076,25 +1102,34 @@ void RgbdEvaluatorPreprocessing::imgMouseCallbackKP( int event, int x, int y, in
     {
       // set keypoints in image
       case CV_EVENT_LBUTTONDOWN:
-
+        // check if keypoint out of boarder
         if( !rgb_processing->checkBoarderKP( rgb_processing->keyPointImageOrigin_, (float_t) x, (float_t) y ) )
         {
           std::cout << "Error: Point " << cv::Point2f(x, y) << " outside of image boundaries" << std::endl;
           return;
         }
-
-        if( rgb_processing->first_image_ )
+        // insert into first image vector
+        else if( rgb_processing->first_image_ )
         {
           insertKeypoints( cv::Point2f(x,y), rgb_processing->mouseKeypointsOrigin_ );
         }
+        // too many keypoints
+        else if( rgb_processing->mouseKeypointsImageX_.size() > numberKP )
+        {
+          std::cout << "Maximum number of keypoints reached! Delete keypoints or press right mouse click to continue!" << std::endl;
+          return;
+        }
+        // last keypoint
+        else if( rgb_processing->mouseKeypointsImageX_.size() == numberKP )
+        {
+          // delete last element
+          rgb_processing->mouseKeypointsImageX_.pop_back();
+          insertKeypoints( cv::Point2f(x,y), rgb_processing->mouseKeypointsImageX_ );
+          return;
+        }
+        // standard case -> insert
         else
         {
-          if( rgb_processing->mouseKeypointsImageX_.size() >= numberKP )
-          {
-            std::cout << "Maximum number of keypoints reached! Delete keypoints or press right mouse click to continue!" << std::endl;
-            return;
-          }
-
           insertKeypoints( cv::Point2f(x,y), rgb_processing->mouseKeypointsImageX_ );
         }
         break;
@@ -1123,6 +1158,7 @@ void RgbdEvaluatorPreprocessing::imgMouseCallbackKP( int event, int x, int y, in
 
       // clear all keypoints from image
       case CV_EVENT_MBUTTONDOWN:
+
         if( rgb_processing->first_image_ )
         {
           std::cout << "Deleted all keypoints( " << rgb_processing->mouseKeypointsOrigin_.size() << " ) in image original ..." << std::endl;
@@ -1139,7 +1175,7 @@ void RgbdEvaluatorPreprocessing::imgMouseCallbackKP( int event, int x, int y, in
         break;
     }
 }
-
+// Implement mouse callback for region of interest
 void RgbdEvaluatorPreprocessing::imgMouseCallbackROI( int event, int x, int y, int flags, void* param )
 {
   if ( !param )

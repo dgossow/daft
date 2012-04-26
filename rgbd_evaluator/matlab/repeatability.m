@@ -1,4 +1,4 @@
-function [erro,repeat,corresp, match_score,matches, twi]=myrepeatability(file1,file2,Hom,imf1,imf2,maskf,common_part)
+function [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,file2,Hom,imf1,imf2,maskf,common_part,make_circles)
 %
 %
 %Computes repeatability and overlap score between two lists of features
@@ -79,9 +79,9 @@ end
 HI=H(:, 1:3);
 H=inv(HI);
 fprintf(1,'Projecting 1 to 2...');
-[feat1 feat1t scales1]=project_regions(feat1',HI);
+[feat1 feat1t scales1t]=project_regions(feat1',HI,make_circles);
 fprintf(1,'and 2 to 1...\n');
-[feat2 feat2t scales2]=project_regions(feat2',H);
+[feat2 feat2t scales2t]=project_regions(feat2',H,make_circles);
 
 %fprintf(1,'size_x %f %f\n',feat1(1,8), feat1t(1,8));
 %fprintf(1,'major %f %f\n',feat1(1,6), feat1t(1,6));
@@ -90,6 +90,9 @@ fprintf(1,'and 2 to 1...\n');
 
 %ind_small=find(feat1(:,6)<12)
 %feat1(ind_small,6:7)
+
+%sfigure(10);
+%display_projected_features(imf2,feat2',feat1t');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,7 +109,7 @@ im2y=im2x(1);
 im2x=im2x(2);
 
 %.. scales1'>9 & ..
-ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+ind=find(scales1t'>6 & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
 
@@ -120,7 +123,7 @@ feat1t=feat1t(ind,:);
 
 %scales1=scales1(ind);
 
-ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
+ind=find(scales2t'>6 & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);
 
@@ -139,6 +142,11 @@ feat2t=feat2t(ind,:);
 fprintf(1,'nb of regions in common part in image1 %d.\n',size(feat1,1));
 fprintf(1,'nb of regions in common part in image2 %d.\n',size(feat2t,1));
 end 
+
+
+%sfigure(11);
+%display_projected_features(imf2,feat2',feat1t');
+%pause(1);
 
 sf=min([size(feat1,1) size(feat2t,1)]);
 
@@ -195,93 +203,4 @@ match_score=100*matches/sf;
 fprintf(1,'\nMatching score  %0.1f, nb of correct matches %.1f.\n',match_score,matches);
 
 
-
-%end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [feat,featp,scales]=project_regions(feat,H)
-
-s=size(feat);
-s1=s(1);
-
-featp=feat;
-scales=zeros(1,s1);
-
-for c1=1:s1,%%%%%%%%%%%%%%%%%
-%feat(c1,3:5)=(1/25)*feat(c1,3:5);
-Mi1=[feat(c1,3) feat(c1,4);feat(c1,4) feat(c1,5)];
-
-%compute affine transformation
-[v1 e1]=eig(Mi1);
-d1=(1/sqrt(e1(1))); 
-d2=(1/sqrt(e1(4))); 
-sc1=sqrt(d1*d2);
-feat(c1,6)=d1;
-feat(c1,7)=d2; 
-%scales(c1)=sqrt(feat(c1,6)*feat(c1,7));
-
-%bounding box
-feat(c1,8) = sqrt(feat(c1,5)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
-feat(c1,9) = sqrt(feat(c1,3)/(feat(c1,3)*feat(c1,5) - feat(c1,4)^2));
-
-Aff=getAff(feat(c1,1),feat(c1,2),sc1, H);
-
-%project to image 2
-l1=[feat(c1,1),feat(c1,2),1];
-l1_2=H*l1';
-l1_2=l1_2/l1_2(3);
-featp(c1,1)=l1_2(1);
-featp(c1,2)=l1_2(2);
-BMB=inv(Aff*inv(Mi1)*Aff');
-[v1 e1]=eig(BMB);
-featp(c1,6)=(1/sqrt(e1(1)));
-featp(c1,7)=(1/sqrt(e1(4)));
-featp(c1,3:5)=[BMB(1) BMB(2) BMB(4)];
-%bounding box in image 2
-featp(c1,8) = sqrt(featp(c1,5)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
-featp(c1,9) = sqrt(featp(c1,3)/(featp(c1,3)*featp(c1,5) - featp(c1,4)^2));
-
-% surface area
-scales(c1)=sqrt(featp(c1,6)*featp(c1,7));
-
 end
-%end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function Aff=getAff(x,y,sc,H)
-h11=H(1);
-h12=H(4);
-h13=H(7);
-h21=H(2);
-h22=H(5);
-h23=H(8);
-h31=H(3);
-h32=H(6);
-h33=H(9);
-fxdx=h11/(h31*x + h32*y +h33) - (h11*x + h12*y +h13)*h31/(h31*x + h32*y +h33)^2;
-fxdy=h12/(h31*x + h32*y +h33) - (h11*x + h12*y +h13)*h32/(h31*x + h32*y +h33)^2;
-
-fydx=h21/(h31*x + h32*y +h33) - (h21*x + h22*y +h23)*h31/(h31*x + h32*y +h33)^2;
-fydy=h22/(h31*x + h32*y +h33) - (h21*x + h22*y +h23)*h32/(h31*x + h32*y +h33)^2;
-
-          Aff=[fxdx fxdy;fydx fydy];
-%end
-
-
-function [feat nb dim]=loadFeatures(file)
-file
-fid = fopen(file, 'r');
-dim=fscanf(fid, '%f',1);
-if dim==1
-dim=0;
-end
-nb=fscanf(fid, '%d',1);
-feat = fscanf(fid, '%f', [5+dim, inf]);
-fclose(fid);
-%end
-
-

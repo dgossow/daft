@@ -463,7 +463,7 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name) {
       {
 
         float t_new;
-        if ( y_right == -target_num_kp_ )
+        if ( y_left > 0 && y_right == -target_num_kp_ )
         {
           // if we've reached zero keypoints, take
           // middle
@@ -568,7 +568,7 @@ void ExtractDetectorFile::extractAllKeypoints() {
   det_p.min_px_scale_ = 2.5;
   //det_p.base_scale_ = 0.05;
   //det_p.scale_levels_ = 1;
-  det_p.det_threshold_ = 0.05;
+  det_p.det_threshold_ = 0.2;
   //det_p.pf_type_ = det_p.PF_NONE;
   det_p.pf_threshold_ = 5;
 
@@ -577,8 +577,11 @@ void ExtractDetectorFile::extractAllKeypoints() {
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT" );
 
-  //det_p.det_type_=det_p.DET_BOX;
-  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
+  //det_p.affine_=false;
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine" );
+
+  det_p.det_type_=det_p.DET_BOX;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
 
   //det_p.min_px_scale_ = 4;
   //desc_p.octave_offset_ = -1;
@@ -648,8 +651,8 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
     alpha_a = atan2(ay, ax);
     alpha_b = atan2(by, bx);
 
-    a_length = it->affine_major;
-    b_length = it->affine_minor;
+    a_length = 0.5 * it->affine_major;
+    b_length = 0.5 * it->affine_minor;
 
     ax = cos(alpha_a);
     bx = cos(alpha_b);

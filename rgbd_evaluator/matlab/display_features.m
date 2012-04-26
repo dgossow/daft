@@ -14,18 +14,28 @@ function display_features(file1,imf1,dx,dy)
 
 [feat1 nb dim]=loadFeatures(file1);
 clf;imshow(imf1);
+
 for c1=1:nb,%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-drawellipse([feat1(3,c1) feat1(4,c1); feat1(4,c1) feat1(5,c1) ], feat1(1,c1)+dx, feat1(2,c1)+dy,'y');
+
+    drawellipse([feat1(3,c1) feat1(4,c1); feat1(4,c1) feat1(5,c1) ], feat1(1,c1)+dx, feat1(2,c1)+dy,'g',0);
+    drawellipse([feat1(3,c1) feat1(4,c1); feat1(4,c1) feat1(5,c1) ], feat1(1,c1)+dx, feat1(2,c1)+dy,'y',1);
+    
 end%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 end
 
-function drawellipse(Mi,i,j,col)
+function drawellipse(Mi,i,j,col,make_circle)
 hold on;
 [v e]=eig(Mi);
 
 l1=1/sqrt(e(1));
-
 l2=1/sqrt(e(4));
+
+if make_circle
+    radius=sqrt(l1*l2);
+    l1=radius;
+    l2=radius;
+end
 
 alpha=atan2(v(4),v(3));
 s=1;
@@ -37,11 +47,12 @@ xbar=x*cos(alpha) + y*sin(alpha);
 ybar=y*cos(alpha) - x*sin(alpha);
 plot(ybar+i,xbar+j,'-k','LineWidth',3);
 plot(ybar+i,xbar+j,col,'LineWidth',1);
-col='-k';
+%col='-k';
 %plot([i-2 i+2],[j j],col,'LineWidth',3);
 %plot([i i],[j-2 j+2],col,'LineWidth',3);
 set(gca,'Position',[0 0 1 1]);
 hold off;
+
 end
 
 

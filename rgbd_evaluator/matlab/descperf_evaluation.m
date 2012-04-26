@@ -1,4 +1,4 @@
-function [precision, recall] = descperf_evaluation( base_path, dataset_name, det_suffix, x_val_file )
+function [precision, recall] = descperf_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
 
 data_path = [base_path, dataset_name, '/'];
 graph_path = [data_path, 'results/'];
@@ -36,9 +36,9 @@ for i=2:num_img
         imf1=sprintf('%simg1.ppm',data_path);
         imf2=sprintf('%simg%d.ppm',data_path,i);
 
-        [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,file2,Hom,imf1,imf2,'',0);
+        [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,file2,Hom,imf1,imf2,'',0,not (is_affine{d}));
 
-        [correct_match_nn,total_match_nn,correct_match_sim,total_match_sim,correct_match_rn,total_match_rn] = descperf(file1,file2,Hom,imf1,imf2,corresp(4),twi);
+        [correct_match_nn,total_match_nn,correct_match_sim,total_match_sim,correct_match_rn,total_match_rn] = descperf(file1,file2,not (is_affine{d}),Hom,imf1,imf2,corresp(4),twi);
 
         recall=correct_match_rn./corresp(4);
         %precision=(total_match_rn-correct_match_rn)./total_match_rn

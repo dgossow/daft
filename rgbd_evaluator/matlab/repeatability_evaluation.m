@@ -1,4 +1,4 @@
-function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, x_val_file )
+function seqrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
 
 data_path = [base_path dataset_name '/'];
 graph_path = [data_path 'results/'];
@@ -41,7 +41,6 @@ for d=1:num_det
     seqmatchscore=[];
     
     for i=2:num_img
-        
         file1=sprintf('%skeypoints/img1.%s',data_path,char(det_suffix(d)));
         file2=sprintf('%skeypoints/img%d.%s',data_path,i,char(det_suffix(d)));
         Hom=sprintf('%sH1to%dp',data_path,i);
@@ -49,7 +48,7 @@ for d=1:num_det
         imf2=sprintf('%simg%d.ppm',data_path,i);
         maskf=sprintf('%smask.pgm',data_path);
         
-        [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,file2,Hom,imf1,imf2,maskf,1);
+        [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,file2,Hom,imf1,imf2,maskf,1,not (is_affine{d}));
         seqrepeat=[seqrepeat repeat(4)];
         seqcorresp=[seqcorresp corresp(4)];
         seqmatchscore=[seqmatchscore match_score];
