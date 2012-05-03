@@ -35,9 +35,9 @@ void findMaxima( const cv::Mat1d &img,
         continue;
       }
 
-      double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
+      double sp = scale_map[y][x] * base_scale;// * 0.25 - 1;
 
-      if ( s < min_px_scale || s > max_px_scale || x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
+      if ( sp < min_px_scale || sp > max_px_scale || x-sp < 0 || x+sp >= img.cols || y-sp < 0 || y+sp > img.rows )
       {
         continue;
       }
@@ -56,7 +56,7 @@ void findMaxima( const cv::Mat1d &img,
       }
 
       // Round scale, substract the one extra pixel we have in the center
-      int window = s; //(s+0.5) / 2.0 - 0.5;
+      int window = sp; //(s+0.5) / 2.0 - 0.5;
       if ( window < 1 ) window = 1;
 
       bool isMax = true;
@@ -82,7 +82,7 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, sp*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }
@@ -90,8 +90,9 @@ void findMaxima( const cv::Mat1d &img,
 
 
 void findMaximaAffine(
-    const cv::Mat1d &img,  const cv::Mat1d &scale_map,
-    const Mat2f &grad_map,
+    const cv::Mat1d &img,
+    const cv::Mat1d &scale_map,
+    const Mat3f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -110,9 +111,9 @@ void findMaximaAffine(
         continue;
       }
 
-      double s = scale_map[y][x] * base_scale;// * 0.25 - 1;
+      double sp = scale_map[y][x] * base_scale;// * 0.25 - 1;
 
-      if ( s < min_px_scale || s > max_px_scale || x-s < 0 || x+s >= img.cols || y-s < 0 || y+s > img.rows )
+      if ( sp < min_px_scale || sp > max_px_scale || x-sp < 0 || x+sp >= img.cols || y-sp < 0 || y+sp > img.rows )
       {
         continue;
       }
@@ -130,29 +131,22 @@ void findMaximaAffine(
       }
 
       // compute ellipse parameters
-      float angle, major, minor;
-      Point3f normal;
-      bool ok = getAffine(grad_map[y][x], x, y, s, base_scale,angle, major, minor, normal);
-      // break if gradient can not be computed
-      if(!ok || minor < min_px_scale ) {
-        continue;
-      }
-
-      float A, B, C;
-      ellipseParameters(angle, major, minor, A, B, C);
+      const float major_x = affine_map[y][x][0];
+      const float major_y = affine_map[y][x][1];
+      const float minor = affine_map[y][x][2] * sp;
 
       // break if ellipse is too small or thin
-      if(major < 1.0f || minor < 1.0f) {
+      if( isnan(major_x) || minor < min_px_scale ) {
         continue;
       }
 
-      // Round scale, substract the one extra pixel we have in the center
-      int window = s;// static_cast<int>(s + 0.5); // ... doesn't hurt to make it bigger
-      if ( window < 1 ) window = 1;
+      const float angle = std::atan2( major_y, major_x );
 
-//      if((y*img.rows + x) % 100 == 0) {
-//        std::cout << window << " " << angle << " " << major << " " << minor << " " << A << " " << B << " " << C << std::endl;
-//      }
+      float A, B, C;
+      computeEllipseParams(angle, sp, minor, A, B, C);
+
+      int window = sp;
+      if ( window < 1 ) window = 1;
 
       float cos_angle = cos(angle);
 
@@ -200,7 +194,7 @@ void findMaximaAffine(
 
       if(is_max) {
         // is a maximum -> add keypoint
-        kp.push_back( KeyPoint3D ( x, y, s*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, sp*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }

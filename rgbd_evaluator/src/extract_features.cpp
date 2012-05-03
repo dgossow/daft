@@ -457,7 +457,7 @@ std::vector<cv::KeyPoint3D> getDaftKp(daft_ns::DAFT::DetectorParams p_det, daft_
 
   std::vector<cv::KeyPoint3D> kp1;
   daft_ns::DAFT daft1( p_det, p_desc );
-  daft1.detect( gray_img, depth_img, K, kp1 );
+  daft1( gray_img, depth_img, K, kp1 );
 
   return kp1;
   /*
@@ -515,11 +515,7 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
 
     std::cout << name << std::endl;
 
-<<<<<<< HEAD
     if (it == it_begin && target_num_kp_ != 0)
-=======
-    if (target_num_kp_ != 0 && it == it_begin)
->>>>>>> 289f2fce799708b7e2bb1a5966db7f10801326b9
     {
       // find optimal thresholds by secant method
       float t_left = t*0.5;
@@ -645,7 +641,8 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
   }
 }
 
-void ExtractDetectorFile::extractAllKeypoints() {
+void ExtractDetectorFile::extractAllKeypoints()
+{
   daft_ns::DAFT::DetectorParams det_p;
   daft_ns::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
@@ -660,8 +657,10 @@ void ExtractDetectorFile::extractAllKeypoints() {
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT", 3.16326 );
 
+  det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=false;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine", 3.16326 );
+  det_p.max_search_algo_=det_p.MAX_FAST;
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine", 3.16326 );
 
   //det_p.det_type_=det_p.DET_BOX;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
@@ -671,8 +670,8 @@ void ExtractDetectorFile::extractAllKeypoints() {
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
   //extractKeypoints( &getSurfKp, "SURF", 107.981 );
-  extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
-  extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
+  //extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
+  //extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
 
 void ExtractDetectorFile::printMat(cv::Matx33f M) {

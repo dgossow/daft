@@ -13,7 +13,7 @@
 
 #include <fstream>
 
-#include <features3d/keypoint3d.h>
+#include <opencv2/features3d/features3d.hpp>
 #include "stuff.h"
 
 namespace cv
@@ -44,32 +44,23 @@ void convolve( const Mat1d &ii,
  Compute the kernel response for every pixel of the given image.
  The kernel size and shape will be a local affine transformation.
  The template argument specifies the filter kernel.
- * @param ii            The Integral Image
- * @param scale_map     The scale map (scale multiplier per pixel)
- * @param ii_depth_map  The integral depth map (im meters)
- * @param ii_depth_countIntegral of the number of valid depth pixels
- * @param camera_matrix Camera intrinsics
- * @param base_scale    The global scale multiplier
+ * @param ii            integral image
+ * @param scale_map     scale map (scale multiplier per pixel)
+ * @param depth_map     depth map [meter]
+ * @param sw            world scale [meter]
  * @param min_px_scale  Minimal scale in pixels
- * @param max_px_scale  Maximal scale in pixels
  * @param img_out       The output image
  */
-template <float (*F)( const Mat1d &ii, Vec2f &grad,
-    int x, int y, float sp, float sw, float min_sp )>
+template <float (*F)( const Mat1d &ii,
+    int x, int y, float sp,
+    float sw, float major_x, float major_y,
+    float minor_ratio, float min_sp )>
 void convolveAffine( const Mat1d &ii,
     const Mat1f &scale_map,
-    const Mat1f &depth_map,
+    const Mat3f& affine_map,
     float sw,
     float min_px_scale,
-    Mat1f &img_out,
-    Mat2f& depth_grad );
-
-void computeDepthGrad(
-        const Mat1f &scale_map,
-    const Mat1f &depth_map,
-    float sw,
-    float min_px_scale,
-    Mat2f& depth_grad );
+    Mat1f &img_out );
 
 /*!
  Find the local maxima in the given image with a minimal value of thresh,
@@ -89,18 +80,20 @@ void findMaxima( const Mat1d &img,
      double thresh,
      std::vector< KeyPoint3D >& kp );
 
-void findMaximaAffine(
-    const cv::Mat1d &img,
-    const cv::Mat1d &scale_map,
-    const Mat2f &grad_map,
+/*! Like findMaxima, but faster and a little less accurate */
+void findMaximaMipMap( const Mat1d &img,
+    const Mat1d &scale_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
     double thresh,
     std::vector< KeyPoint3D >& kp );
 
-void findMaximaMipMap( const Mat1d &img,
-    const Mat1d &scale_map,
+/*! Like findMaxima, but do non-max suppression in affine neighborhood */
+void findMaximaAffine(
+    const cv::Mat1d &img,
+    const cv::Mat1d &scale_map,
+    const Mat3f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -173,15 +166,16 @@ void convolve( const Mat1d &ii,
   }
 }
 
-template <float (*F)( const Mat1d &ii, Vec2f &grad,
-    int x, int y, float sp, float sw, float min_sp )>
+template <float (*F)( const Mat1d &ii,
+    int x, int y, float sp,
+    float sw, float major_x, float major_y,
+    float minor_ratio, float min_sp )>
 void convolveAffine( const Mat1d &ii,
     const Mat1f &scale_map,
-    const Mat1f &depth_map,
+    const Mat3f& affine_map,
     float sw,
     float min_px_scale,
-    Mat1f &img_out,
-    Mat2f& depth_grad )
+    Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
 
@@ -192,13 +186,14 @@ void convolveAffine( const Mat1d &ii,
     {
       const float sp = getScale(scale_map[y][x], sw);
 
-      if ( isnan( depth_grad[y][x][0] ) || isnan( depth_grad[y][x][1] ) || sp < min_px_scale )
+      if ( isnan( affine_map[y][x][0] ) || sp < min_px_scale )
       {
         img_out(y,x) = nan;
         continue;
       }
 
-      img_out(y,x) = F( ii, depth_grad[y][x], x, y, sp, sw, min_px_scale );
+      img_out(y,x) = F( ii, x, y, sp, sw, affine_map[y][x][0],
+          affine_map[y][x][1], affine_map[y][x][2], min_px_scale );
     }
   }
 }

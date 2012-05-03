@@ -3,7 +3,7 @@
  * Copyright (C) 2011 David Gossow
 */
 
-#include "features3d/keypoint3d.h"
+#include <opencv2/features3d/features3d.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -27,7 +27,6 @@ static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar&
     {
       Size2f bsize( p.affine_major, p.affine_minor );
       cv::RotatedRect box( p.pt, bsize, p.affine_angle/M_PI*180.0 );
-      ellipse( img, box, cv::Scalar(0,0,0), 2, 16 );
       ellipse( img, box, color, 1, 16 );
     }
     else

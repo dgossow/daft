@@ -26,13 +26,14 @@ struct KeyPoint3D: public cv::KeyPoint
 
   float world_size; //!< diameter (in meters) of the meaningful keypoint neighborhood
 
-  CV_PROP_RW Point3f pt3d; //!< 3D position in the camera frame
-  CV_PROP_RW Point3f normal; //!< 3D normal in camera coords
+  // 3d pose of the keypoint in image space
+  CV_PROP_RW Point3f pt3d; //!< 3D position
+  CV_PROP_RW Point3f normal; //!< 3D normal TODO: Quaternion
 
-  // affine transformation
-  CV_PROP_RW float affine_angle;
-  CV_PROP_RW float affine_major;
-  CV_PROP_RW float affine_minor;
+  // affine approximation of the tangent plane in image space
+  CV_PROP_RW float affine_angle; //!< angle of major axis
+  CV_PROP_RW float affine_major; //!< length of major axis
+  CV_PROP_RW float affine_minor; //!< length of minor axis
 
   std::vector< float > desc;
 };

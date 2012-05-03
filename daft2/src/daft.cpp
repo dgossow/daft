@@ -1,5 +1,5 @@
 /*
- * RGBD Features -> OpenCV bridge
+ * DAFT
  * Copyright (C) 2011 David Gossow
  */
 
@@ -21,6 +21,13 @@
 namespace cv {
 namespace daft2 {
 
+boost::timer t;
+
+#define TIMER_START t.restart();
+#define TIMER_STOP std::cout << "++++++ Time elapsed: " << t.elapsed()*1000.0 << "ms ++++++" << std::endl;
+
+//DEBUG FLAGS.
+//
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 
@@ -33,9 +40,13 @@ DAFT::~DAFT() {
 }
 
 
-void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
+void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp )
 {
+  std::cout << "Preprocessing" << std::endl;
+
+  TIMER_START
+
   if (image.size != depth_map_orig.size) {
     return;
   }
@@ -47,41 +58,20 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   prepareData( image, depth_map_orig, gray_image, ii, depth_map );
 
   // Initialize parameters
-
   int n_octaves = det_params_.scale_levels_;
 
-  float max_px_scale = std::min(image.rows, image.cols) / 5 / pow(2.0,desc_params_.octave_offset_);
+  float max_px_scale = 4.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
   if ( det_params_.max_px_scale_ != det_params_.AUTO )
   {
     max_px_scale = std::min( max_px_scale, det_params_.max_px_scale_ );
   }
 
-  std::cout << "max_px_scale" << max_px_scale << std::endl;
-
   const float f = K(0, 0);
 
   // Integrate Depth + Depth count (#of valid pixels)
-  cv::Mat1d ii_depth_map(depth_map.rows + 1, depth_map.cols + 1);
-  cv::Mat_<uint64_t> ii_depth_count(depth_map.rows + 1, depth_map.cols + 1);
-
-  for (int y = 0; y < depth_map.rows + 1; y++) {
-    double row_sum = 0;
-    double row_count = 0;
-    for (int x = 0; x < depth_map.cols + 1; x++) {
-      if (x == 0 || y == 0) {
-        ii_depth_map[y][x] = 0;
-        ii_depth_count[y][x] = 0;
-      } else {
-        float depth = depth_map[y - 1][x - 1];
-        if (!isnan(depth)) {
-          row_sum += depth;
-          row_count += 1;
-        }
-        ii_depth_map[y][x] = row_sum + ii_depth_map[y - 1][x];
-        ii_depth_count[y][x] = row_count + ii_depth_count[y - 1][x];
-      }
-    }
-  }
+  cv::Mat1d ii_depth_map;
+  cv::Mat_<uint32_t> ii_depth_count;
+  depthIntegral( depth_map, ii_depth_map, ii_depth_count );
 
 #ifdef SHOW_DEBUG_WIN
   imshowNorm("ii_depth_map",ii_depth_map,0);
@@ -143,21 +133,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   kp.clear();
   kp.reserve(50000);
 
-#if 0
-  cv::Mat1f grad_map_x(depth_map.size());
-  cv::Mat1f grad_map_y(depth_map.size());
-  convolveAffine<gradX>(ii, scale_map, ii_depth_map, ii_depth_count, base_scale,
-      det_params_.min_px_scale_, max_px_scale, grad_map_x);
-  convolveAffine<gradY>(ii, scale_map, ii_depth_map, ii_depth_count, base_scale,
-      det_params_.min_px_scale_, max_px_scale, grad_map_y);
-  cv::imshow("grad_map_x", grad_map_x * 0.2 + 0.5);
-  cv::imshow("grad_map_y", grad_map_y * 0.2 + 0.5);
-#endif
-
-  //imshow( "img", gray_image );
-  //imshowNorm( "depth", depth_map, 0 );
-
-  // all octaves that we need to compute
+  // make list of all octaves that we need to compute
   std::set<int> octaves;
 
   // compute which octaves we need
@@ -171,76 +147,64 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   std::map< int, Mat1f > smoothed_imgs;
   std::map< int, Mat1f> smoothed_depth_maps;
-  std::map< int, Mat2f > depth_grads;
-
-  // TODO: compute depth gradient
-
+  std::map< int, Mat3f > affine_maps;
 
   // compute depth-normalized image pyramid
 
+  TIMER_STOP
+
+  std::cout << "Computing smooth depth + gradient" << std::endl;
+
+  TIMER_START
   for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
   {
   	int octave = *it;
   	double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
 
-    std::cout << "octave " << octave << " scale " << scale << std::endl;
-
     smoothed_imgs[octave] = Mat1f();
     smoothed_depth_maps[octave] = Mat1f();
-    depth_grads[octave] = Mat2f();
+    affine_maps[octave] = Mat3f();
 
-    Mat1f& smoothed_img = smoothed_imgs[octave];
     Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
-    Mat2f& depth_grad = depth_grads[octave];
+    Mat3f& affine_map = affine_maps[octave];
 
     smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
+    computeAffineMap( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, affine_map );
+  }
+  TIMER_STOP
 
-    computeDepthGrad( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, depth_grad );
+  std::cout << "Computing gaussians" << std::endl;
+
+  TIMER_START
+  for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
+  {
+    int octave = *it;
+    double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
+    Mat1f& smoothed_img = smoothed_imgs[octave];
+    Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
+    Mat3f& affine_map = affine_maps[octave];
 
 #ifdef SHOW_DEBUG_WIN
-<<<<<<< HEAD
-    std::stringstream s; s<<"smooth_depth s="<<scale;
-    imshowNorm( s.str(), smoothed_depth_map, 0 );
-=======
     {
     std::stringstream s; s<<" s="<<scale;
 
     imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
-    std::vector<cv::Mat> depth_grads;
-    cv::split(depth_grad,depth_grads);
-    imshowNorm( "depth grad.x" + s.str(), depth_grads[0], 0 );
-    imshowNorm( "depth grad.y" + s.str(), depth_grads[1], 0 );
+    std::vector<cv::Mat> affine_map_channels;
+    cv::split(affine_map,affine_map_channels);
+    imshowNorm( "major.x" + s.str(), affine_map_channels[0]*0.5+0.5, 0 );
+    imshowNorm( "major.y" + s.str(), affine_map_channels[1]*0.5+0.5, 0 );
+    imshowNorm( "minor_ratio" + s.str(), affine_map_channels[2], 0 );
     }
->>>>>>> 289f2fce799708b7e2bb1a5966db7f10801326b9
 #endif
 
     // compute filter response for all pixels
     switch (det_params_.det_type_) {
-    case DetectorParams::DET_BOX:
-      if (det_params_.affine_) {
-        convolveAffine<boxAffine>(ii, scale_map, depth_map,
-            scale, 1, smoothed_img, depth_grad );
-      } else {
-        convolve<box>(ii, scale_map, scale, 1, smoothed_img);
-      }
-      break;
     case DetectorParams::DET_FELINE:
       if (det_params_.affine_) {
-        convolveAffine<felineAffine>(ii, scale_map, smoothed_depth_map,
-            scale, 1, smoothed_img, depth_grad );
+        convolveAffine<felineAffine>(ii, scale_map, affine_map,
+            scale, 1, smoothed_img );
       } else {
-        convolve<box>(ii, scale_map, scale, 1, smoothed_img);
-      }
-      break;
-    case DetectorParams::DET_9X9:
-      if (det_params_.affine_) {
-          convolveAffine<gaussAffine>(ii, scale_map, smoothed_depth_map,
-              scale, 1, smoothed_img, depth_grad );
-      } else {
-        convolve<gauss>(ii, scale_map, scale, 1, smoothed_img);
-
-        //showBig( 128, sGaussKernel.asCvImage() + 0.5f, "gauss" );
-        //std::cout << "cv::sum(sGaussKernel.asCvImage()) " << cv::sum(sGaussKernel.asCvImage())[0] << std::endl;
+        convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
     default:
@@ -272,18 +236,21 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
 #endif
   }
+  TIMER_STOP
 
   Mat1f response_map;
   response_map.create(gray_image.rows, gray_image.cols);
 
-  // compute difference of gaussians and detect extrema
+  std::cout << "Computing response & finding max" << std::endl;
+
+  TIMER_START
+  // compute abs. difference of gaussians and detect maxima
   for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
   {
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
-    //std::cout << "det octave " << octave << " scale " << scale << std::endl;
   	cv::absdiff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
-    Mat2f& depth_grad = depth_grads[octave];
+    Mat3f& affine_map = affine_maps[octave];
 
     // save index where new kps will be inserted
     unsigned kp_first = kp.size();
@@ -292,7 +259,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     switch (det_params_.max_search_algo_) {
     case DetectorParams::MAX_WINDOW:
       if ( det_params_.affine_ ) {
-        findMaximaAffine(response_map, scale_map, depth_grad,
+        findMaximaAffine(response_map, scale_map, affine_map,
             scale, det_params_.min_px_scale_, max_px_scale,
             det_params_.det_threshold_, kp);
       }
@@ -327,22 +294,22 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
       cv::Mat display_image;
       response_map.convertTo( display_image, CV_8UC1, 900, 0.0 );
 
-      vector<KeyPoint3D> kp2;
+      std::vector<KeyPoint3D> kp2;
       for ( unsigned k=kp_first; k<kp.size(); k++ )
       {
         KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
 
-        Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
-        Vec2f depth_grad = depth_grads[kp[k].octave](kp_y,kp_x);
+        Vec3f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
 
-        if ( getAffine( depth_grad, kp_x, kp_y, kp[k].size*0.25f, kp[k].world_size*0.25f,
-              kp[k].affine_angle, kp[k].affine_major, kp[k].affine_minor,
-              kp[k].normal ) )
+        if ( affine_params[2] > 0.1 )
         {
-          kp[k].affine_minor *= 4.0f;
-          kp[k].affine_major *= 4.0f;
+          // keypoint shall cover outer and inner and wants size not radius
+          kp_curr.affine_major = kp[k].size;
+          kp_curr.affine_minor = kp[k].size * affine_params[2];
+          kp_curr.affine_angle = atan2( affine_params[1], affine_params[0] );
+
           kp2.push_back(kp_curr);
         }
       }
@@ -368,9 +335,11 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     }
 #endif
   }
+  TIMER_STOP
 
   std::cout << kp.size() << " keypoints found in first stage." << std::endl;
 
+  TIMER_START
   // filter found maxima by applying a threshold on a second kernel
   switch (det_params_.pf_type_) {
   case DetectorParams::PF_NONE:
@@ -399,12 +368,14 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
 
   std::cout << kp.size() << " keypoints left after post-filter." << std::endl;
+  TIMER_STOP
+  TIMER_START
 
   // assign 3d points, normals and local affine params
   float f_inv = 1.0 / f;
   float cx = K(0, 2);
   float cy = K(1, 2);
-  vector<KeyPoint3D> kp2;
+  std::vector<KeyPoint3D> kp2;
   kp2.reserve(kp.size());
 
   // correct keypoint size according to given octave offset
@@ -420,15 +391,14 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
     int kp_y = kp[k].pt.y;
     getPt3d(f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d);
 
-    Vec2f depth_grad = depth_grads[kp[k].octave](kp_y,kp_x);
+    Vec3f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
 
-    if (getAffine(depth_grad, kp_x, kp_y, kp[k].size * 0.25f,
-        kp[k].world_size * 0.25f, kp[k].affine_angle, kp[k].affine_major,
-        kp[k].affine_minor, kp[k].normal) && kp[k].affine_major / kp[k].affine_minor < 10.0 )
+    if ( affine_params[2] > 0.1 )
     {
       // keypoint shall cover outer and inner and wants size not radius
-      kp[k].affine_minor *= 4.0f;
-      kp[k].affine_major *= 4.0f;
+      kp[k].affine_major = kp[k].size;
+      kp[k].affine_minor = kp[k].size * affine_params[2];
+      kp[k].affine_angle = atan2( affine_params[1], affine_params[0] );
 
       // compute exact normal using pca
       kp[k].normal = getNormal(kp[k], depth_map, K, 2.0 / scale_fac );
@@ -444,6 +414,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
   kp.swap(kp2);
 
   std::cout << kp.size() << " keypoints left after descriptor computation." << std::endl;
+  TIMER_STOP
 
 
 #ifdef FIND_MAXKP
@@ -490,9 +461,7 @@ void DAFT::detect(const cv::Mat &image, const cv::Mat &depth_map_orig,
 }
 
 
-
-
-void DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
+bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
     Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map )
 {
   gray_image = image;
@@ -524,16 +493,22 @@ void DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
   break;
   default:
-    //return;
+    return false;
     break;
   }
 
   // Convert depth map to floating point
   if (depth_map_orig.type() == CV_16U) {
     depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
-  } else {
+  } else if (depth_map_orig.type() == CV_32F) {
     depth_map = depth_map_orig;
   }
+  else
+  {
+    return false;
+  }
+
+  return true;
 }
 
 

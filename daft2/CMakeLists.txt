@@ -25,6 +25,7 @@ rosbuild_add_library (daft2
 src/daft.cpp
 src/feature_detection.cpp
 src/descriptor.cpp
+src/depth_filter.cpp
 )
 
 target_link_libraries(daft2 ${OpenCV_LIBS})

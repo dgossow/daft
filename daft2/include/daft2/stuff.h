@@ -16,6 +16,7 @@ namespace daft2
 
 const float nan = std::numeric_limits<float>::quiet_NaN();
 
+/*
 inline void imshow( std::string win_title, cv::Mat img )
 {
   cv::Mat img2 = img;
@@ -29,6 +30,7 @@ inline void imshow( std::string win_title, cv::Mat img )
   std::cout << "Writing " << im_f << std::endl;
   cv::imwrite( im_f, img2 );
 }
+*/
 
 inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
 {
@@ -123,6 +125,31 @@ void integral2( const cv::Mat_<T1>& m_in, cv::Mat_<T2>& m_out, T2 factor=1.0 )
         T2 val = factor * static_cast<T2>(m_in[y - 1][x - 1]);
         m_out[y][x] = row_sum + m_out[y - 1][x];
         row_sum += val;
+      }
+    }
+  }
+}
+
+inline void depthIntegral( const cv::Mat1f& depth_map, cv::Mat1d& ii_depth_map, cv::Mat_<uint32_t>& ii_depth_count )
+{
+  ii_depth_map.create(depth_map.rows + 1, depth_map.cols + 1);
+  ii_depth_count.create(depth_map.rows + 1, depth_map.cols + 1);
+
+  for (int y = 0; y < depth_map.rows + 1; y++) {
+    double row_sum = 0;
+    double row_count = 0;
+    for (int x = 0; x < depth_map.cols + 1; x++) {
+      if (x == 0 || y == 0) {
+        ii_depth_map[y][x] = 0;
+        ii_depth_count[y][x] = 0;
+      } else {
+        float depth = depth_map[y - 1][x - 1];
+        if (!isnan(depth)) {
+          row_sum += depth;
+          row_count += 1;
+        }
+        ii_depth_map[y][x] = row_sum + ii_depth_map[y - 1][x];
+        ii_depth_count[y][x] = row_count + ii_depth_count[y - 1][x];
       }
     }
   }
@@ -229,7 +256,7 @@ inline float fastInverseLen( const Point3f& p )
 
 
 inline float meanDepth(const Mat1d &ii_depth_map,
-    const cv::Mat_<uint64_t>& ii_depth_count,
+    const cv::Mat_<uint32_t>& ii_depth_count,
     int x, int y, int sp_int )
 {
   int x_left = x-sp_int;
@@ -269,81 +296,12 @@ inline bool computeGradient(
   const float d_xn = depth_map(y,x-sp_int);
   const float d_yn = depth_map(y-sp_int,x);
 
-  /*
-  float d_right = d_xp;
-  float d_left = d_xn;
-  float d_top = d_yn;
-  float d_bottom = d_yp;
-
-  float x_fac = 0.5*sp/float(sp_int);
-  float y_fac = 0.5*sp/float(sp_int);
-
-  if (isnan(d_xp))
-  {
-    if ( isnan(d_center) || isnan(d_xn) )
-    {
-      grad[0] = grad[1] = nan;
-      return false;
-    }
-    d_right = d_center;
-    x_fac *= 0.5;
-  }
-  if (isnan(d_xn))
-  {
-    if ( isnan(d_center) || isnan(d_xp) )
-    {
-      grad[0] = grad[1] = nan;
-      return false;
-    }
-    d_left = d_center;
-    x_fac *= 0.5;
-  }
-  if (isnan(d_yp))
-  {
-    if ( isnan(d_center) || isnan(d_yn) )
-    {
-      grad[0] = grad[1] = nan;
-      return false;
-    }
-    d_bottom = d_center;
-    y_fac *= 0.5;
-  }
-  if (isnan(d_yn))
-  {
-    if ( isnan(d_center) || isnan(d_yp) )
-    {
-      grad[0] = grad[1] = nan;
-      return false;
-    }
-    d_top = d_center;
-    y_fac *= 0.5;
-  }
-  grad[0] = (d_right - d_left)*x_fac;
-  grad[1] = (d_bottom - d_top)*y_fac;
-  return true;
-  */
-
   if ( isnan(d_center) || isnan(d_xp) || isnan(d_yp) || isnan(d_xn) || isnan(d_yn) )
   {
     grad[0] = grad[1] = nan;
     return false;
   }
 
-  /*
-  float dxx = d_xp - 2*d_center + d_xn;
-  float dyy = d_yp - 2*d_center + d_yn;
-
-  const float MaxCurvature = 1.0f;
-  // test for local planarity
-  // TODO note: this does not check for the case of a saddle
-  if ( std::abs(dxx + dyy) > MaxCurvature )
-  {
-    grad[0] = grad[1] = nan;
-    return false;
-  }
-  */
-
-// depth gradient between (x+sp) and (x-sp)
   const float fac = 0.5*sp/float(sp_int);
   grad[0] = (d_xp - d_xn)*fac;
   grad[1] = (d_yp - d_yn)*fac;
@@ -408,7 +366,7 @@ inline void getMajorMinor( const Vec2f& grad, float sp, float sw, float& major_x
 }
 
 /** Computes A*x^2 + B*x*y + C*y^2 form of ellipse from angle and major/minor axis length */
-inline void ellipseParameters(float angle, float major, float minor, float& A, float& B, float& C)
+inline void computeEllipseParams(float angle, float major, float minor, float& A, float& B, float& C)
 {
   float ax = std::cos(angle);
   float ay = std::sin(angle);

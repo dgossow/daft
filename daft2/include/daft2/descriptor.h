@@ -9,7 +9,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <features3d/keypoint3d.h>
+#include <opencv2/features3d/features3d.hpp>
 
 #include "filter_kernels.h"
 #include "stuff.h"

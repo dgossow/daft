@@ -3,12 +3,11 @@
  * Copyright (C) 2011 David Gossow
 */
 
-#include <opencv2/features2d/features2d.hpp>
-
 #ifndef __DAFT2_DAFT2_H__
 #define __DAFT2_DAFT2_H__
 
-#include "features3d/keypoint3d.h"
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/features3d/features3d.hpp>
 
 namespace cv
 {
@@ -24,7 +23,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_BOX=0, DET_9X9=1, DET_FELINE=2 };
+    enum { DET_FELINE=0 };
     enum { PF_NONE=0, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
     enum { MAX_WINDOW=0, MAX_FAST=2 };
 
@@ -37,7 +36,7 @@ public:
         int scale_levels = AUTO,
         float min_px_scale = 2.5,
         float max_px_scale = AUTO,
-        int detector_type = DET_BOX,
+        int detector_type = DET_FELINE,
         float det_threshold = 0.02,
         int postfilter_type = PF_PRINC_CURV_RATIO,
         float pf_threshold = 5.0,
@@ -56,17 +55,6 @@ public:
           affine_(affine)
     {
     }
-
-
-    struct DescriptorParams
-    {
-      /** default constructor */
-      DescriptorParams( int octave_offset=0 ) : octave_offset_(octave_offset)
-      {
-      }
-
-      int octave_offset_;
-    };
 
     /** The smallest scale (in meters) at which to search for features */
     double base_scale_;
@@ -120,24 +108,26 @@ public:
 
 
   /** Constructor
-   * @param detector_params parameters to use
+   * @param detector_params parameters for the detector
+   * @param desc_params parameters for the descriptor
    */
-  DAFT(const DetectorParams & detector_params = DetectorParams(), const DescriptorParams & desc_params=DescriptorParams() );
+  DAFT(const DetectorParams & detector_params = DetectorParams(),
+      const DescriptorParams & desc_params=DescriptorParams() );
 
   ~DAFT();
 
-  /** Detect salient keypoints on a rectified depth+intensity image
+  /** Detect salient keypoints using a pair of depth and intensity images
    * @param image the image to compute the features and descriptors on
-   * @param depthImage the depth image (depth values in meters)
-   * @param cameraMatrix
-   * @param keypoints the resulting keypoints
+   * @param depth_map the depth image (depth values in meters)
+   * @param K 3x3 Matrix with intrinsic camera parameters
+   * @param keypoints The resulting keypoints
    */
-  void detect(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f camera_matrix,
+  void operator()(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints );
 
 private:
 
-  void prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
+  bool prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
       Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map );
 
   /** Parameters tuning RgbdFeatures */

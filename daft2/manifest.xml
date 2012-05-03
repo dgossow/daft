@@ -10,7 +10,7 @@
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
  
-  <depend package="opencv_extra"/>
+  <depend package="cv_features3d"/>
   
   <export> 
       <cpp cflags="-I${prefix}/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -ldaft2"/>
