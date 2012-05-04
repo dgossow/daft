@@ -19,7 +19,7 @@ namespace cv
 namespace daft2
 {
 
-inline float felineAffineImpl( const Mat1d &ii,
+inline float felineImpl( const Mat1d &ii,
     float major_len, float minor_len,
     float major_x, float major_y,
     int box_size, int x, int y)
@@ -38,23 +38,20 @@ inline float felineAffineImpl( const Mat1d &ii,
   for ( int step=0; step<num_steps; step++ )
   {
     float t = float(step)/float(num_steps-1) * 2.0 - 1.0;
-    int x1 = x - t*start_x + 0.5;
-    int y1 = y - t*start_y + 0.5;
+    int x1 = (float)x - t*start_x + 0.5;
+    int y1 = (float)y - t*start_y + 0.5;
     val += integrate( ii, x1-box_size, y1-box_size, x1+box_size, y1+box_size );
   }
 
-  return val / ( float(num_steps) * 4*box_size*box_size ) * 0.73469f;
+  return val / float( num_steps * 4*box_size*box_size );
 }
 
-inline float felineAffine( const Mat1d &ii,
-    int x, int y, float sp,
-    float sw, float major_x, float major_y,
-    float minor_ratio, float min_sp )
+inline float feline( const Mat1d &ii,
+    int x, int y,
+    float major_len,  float minor_len,
+    float major_x, float major_y )
 {
-  const float major_len = sp;
-  const float minor_len = minor_ratio * major_len;
-
-  if ( minor_len < min_sp )
+  if ( !checkBounds( ii, x, y, major_len+1 ) )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
@@ -64,8 +61,8 @@ inline float felineAffine( const Mat1d &ii,
   const int box_size_int = box_size;
   float t1 = box_size - box_size_int;
 
-  float f1 = felineAffineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int, x, y );
-  float f2 = felineAffineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int+1, x, y );
+  float f1 = felineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int, x, y );
+  float f2 = felineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int+1, x, y );
 
   return interpolateLinear(t1,f1,f2);
 }
@@ -73,20 +70,18 @@ inline float felineAffine( const Mat1d &ii,
 /* Compute box mean with sub-integer scale interpolation */
 inline float boxMean( const Mat1d &ii, int x, int y, float s )
 {
-  // normalizes to same max value as the gauss filter
-  static const float NORM_1 = 0.73469f;
   // make the box which cover the same area as a circle withradius s
   s *= 0.886f;
   if ( s < 1 ) s=1;
-  int si = int(s);
-  int si1 = si+1;
+  const int si = int(s);
+  const int si1 = si+1;
   if (!checkBounds( ii, x, y, si+1 ) )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
-  float v1 = integrate ( ii, x - si,  y - si, x + si, y + si ) / float(4*si*si);
-  float v2 = integrate ( ii, x - si1,  y - si1, x + si1, y + si1 ) / float(4*si1*si1);
-  return interpolateLinear(s - float(si), v1, v2) * NORM_1;
+  const float v1 = integrate ( ii, x - si,  y - si, x + si, y + si ) / float(4*si*si);
+  const float v2 = integrate ( ii, x - si1,  y - si1, x + si1, y + si1 ) / float(4*si1*si1);
+  return interpolateLinear(s - float(si), v1, v2);
 }
 
 inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )

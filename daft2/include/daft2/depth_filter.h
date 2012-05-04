@@ -19,7 +19,8 @@ namespace cv
 namespace daft2
 {
 
-void smoothDepth( const Mat1f &scale_map,
+void smoothDepth(
+    const Mat1f &scale_map,
     const Mat1d &ii_depth_map,
     const Mat_<uint32_t>& ii_depth_count,
     float base_scale,
@@ -30,7 +31,7 @@ void computeAffineMap(
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    Mat3f& affine_map );
+    Mat4f& affine_map );
 
 }
 }

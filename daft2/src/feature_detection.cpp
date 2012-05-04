@@ -91,8 +91,7 @@ void findMaxima( const cv::Mat1d &img,
 
 void findMaximaAffine(
     const cv::Mat1d &img,
-    const cv::Mat1d &scale_map,
-    const Mat3f &affine_map,
+    const Mat4f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -111,9 +110,18 @@ void findMaximaAffine(
         continue;
       }
 
-      double sp = scale_map[y][x] * base_scale;// * 0.25 - 1;
+      // compute ellipse parameters
+      const float& major_len = affine_map[y][x][0];
+      const float& minor_len = affine_map[y][x][1];
+      const float& major_x = affine_map[y][x][2];
+      const float& major_y = affine_map[y][x][3];
 
-      if ( sp < min_px_scale || sp > max_px_scale || x-sp < 0 || x+sp >= img.cols || y-sp < 0 || y+sp > img.rows )
+      if (major_len < min_px_scale ||
+          major_len > max_px_scale ||
+          x-major_len < 0 ||
+          x+major_len >= img.cols ||
+          y-major_len < 0 ||
+          y+major_len >= img.rows )
       {
         continue;
       }
@@ -130,22 +138,17 @@ void findMaximaAffine(
         continue;
       }
 
-      // compute ellipse parameters
-      const float major_x = affine_map[y][x][0];
-      const float major_y = affine_map[y][x][1];
-      const float minor = affine_map[y][x][2] * sp;
-
       // break if ellipse is too small or thin
-      if( isnan(major_x) || minor < min_px_scale ) {
+      if( isnan(major_x) || minor_len < min_px_scale ) {
         continue;
       }
 
       const float angle = std::atan2( major_y, major_x );
 
       float A, B, C;
-      computeEllipseParams(angle, sp, minor, A, B, C);
+      computeEllipseParams(angle, major_len, minor_len, A, B, C);
 
-      int window = sp;
+      int window = major_len;
       if ( window < 1 ) window = 1;
 
       float cos_angle = cos(angle);
@@ -194,7 +197,7 @@ void findMaximaAffine(
 
       if(is_max) {
         // is a maximum -> add keypoint
-        kp.push_back( KeyPoint3D ( x, y, sp*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D ( x, y, major_len*4.0, base_scale*4.0, -1, img[y][x] ) );
       }
     }
   }

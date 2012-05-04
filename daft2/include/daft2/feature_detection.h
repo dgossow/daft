@@ -56,8 +56,7 @@ template <float (*F)( const Mat1d &ii,
     float sw, float major_x, float major_y,
     float minor_ratio, float min_sp )>
 void convolveAffine( const Mat1d &ii,
-    const Mat1f &scale_map,
-    const Mat3f& affine_map,
+    const Mat4f& affine_map,
     float sw,
     float min_px_scale,
     Mat1f &img_out );
@@ -92,8 +91,7 @@ void findMaximaMipMap( const Mat1d &img,
 /*! Like findMaxima, but do non-max suppression in affine neighborhood */
 void findMaximaAffine(
     const cv::Mat1d &img,
-    const cv::Mat1d &scale_map,
-    const Mat3f &affine_map,
+    const Mat4f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -167,33 +165,34 @@ void convolve( const Mat1d &ii,
 }
 
 template <float (*F)( const Mat1d &ii,
-    int x, int y, float sp,
-    float sw, float major_x, float major_y,
-    float minor_ratio, float min_sp )>
+    int x, int y,
+    float major_len,  float minor_len,
+    float major_x, float major_y )>
 void convolveAffine( const Mat1d &ii,
-    const Mat1f &scale_map,
-    const Mat3f& affine_map,
-    float sw,
+    const Mat4f& affine_map,
     float min_px_scale,
     Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
 
   static const float nan = std::numeric_limits<float>::quiet_NaN();
+
   for ( int y = 0; y < ii.rows-1; y++ )
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
-      const float sp = getScale(scale_map[y][x], sw);
+      const float& major_len = affine_map[y][x][0];
+      const float& minor_len = affine_map[y][x][1];
+      const float& major_x = affine_map[y][x][2];
+      const float& major_y = affine_map[y][x][3];
 
-      if ( isnan( affine_map[y][x][0] ) || sp < min_px_scale )
+      if ( isnan( major_len ) || minor_len < min_px_scale )
       {
         img_out(y,x) = nan;
         continue;
       }
 
-      img_out(y,x) = F( ii, x, y, sp, sw, affine_map[y][x][0],
-          affine_map[y][x][1], affine_map[y][x][2], min_px_scale );
+      img_out(y,x) = F( ii, x, y, major_len, minor_len, major_x, major_y );
     }
   }
 }

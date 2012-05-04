@@ -90,10 +90,25 @@ void ExtractDetectorFile::readDataFiles() {
   }
 
   cv::Mat mask_tmp = cv::imread(maskImagePath);
-  //mask_tmp.convertTo(maskImage_,CV_BGR2GRAY);
 
-  maskImage_ = mask_tmp;
-  std::cout << maskImage_.type() << std::endl;
+  mask_img_.create( mask_tmp.rows, mask_tmp.cols );
+
+  for ( int y=0; y<mask_tmp.rows; y++ )
+  {
+    for ( int x=0; x<mask_tmp.rows; x++ )
+    {
+      if ( mask_tmp.at<cv::Vec3b>(y,x)[0] > 128 )
+      {
+        mask_img_(y,x) = 255;
+      }
+      else
+      {
+        mask_img_(y,x) = 0;
+      }
+    }
+  }
+
+  cv::imshow("mask_img_",mask_img_);
 
   // create image paths
   std::string image_rgb_name;
@@ -257,20 +272,6 @@ std::vector<cv::KeyPoint3D> makeKp3d(std::vector<cv::KeyPoint> kp) {
   return kp_3d;
 }
 
-std::vector<cv::KeyPoint3D> makeKp3d(std::vector<cv::KeyPoint> kp,
-    cv::Mat1d descriptors) {
-  std::vector<cv::KeyPoint3D> kp3d_vec;
-  kp3d_vec.reserve(kp.size());
-  for (size_t k = 0; k < kp.size(); k++) {
-    cv::KeyPoint3D kp3d = kp[k];
-    for (int i = 0; i < descriptors.cols; i++) {
-      kp3d.desc.push_back(descriptors[k][i]);
-    }
-    kp3d_vec.push_back(kp3d);
-  }
-  return kp3d_vec;
-}
-
 // these helper function compute the number of keypoints
 // for a given threshold
 
@@ -280,7 +281,7 @@ public:
   VecIns(std::vector<parallelsurf::KeyPoint>& keyPoints) :
       m_KeyPoints(keyPoints) {
   }
-  ;
+  virtual ~VecIns() {};
   inline virtual void operator()(const parallelsurf::KeyPoint &keyPoint) {
     m_KeyPoints.push_back(keyPoint);
   }
@@ -288,8 +289,15 @@ private:
   std::vector<parallelsurf::KeyPoint>& m_KeyPoints;
 };
 
-std::vector<cv::KeyPoint3D> getSurfKp(const cv::Mat& gray_img,
-    const cv::Mat& depth_img, cv::Matx33f& K, float t) {
+void getSurfKp(
+    const cv::Mat& gray_img,
+    const cv::Mat1b& mask_img,
+    const cv::Mat& depth_img,
+    cv::Matx33f K,
+    float t,
+    std::vector<cv::KeyPoint3D>& keypoints,
+    cv::Mat1f& descriptors )
+{
   unsigned char** pixels = new unsigned char*[gray_img.rows];
   for (int y = 0; y < gray_img.rows; y++) {
     pixels[y] = new unsigned char[gray_img.cols];
@@ -312,37 +320,49 @@ std::vector<cv::KeyPoint3D> getSurfKp(const cv::Mat& gray_img,
   descriptor.makeDescriptors(surf_kps.begin(), surf_kps.end());
 
   if (surf_kps.size() == 0) {
-    return std::vector<cv::KeyPoint3D>();
+    return;
   }
 
-  int desc_len = surf_kps[0]._vec.size();
   int num_kp = surf_kps.size();
 
   std::vector<cv::KeyPoint> kps;
-  cv::Mat1d descriptors(num_kp, desc_len);
+
+  int desc_len = surf_kps[0]._vec.size();
+  descriptors.create(num_kp, desc_len);
 
   for (int i = 0; i < num_kp; i++) {
     cv::KeyPoint kp;
     parallelsurf::KeyPoint &surf_kp = surf_kps[i];
 
-    kp.angle = surf_kp._ori;
-    kp.class_id = 0;
-    kp.octave = 0;
-    kp.pt = cv::Point2f(surf_kp._x, surf_kp._y);
-    kp.response = surf_kp._score;
-    kp.size = surf_kp._scale * 7.768891354;
-    kps.push_back(kp);
+    if ( mask_img.rows == 0 || mask_img(surf_kp._y,surf_kp._x) != 0 )
+    {
+      kp.angle = surf_kp._ori;
+      kp.class_id = 0;
+      kp.octave = 0;
+      kp.pt = cv::Point2f(surf_kp._x, surf_kp._y);
+      kp.response = surf_kp._score;
+      kp.size = surf_kp._scale * 7.768891354;
+      kps.push_back(kp);
 
-    for (int j = 0; j < desc_len; j++) {
-      descriptors[i][j] = surf_kp._vec[j];
+      for (int j = 0; j < desc_len; j++) {
+        descriptors[kps.size()-1][j] = surf_kp._vec[j];
+      }
     }
   }
+  descriptors = descriptors( cv::Rect( 0, 0, desc_len, kps.size() ) ).clone();
 
-  return makeKp3d(kps, descriptors);
+  keypoints = makeKp3d(kps);
 }
 
-std::vector<cv::KeyPoint3D> getSiftKp(const cv::Mat& gray_img,
-    const cv::Mat& depth_img, cv::Matx33f& K, float t) {
+void getSiftKp(
+    const cv::Mat& gray_img,
+    const cv::Mat1b& mask_img,
+    const cv::Mat& depth_img,
+    cv::Matx33f K,
+    float t,
+    std::vector<cv::KeyPoint3D>& keypoints,
+    cv::Mat1f& descriptors )
+{
   Lowe::SIFT sift;
   sift.PeakThreshInit = 0.01 * t;
 
@@ -357,34 +377,47 @@ std::vector<cv::KeyPoint3D> getSiftKp(const cv::Mat& gray_img,
 
   lowe_kps = sift.getKeypoints(lowe_img);
   if (lowe_kps.size() == 0) {
-    return std::vector<cv::KeyPoint3D>();
+    return;
   }
 
-  int desc_len = lowe_kps[0].ivec.size();
   int num_kp = lowe_kps.size();
 
   std::vector<cv::KeyPoint> kps;
-  cv::Mat1d descriptors(num_kp, desc_len);
+
+  int desc_len = lowe_kps[0].ivec.size();
+  descriptors.create(num_kp, desc_len);
 
   for (int i = 0; i < num_kp; i++) {
-    cv::KeyPoint kp;
     Lowe::SIFT::Key& lowe_kp = lowe_kps[i];
-    kp.angle = 0;
-    kp.class_id = 0;
-    kp.octave = 0;
-    kp.pt = cv::Point2f(lowe_kp.col, lowe_kp.row);
-    kp.response = lowe_kp.strength;
-    kp.size = lowe_kp.scale * 6.14;
-    kps.push_back(kp);
-    for (int j = 0; j < desc_len; j++) {
-      descriptors[i][j] = lowe_kp.ivec[j];
+    if ( mask_img.rows == 0 || mask_img(lowe_kp.row, lowe_kp.col) )
+    {
+      cv::KeyPoint kp;
+      kp.angle = 0;
+      kp.class_id = 0;
+      kp.octave = 0;
+      kp.pt = cv::Point2f(lowe_kp.col, lowe_kp.row);
+      kp.response = lowe_kp.strength;
+      kp.size = lowe_kp.scale * 6.14;
+      kps.push_back(kp);
+      for (int j = 0; j < desc_len; j++) {
+        descriptors[kps.size()-1][j] = lowe_kp.ivec[j];
+      }
     }
   }
+  descriptors = descriptors( cv::Rect( 0, 0, desc_len, kps.size() ) ).clone();
 
-  return makeKp3d(kps, descriptors);
+
+  keypoints = makeKp3d(kps);
 }
 
-std::vector<cv::KeyPoint3D> getOrbKp(const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+void getOrbKp(
+    const cv::Mat& gray_img,
+    const cv::Mat1b& mask_img,
+    const cv::Mat& depth_img,
+    cv::Matx33f K,
+    float t,
+    std::vector<cv::KeyPoint3D>& keypoints,
+    cv::Mat1f& descriptors )
 {
   //cv::Mat gray_img_small;
   //cv::resize( gray_img, gray_img_small, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR);
@@ -416,14 +449,16 @@ std::vector<cv::KeyPoint3D> getOrbKp(const cv::Mat& gray_img, const cv::Mat& dep
   std::vector<cv::KeyPoint> kps;
   cv::Mat1b desc;
 
-  orb.operator ()( gray_img, cv::Mat(), kps, desc, false );
+  cv::Mat empty_mask;
+
+  orb( gray_img, empty_mask, kps, desc, false );
 
   std::cout << desc.type() << std::endl;
   std::cout << desc.rows << std::endl;
   std::cout << desc.cols << std::endl;
-  //std::cout << kps.size() << std::endl;
+  std::cout << kps.size() << std::endl;
 
-  cv::Mat1d descriptors( desc.rows, desc.cols*8 );
+  descriptors.create( desc.rows, desc.cols*8 );
   for ( int i=0; i<desc.rows; i++ )
   {
     for ( int j=0; j<desc.cols; j++ )
@@ -447,19 +482,24 @@ std::vector<cv::KeyPoint3D> getOrbKp(const cv::Mat& gray_img, const cv::Mat& dep
     //std::cout << kps[i].size << std::endl;
   }
 
-  return makeKp3d(kps, descriptors);
+  keypoints = makeKp3d(kps);
 }
 
-std::vector<cv::KeyPoint3D> getDaftKp(daft_ns::DAFT::DetectorParams p_det, daft_ns::DAFT::DescriptorParams p_desc,
-    const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t )
+void getDaftKp(
+    daft_ns::DAFT::DetectorParams p_det,
+    daft_ns::DAFT::DescriptorParams p_desc,
+    const cv::Mat& gray_img,
+    const cv::Mat1b& mask_img,
+    const cv::Mat& depth_img,
+    cv::Matx33f K,
+    float t,
+    std::vector<cv::KeyPoint3D>& keypoints,
+    cv::Mat1f& descriptors )
 {
   p_det.det_threshold_ *= t;
 
-  std::vector<cv::KeyPoint3D> kp1;
   daft_ns::DAFT daft1( p_det, p_desc );
-  daft1( gray_img, depth_img, K, kp1 );
-
-  return kp1;
+  daft1( gray_img, mask_img, depth_img, K, keypoints, descriptors );
   /*
 
    p_det.base_scale_ *= sqrt(2);
@@ -511,8 +551,6 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
     cv::Mat gray_img;
     cv::cvtColor(rgb_img, gray_img, CV_BGR2GRAY);
 
-    cv::Mat mask;
-
     std::cout << name << std::endl;
 
     if (it == it_begin && target_num_kp_ != 0)
@@ -521,8 +559,14 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
       float t_left = t*0.5;
       float t_right = t*2;
 
-      int y_left = filterKpMask( getKp(gray_img, depth_img, K_, t_left) ).size() - target_num_kp_;
-      int y_right = filterKpMask( getKp(gray_img, depth_img, K_, t_right) ).size() - target_num_kp_;
+      std::vector<cv::KeyPoint3D> kp_left,kp_right;
+      cv::Mat1f descriptors;
+
+      getKp(gray_img, mask_img_, depth_img, K_, t_left, kp_left, descriptors );
+      getKp(gray_img, mask_img_, depth_img, K_, t_right, kp_right, descriptors );
+
+      int y_left = kp_left.size() - target_num_kp_;
+      int y_right = kp_right.size() - target_num_kp_;
 
       int its = 0;
 
@@ -546,7 +590,9 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
           t_new = 0;
         }
 
-        int y_new = filterKpMask( getKp(gray_img, depth_img, K_, t_new) ).size() - target_num_kp_;
+        std::vector<cv::KeyPoint3D> kp_new;
+        getKp(gray_img, mask_img_, depth_img, K_, t_new, kp_new, descriptors );
+        int y_new = kp_new.size() - target_num_kp_;
 
         if ( std::abs(y_new) < 5 )
         {
@@ -613,24 +659,30 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
     s << "img" << count;
     count++;
 
-    std::vector<cv::KeyPoint3D> kp = getKp(gray_img, depth_img, K_, t);
-    std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
+    std::vector<cv::KeyPoint3D> kp;
+    cv::Mat1f desc;
 
     if (first_image) {
-      kp = filterKpMask(kp);
+      getKp(gray_img, mask_img_, depth_img, K_, t, kp, desc );
+      std::cout << name << " " << s.str() << " #filtered kp = " << kp.size() << std::endl;
+
       first_image = false;
 
       cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0, 0, 255),
           cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-      storeKeypoints(kp, s.str(), name, rgb_img, rgb_img);
+      storeKeypoints(kp, desc, s.str(), name, rgb_img, rgb_img);
     } else {
+      cv::Mat1b fake_mask( (int)gray_img.rows, (int)gray_img.cols, (cv::Mat1b::value_type)1 );
+      getKp(gray_img, fake_mask, depth_img, K_, t, kp, desc );
+      std::cout << name << " " << s.str() << " #kp = " << kp.size() << std::endl;
+
       cv::Mat first_kp_img_warped = rgb_img.clone();
       cv::warpPerspective(first_kp_img, first_kp_img_warped, cv::Mat(it->hom),
           cv::Size(rgb_img.cols, rgb_img.rows));
 
       printMat(it->hom);
 
-      storeKeypoints(kp, s.str(), name, rgb_img, first_kp_img_warped);
+      storeKeypoints(kp, desc, s.str(), name, rgb_img, first_kp_img_warped);
     }
 
     if (verbose_) {
@@ -655,7 +707,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT", 3.16326 );
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 3.16326 );
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=false;
@@ -669,9 +721,9 @@ void ExtractDetectorFile::extractAllKeypoints()
   //desc_p.octave_offset_ = -1;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
-  //extractKeypoints( &getSurfKp, "SURF", 107.981 );
-  //extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
-  //extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
+  extractKeypoints( &getSurfKp, "SURF", 107.981 );
+  extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
+  extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
 
 void ExtractDetectorFile::printMat(cv::Matx33f M) {
@@ -690,9 +742,9 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask(
   std::vector<cv::KeyPoint3D> kp_filtered;
 
   for (uint32_t i = 0; i < kp.size(); i++) {
-    //std::cout << int(maskImage_( kp.at(i).pt.y, kp.at(i).pt.x )) << " ";
+    //std::cout << int(mask_img_( kp.at(i).pt.y, kp.at(i).pt.x )) << " ";
     // check for black spots in maskimage
-    if (maskImage_.at<cv::Vec3b>(int(kp[i].pt.y), int(kp[i].pt.x))[0] > 128) {
+    if (mask_img_.at<cv::Vec3b>(int(kp[i].pt.y), int(kp[i].pt.x))[0] > 128) {
       kp_filtered.push_back(kp[i]);
     }
   }
@@ -702,12 +754,21 @@ std::vector<cv::KeyPoint3D> ExtractDetectorFile::filterKpMask(
   return kp_filtered;
 }
 
-void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
-    std::string img_name, std::string extension, cv::Mat& rgb_img, cv::Mat& warped_img ) {
+void ExtractDetectorFile::storeKeypoints(
+    std::vector<cv::KeyPoint3D> keypoints,
+    cv::Mat1f& descriptors,
+    std::string img_name,
+    std::string extension,
+    cv::Mat& rgb_img,
+    cv::Mat& warped_img )
+{
   if (keypoints.size() == 0) {
     return;
   }
+
   std::vector<cv::KeyPoint3D>::iterator it;
+  int k;
+
   double_t ax, bx, ay, by, a_length, b_length, alpha_a, alpha_b;
   double_t A, B, C;
 
@@ -719,10 +780,10 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
   file.open(filePath.c_str(), std::ios::out);
 
   // header
-  file << keypoints[0].desc.size() + 1 << std::endl;
-  file << keypoints.size() << std::endl;
+  file << descriptors.cols + 1 << std::endl;
+  file << descriptors.rows << std::endl;
 
-  for (it = keypoints.begin(); it != keypoints.end(); it++) {
+  for (k=0,it = keypoints.begin(); it != keypoints.end(); k++,it++) {
     //hack
     //it->affine_minor = it->affine_major;
 
@@ -762,8 +823,8 @@ void ExtractDetectorFile::storeKeypoints(std::vector<cv::KeyPoint3D> keypoints,
       file << " 0.0";
     }
 
-    for (unsigned i = 0; i < it->desc.size(); i++) {
-      file << " " << it->desc[i];
+    for (unsigned i = 0; i < descriptors.cols; i++) {
+      file << " " << descriptors(k,i);
     }
 
     file << std::endl;

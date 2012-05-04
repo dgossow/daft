@@ -18,7 +18,7 @@ void computeAffineMap(
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    Mat3f& affine_map )
+    Mat4f& affine_map )
 {
   if ( affine_map.rows != 0 )
   {
@@ -38,27 +38,30 @@ void computeAffineMap(
       if ( isnan(sp) || sp < min_px_scale ||
            !computeGradient( depth_map, x, y, sp, grad ) )
       {
-        affine_map[y][x][0] = affine_map[y][x][1] = affine_map[y][x][2] = nan;
+        affine_map[y][x][0] = nan;
       }
       else
       {
         // if the gradient is 0, make circle
         if ( grad[0] == 0 && grad[1] == 0 )
         {
-          affine_map[y][x][0] = 0.0f;
-          affine_map[y][x][1] = 1.0f;
+          affine_map[y][x][0] = sp;
+          affine_map[y][x][1] = sp;
           affine_map[y][x][2] = 1.0f;
+          affine_map[y][x][3] = 0.0f;
           continue;
         }
 
         const float grad_len_sqr = grad[0]*grad[0] + grad[1]*grad[1];
 
-        const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
-        affine_map[y][x][0] = -grad[1] * grad_len_inv;
-        affine_map[y][x][1] = grad[0] * grad_len_inv;
+        // major/minor axis lengths
+        affine_map[y][x][0] = sp;
+        affine_map[y][x][1] = sp * fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
 
-        // compute the minor/major axis ratio
-        affine_map[y][x][2] = fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
+        // major axis as unit vector
+        const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
+        affine_map[y][x][2] = -grad[1] * grad_len_inv;
+        affine_map[y][x][3] = grad[0] * grad_len_inv;
       }
     }
   }

@@ -39,10 +39,21 @@ DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & desc
 DAFT::~DAFT() {
 }
 
-
-void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
-    cv::Matx33f K, std::vector<KeyPoint3D> & kp )
+void DAFT::operator()( const cv::Mat &image,
+    const cv::Mat &depth_map_orig,
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
 {
+  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)1 );
+  this->operator()(image,mask,depth_map_orig,K,kp,desc);
+}
+
+void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
+    const cv::Mat &depth_map_orig,
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
+{
+  kp.clear();
+  desc = cv::Mat1f();
+
   std::cout << "Preprocessing" << std::endl;
 
   TIMER_START
@@ -147,7 +158,7 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
   std::map< int, Mat1f > smoothed_imgs;
   std::map< int, Mat1f> smoothed_depth_maps;
-  std::map< int, Mat3f > affine_maps;
+  std::map< int, Mat4f > affine_maps; // entries are (major_len, minor_len, major_x, major_y)
 
   // compute depth-normalized image pyramid
 
@@ -163,10 +174,10 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
 
     smoothed_imgs[octave] = Mat1f();
     smoothed_depth_maps[octave] = Mat1f();
-    affine_maps[octave] = Mat3f();
+    affine_maps[octave] = Mat4f();
 
     Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
-    Mat3f& affine_map = affine_maps[octave];
+    Mat4f& affine_map = affine_maps[octave];
 
     smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
     computeAffineMap( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, affine_map );
@@ -182,7 +193,7 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
     double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
     Mat1f& smoothed_img = smoothed_imgs[octave];
     Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
-    Mat3f& affine_map = affine_maps[octave];
+    Mat4f& affine_map = affine_maps[octave];
 
 #ifdef SHOW_DEBUG_WIN
     {
@@ -201,8 +212,7 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
     switch (det_params_.det_type_) {
     case DetectorParams::DET_FELINE:
       if (det_params_.affine_) {
-        convolveAffine<felineAffine>(ii, scale_map, affine_map,
-            scale, 1, smoothed_img );
+        convolveAffine<feline>(ii, affine_map, 1, smoothed_img );
       } else {
         convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
@@ -250,7 +260,7 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
   	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
   	cv::absdiff( smoothed_imgs[octave+1], smoothed_imgs[octave], response_map );
-    Mat3f& affine_map = affine_maps[octave];
+    Mat4f& affine_map = affine_maps[octave];
 
     // save index where new kps will be inserted
     unsigned kp_first = kp.size();
@@ -259,7 +269,7 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
     switch (det_params_.max_search_algo_) {
     case DetectorParams::MAX_WINDOW:
       if ( det_params_.affine_ ) {
-        findMaximaAffine(response_map, scale_map, affine_map,
+        findMaximaAffine(response_map, affine_map,
             scale, det_params_.min_px_scale_, max_px_scale,
             det_params_.det_threshold_, kp);
       }
@@ -375,14 +385,19 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
   float f_inv = 1.0 / f;
   float cx = K(0, 2);
   float cy = K(1, 2);
+
   std::vector<KeyPoint3D> kp2;
+
   kp2.reserve(kp.size());
+
+  SurfDescriptor surf_desc;
+  cv::Mat1f desc_tmp( kp.size(), surf_desc.getDescLen() );
 
   // correct keypoint size according to given octave offset
   float scale_fac = pow( 2.0, float(desc_params_.octave_offset_) );
 
-  for (unsigned k = 0; k < kp.size(); k++) {
-
+  for (unsigned k = 0; k < kp.size(); k++)
+  {
   	kp[k].size *= scale_fac;
   	kp[k].world_size *= scale_fac;
   	kp[k].octave += desc_params_.octave_offset_;
@@ -391,27 +406,34 @@ void DAFT::operator()(const cv::Mat &image, const cv::Mat &depth_map_orig,
     int kp_y = kp[k].pt.y;
     getPt3d(f_inv, cx, cy, kp_x, kp_y, depth_map[kp_y][kp_x], kp[k].pt3d);
 
-    Vec3f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
+    Vec4f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
 
-    if ( affine_params[2] > 0.1 )
+    if ( mask( kp[k].pt.y, kp[k].pt.x ) != 0 && affine_params[0]/affine_params[1] < 10.0 )
     {
       // keypoint shall cover outer and inner and wants size not radius
-      kp[k].affine_major = kp[k].size;
-      kp[k].affine_minor = kp[k].size * affine_params[2];
-      kp[k].affine_angle = atan2( affine_params[1], affine_params[0] );
+      kp[k].affine_major = 4.0*affine_params[0];
+      kp[k].affine_minor = 4.0*affine_params[1];
+      kp[k].affine_angle = atan2( affine_params[3], affine_params[2] );
 
       // compute exact normal using pca
       kp[k].normal = getNormal(kp[k], depth_map, K, 2.0 / scale_fac );
 
       Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
       Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-      if ( getDesc( desc_params_.patch_size_, smoothed_img, smoothed_img2, kp[k], depth_map, K ) )
+
+      // reference current row from descriptor matrix
+      Mat1f curr_desc(desc_tmp, cv::Rect( 0, kp2.size(), desc_tmp.cols, 1 ) );
+
+      if ( surf_desc.getDesc( desc_params_.patch_size_, smoothed_img, smoothed_img2, kp[k], curr_desc, depth_map, K ) )
       {
         kp2.push_back(kp[k]);
       }
     }
   }
   kp.swap(kp2);
+
+  // copy descriptors to matrix
+  desc = desc_tmp( cv::Rect( 0, 0, surf_desc.getDescLen(), kp.size() ) ).clone();
 
   std::cout << kp.size() << " keypoints left after descriptor computation." << std::endl;
   TIMER_STOP

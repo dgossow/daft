@@ -48,12 +48,24 @@ private:
 
   void extractAllKeypoints();
 
-  typedef boost::function< std::vector<cv::KeyPoint3D> ( const cv::Mat& gray_img, const cv::Mat& depth_img, cv::Matx33f& K, float  t ) > GetKpFunc;
+  typedef boost::function< void (
+      const cv::Mat& gray_img,
+      const cv::Mat1b& mask_img,
+      const cv::Mat& depth_img,
+      cv::Matx33f K,
+      float t,
+      std::vector<cv::KeyPoint3D>& keypoints,
+      cv::Mat1f& descriptors ) > GetKpFunc;
 
   void extractKeypoints( GetKpFunc getKp, std::string name, float t );
 
-  void storeKeypoints(std::vector<cv::KeyPoint3D> keypoints, std::string img_name,
-      std::string extension, cv::Mat& rgb_img, cv::Mat& warped_img );
+  void storeKeypoints(
+      std::vector<cv::KeyPoint3D> keypoints,
+      cv::Mat1f& descriptors,
+      std::string img_name,
+      std::string extension,
+      cv::Mat& rgb_img,
+      cv::Mat& warped_img );
 
   std::vector<cv::KeyPoint3D> filterKpMask( std::vector<cv::KeyPoint3D> kp );
 
@@ -62,7 +74,7 @@ private:
   void printMat( cv::Matx33f M );
 
   cv::Matx33f K_;
-  cv::Mat maskImage_;
+  cv::Mat1b mask_img_;
 
   std::string file_path_;
   std::string file_name_;

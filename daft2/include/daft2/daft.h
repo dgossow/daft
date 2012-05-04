@@ -117,13 +117,16 @@ public:
   ~DAFT();
 
   /** Detect salient keypoints using a pair of depth and intensity images
-   * @param image the image to compute the features and descriptors on
-   * @param depth_map the depth image (depth values in meters)
-   * @param K 3x3 Matrix with intrinsic camera parameters
+   * @param image     the image to compute the features and descriptors on
+   * @param depth_map the depth image in meters (float,double) or millimeters (int16)
+   * @param K         matrix with intrinsic camera parameters
    * @param keypoints The resulting keypoints
+   * @param desc      float matrix with row-wise descriptors
    */
   void operator()(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f K,
-      std::vector<cv::KeyPoint3D> & keypoints );
+      std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
+  void operator()(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
+      std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
 
 private:
 

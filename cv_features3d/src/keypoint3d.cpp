@@ -31,11 +31,9 @@ static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar&
     }
     else
     {
-      //int radius = p.size * draw_multiplier / 2;
       int radius = 3 * draw_multiplier;
       Point center( cvRound(p.pt.x * draw_multiplier), cvRound(p.pt.y * draw_multiplier) );
       circle( img, center, radius, color, 1, CV_AA, draw_shift_bits );
-      //std::cout << "circ";
     }
   }
   else
