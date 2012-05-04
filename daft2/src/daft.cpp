@@ -410,7 +410,6 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
     if ( mask( kp[k].pt.y, kp[k].pt.x ) != 0 && affine_params[0]/affine_params[1] < 10.0 )
     {
-      // keypoint shall cover outer and inner and wants size not radius
       kp[k].affine_major = 4.0*affine_params[0];
       kp[k].affine_minor = 4.0*affine_params[1];
       kp[k].affine_angle = atan2( affine_params[3], affine_params[2] );

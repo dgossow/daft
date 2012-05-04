@@ -1,6 +1,6 @@
 
-detectors = {'DAFT'};%;'DAFT Non-Affine';'SIFT'};
-is_affine = {1,1,0,0,0};
+detectors = {'DAFT';'SIFT';'SURF'};
+is_affine = {1,0,0,0,0};
 
 %detectors = {'ORB';'SIFT'};
 %is_affine = {0,0};

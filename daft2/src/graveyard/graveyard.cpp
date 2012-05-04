@@ -19,6 +19,63 @@
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+// sp : pixel scale
+// sw : world scale
+inline bool getAffine(
+    const Vec2f& grad,
+    int x, int y,
+    float sp, float sw,
+    float &angle, float &major, float &minor,
+    Point3f& normal )
+{
+  // if the gradient is 0, make circle
+  if ( grad[0] == 0 && grad[1] == 0 )
+  {
+    major = minor = sp;
+    angle = 0;
+    return true;
+  }
+
+  // gradient, normalized to length=1
+
+  // compute the minor axis length
+  float normal_length_inv = fastInverseSqrt( (grad[0]*grad[0] + grad[1]*grad[1]) / (sw*sw) + 1.0f );
+  minor = sp * normal_length_inv;
+  // major axis is easy
+  major = sp;
+  // compute angle
+  angle = std::atan2( grad[0], -grad[1] );
+
+  normal.x = grad[0] / sw;
+  normal.y = grad[1] / sw;
+  normal.z = -1.0f;
+  normal = normal * normal_length_inv;
+
+  return true;
+}
+
+// sp : pixel scale
+// sw : world scale
+inline void getMajorMinor( const Vec2f& grad, float sp, float sw, float& major_x, float& major_y, float &ratio )
+{
+  // if the gradient is 0, make circle
+  if ( grad[0] == 0 && grad[1] == 0 )
+  {
+    major_x = 0;
+    major_y = 1;
+    ratio = 1;
+  }
+
+  const float grad_len_sqr = grad[0]*grad[0] + grad[1]*grad[1];
+
+  // compute the minor axis length
+  ratio = fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
+
+  const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
+  major_x = -grad[1] * grad_len_inv;
+  major_y = grad[0] * grad_len_inv;
+}
+
 
 inline float gaussAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )
 {

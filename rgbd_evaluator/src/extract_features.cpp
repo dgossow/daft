@@ -722,7 +722,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
   extractKeypoints( &getSurfKp, "SURF", 107.981 );
-  extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
+  //extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
   extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
 
