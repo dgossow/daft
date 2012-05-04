@@ -17,7 +17,6 @@
 #include <boost/timer.hpp>
 
 #include <daft2/daft.h>
-#include <daft2/preprocessing.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
@@ -44,9 +43,6 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   // Crop rgb so it has the same size as depth
   intensity_image = cv::Mat( orig_intensity_image->image, cv::Rect( 0,0, depth_image.cols, depth_image.rows ) );
 
-  cv::Mat1f depth_image_closed;
-  cv::daft2::improveDepthMap<30>( depth_image, depth_image_closed, 0.2f );
-
   cv::Matx33d camera_matrix( ros_camera_info->P.data() );
   camera_matrix(1,2) /= 2;
 
@@ -66,12 +62,13 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.det_threshold_ = 0.04;
 
   p2 = p1;
-  p1.det_type_=p1.DET_BOX;
   p2.affine_ = true;
 
   cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
-  rgbd_features1.detect( intensity_image, depth_image_closed, camera_matrix, keypoints1);
+  cv::Mat desc;
+
+  rgbd_features1( intensity_image, depth_image, camera_matrix, keypoints1, desc );
   //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
   //
 

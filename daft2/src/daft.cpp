@@ -89,7 +89,6 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   //imshowNorm("ii_depth_count",ii_depth_count,0);
 #endif
 
-  // Compute scale map from depth map
   Mat1f scale_map(gray_image.rows, gray_image.cols);
   Mat1f::iterator scale_it = scale_map.begin();
   Mat1f::iterator scale_map_end = scale_map.end();
@@ -97,6 +96,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
   int min_octave = 0;
 
+  // Compute scale map from depth map & optionally determine min/max possible octave
   if (det_params_.scale_levels_ == det_params_.AUTO)
   {
     float min_scale_fac = std::numeric_limits<float>::infinity();
@@ -131,7 +131,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     double n_max = std::floor(log(delta_n_max) / log(2.0));
 
     min_octave = n_min;
-    n_octaves = n_max - n_min + 1;
+    n_octaves = n_max - n_min;
   }
   else
   {
@@ -150,6 +150,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   // compute which octaves we need
   for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
   {
+    // insert octave and next bigger one (for diff-of-gaussian)
   	octaves.insert(octave);
   	octaves.insert(octave+1);
   	octaves.insert(octave+desc_params_.octave_offset_);
@@ -192,7 +193,6 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     int octave = *it;
     double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
     Mat1f& smoothed_img = smoothed_imgs[octave];
-    Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
     Mat4f& affine_map = affine_maps[octave];
 
 #ifdef SHOW_DEBUG_WIN
@@ -350,7 +350,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   std::cout << kp.size() << " keypoints found in first stage." << std::endl;
 
   TIMER_START
-  // filter found maxima by applying a threshold on a second kernel
+  // filter found maxima by applying a threshold on a second criterion
   switch (det_params_.pf_type_) {
   case DetectorParams::PF_NONE:
     break;

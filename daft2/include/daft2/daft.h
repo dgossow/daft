@@ -125,6 +125,15 @@ public:
    */
   void operator()(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
+
+  /** Detect salient keypoints using a pair of depth and intensity images
+   * @param image     the image to compute the features and descriptors on
+   * @param mask      mask for keypoint filtering (0=reject)
+   * @param depth_map the depth image in meters (float,double) or millimeters (int16)
+   * @param K         matrix with intrinsic camera parameters
+   * @param keypoints The resulting keypoints
+   * @param desc      float matrix with row-wise descriptors
+   */
   void operator()(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
 

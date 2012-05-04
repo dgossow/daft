@@ -24,7 +24,8 @@
 #include <boost/foreach.hpp>
 
 #include <daft2/daft.h>
-//#include <daft/daft.h>
+
+#include "rgbd_evaluator/extract_keypoints.h"
 
 namespace rgbd_evaluator
 {
@@ -47,15 +48,6 @@ private:
   bool readDepth( const std::string & fileName, cv::Mat1f& depth_img );
 
   void extractAllKeypoints();
-
-  typedef boost::function< void (
-      const cv::Mat& gray_img,
-      const cv::Mat1b& mask_img,
-      const cv::Mat& depth_img,
-      cv::Matx33f K,
-      float t,
-      std::vector<cv::KeyPoint3D>& keypoints,
-      cv::Mat1f& descriptors ) > GetKpFunc;
 
   void extractKeypoints( GetKpFunc getKp, std::string name, float t );
 
