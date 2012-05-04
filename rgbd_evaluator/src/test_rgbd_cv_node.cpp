@@ -51,6 +51,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   cv::daft2::DAFT::DetectorParams p1,p2;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
+  /*
   p1.base_scale_ = 0.01;
   p1.scale_levels_ = 1;
   //p1.min_px_scale_ = 3;
@@ -63,10 +64,11 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   p2 = p1;
   p2.affine_ = true;
+  */
 
   cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
-  cv::Mat desc;
+  cv::Mat1f desc;
 
   rgbd_features1( intensity_image, depth_image, camera_matrix, keypoints1, desc );
   //rgbd_features2.detect( intensity_image, depth_image_closed, camera_matrix, keypoints2);
@@ -162,7 +164,7 @@ int main( int argc, char** argv )
 
   ros::NodeHandle comm_nh(""); // for topics, services
 
-  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "/camera/rgb/image", 1);
+  message_filters::Subscriber<sensor_msgs::Image> intensity_img_sub(comm_nh, "/camera/rgb/image_color", 1);
   message_filters::Subscriber<sensor_msgs::Image> depth_img_sub(comm_nh, "/camera/depth_registered/image", 1);
   message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub(comm_nh, "/camera/rgb/camera_info", 1);
 

@@ -74,10 +74,10 @@ void smoothDepth( const Mat1f &scale_map,
     Mat1f &depth_out )
 {
   float nan = std::numeric_limits<float>::quiet_NaN();
-  depth_out.create( ii_depth_map.rows, ii_depth_map.cols );
-  for ( int y = 0; y < ii_depth_map.rows; y++ )
+  depth_out.create( ii_depth_map.rows-1, ii_depth_map.cols-1 );
+  for ( int y = 0; y < ii_depth_map.rows-1; y++ )
   {
-    for ( int x = 0; x < ii_depth_map.cols; ++x )
+    for ( int x = 0; x < ii_depth_map.cols-1; ++x )
     {
       float s = scale_map[y][x] * base_scale + 0.5f;
 
