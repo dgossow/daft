@@ -1,10 +1,5 @@
 <package>
-  <description brief="Feature extraction from RGB-D data">
-
-     rgbd_features provides functions for detecting
-     interest points in RGB-D data based on depth and
-     intensity or color.
-
+  <description brief="Depth-Adaptive Feature Transform (DAFT)">
   </description>
   <author>David Gossow</author>
   <license>BSD</license>
