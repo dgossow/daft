@@ -649,59 +649,6 @@ void RgbdEvaluatorPreprocessing::calculateHomography()
   writeVectorToFile( angles, "viewpoint angle" );
 }
 
-cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography( cv::Mat& img1c, cv::Mat& img2c )
-{
-  cv::Mat img1,img2;
-  cv::cvtColor( img1c, img1, CV_BGR2GRAY );
-  cv::cvtColor( img2c, img2, CV_BGR2GRAY );
-
-  cv::SIFT::CommonParams cp;
-  cv::SIFT::DetectorParams detp;
-  cv::SIFT::DescriptorParams descp;
-  detp.threshold = detp.GET_DEFAULT_THRESHOLD() * 3;
-
-  cv::SIFT sift( cp, detp, descp );
-  std::vector<cv::KeyPoint> kp1,kp2;
-  cv::Mat desc1,desc2;
-  cv::Mat mask;
-  sift( img1, mask, kp1, desc1 );
-  sift( img2, mask, kp2, desc2 );
-
-  cv::BruteForceMatcher< cv::L2<float> > matcher;
-  cv::vector< cv::DMatch > matches1,matches;
-  matcher.match( desc1, desc2, matches1 );
-
-  for ( cv::vector< cv::DMatch >::iterator i=matches1.begin(); i!=matches1.end(); i++ )
-  {
-    if ( i->distance < 200 )
-    {
-      matches.push_back( *i );
-    }
-  }
-
-  cv::Mat disp_img;
-  cv::drawMatches( img1, kp1, img2, kp2, matches, disp_img );
-  cv::imshow("matches",disp_img);
-
-  cv::waitKey(100);
-
-  std::vector<cv::Point2f> src_pts;
-  std::vector<cv::Point2f> dst_pts;
-
-  for ( unsigned i=0; i<matches.size(); i++ )
-  {
-    int i1 = matches[i].queryIdx;
-    int i2 = matches[i].trainIdx;
-    src_pts.push_back( kp1[ i1 ].pt );
-    dst_pts.push_back( kp2[ i2 ].pt );
-  }
-
-  cv::Mat1d hom;
-  hom = cv::findHomography( src_pts, dst_pts, CV_RANSAC );
-
-  return hom;
-}
-
 cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_camx)
 {
   // Translation

@@ -14,10 +14,12 @@ rosbuild_check_for_sse ()
 # Find OpenCV
 find_package(OpenCV REQUIRED)
 
+message("-- OpenCV_LIBS = ${OpenCV_LIBS}" )
+
 # Find Eigen
-find_package(Eigen REQUIRED)
-include_directories(${EIGEN_INCLUDE_DIRS})
-add_definitions(${EIGEN_DEFINITIONS})
+#find_package(Eigen REQUIRED)
+#include_directories(${EIGEN_INCLUDE_DIRS})
+#add_definitions(${EIGEN_DEFINITIONS})
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})

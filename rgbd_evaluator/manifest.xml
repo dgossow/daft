@@ -11,8 +11,6 @@
   <depend package="visualization_msgs" />
   <depend package="sensor_msgs" />
 
-  <depend package="nodelet" />
-
   <depend package="tf" />
   <depend package="image_transport" />
   <depend package="message_filters" />
@@ -21,6 +19,7 @@
   <depend package="cv_bridge"/>
   
   <depend package="daft2" />
+  <depend package="eigen" />
 
   <export>
     <nodelet plugin="${prefix}/nodelets.xml" />

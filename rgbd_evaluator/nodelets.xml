@@ -1,7 +1,0 @@
-<library path="lib/librgbd_evaluator_nodelet">
-  <class name="rgbd_evaluator/RgbdEvaluatorNodelet" type="rgbd_evaluator::RgbdEvaluatorNodelet" base_class_type="nodelet::Nodelet">
-    <description>
-      RGBD Evaluator.
-    </description>
-  </class>
-</library>

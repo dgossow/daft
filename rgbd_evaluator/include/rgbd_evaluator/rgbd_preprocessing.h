@@ -59,7 +59,6 @@ public:
 private:
 
   cv::Matx33f calculateInitialHomography( btTransform transform_camx_to_original, btTransform transform_original );
-  cv::Matx33f calculateInitialHomography( cv::Mat& img1, cv::Mat& img2 );
 
   bool checkBoarderKP( cv::Mat image, float_t x_pos, float_t y_pos );
 
