@@ -8,6 +8,7 @@
 #include "depth_filter.h"
 #include "feature_detection.h"
 #include "descriptor.h"
+#include "preprocessing.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -23,13 +24,16 @@ namespace daft2 {
 
 boost::timer t;
 
-#define TIMER_START t.restart();
-#define TIMER_STOP std::cout << "++++++ Time elapsed: " << t.elapsed()*1000.0 << "ms ++++++" << std::endl;
-
-//DEBUG FLAGS.
+//DEBUG FLAGS (To be removed) ----
 //
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
+
+#define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
+#define TIMER_START t.restart();
+#define TIMER_STOP DBG_OUT( "++++++ Time elapsed: " << t.elapsed()*1000.0 << "ms ++++++" );
+
+//--------------------------------
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
     det_params_(detector_params), desc_params_(descriptor_params) {
@@ -39,22 +43,44 @@ DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & desc
 DAFT::~DAFT() {
 }
 
-void DAFT::operator()( const cv::Mat &image,
-    const cv::Mat &depth_map_orig,
+void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
 {
   cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)1 );
-  this->operator()(image,mask,depth_map_orig,K,kp,desc);
+  computeImpl(image,mask,depth_map_orig,K,kp,desc,true);
+}
+
+void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp )
+{
+  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)1 );
+  cv::Mat1f desc;
+  computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
 }
 
 void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
 {
+  computeImpl(image,mask,depth_map_orig,K,kp,desc,true);
+}
+
+void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
+    const cv::Mat &depth_map_orig,
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp )
+{
+  cv::Mat1f desc;
+  computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
+}
+
+void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
+    const cv::Mat &depth_map_orig,
+    cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc,
+    bool computeDescriptors )
+{
   kp.clear();
   desc = cv::Mat1f();
 
-  std::cout << "Preprocessing" << std::endl;
 
   TIMER_START
 
@@ -79,16 +105,6 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
   const float f = K(0, 0);
 
-  // Integrate Depth + Depth count (#of valid pixels)
-  cv::Mat1d ii_depth_map;
-  cv::Mat_<uint32_t> ii_depth_count;
-  depthIntegral( depth_map, ii_depth_map, ii_depth_count );
-
-#ifdef SHOW_DEBUG_WIN
-  imshowNorm("ii_depth_map",ii_depth_map,0);
-  //imshowNorm("ii_depth_count",ii_depth_count,0);
-#endif
-
   Mat1f scale_map(gray_image.rows, gray_image.cols);
   Mat1f::iterator scale_it = scale_map.begin();
   Mat1f::iterator scale_map_end = scale_map.end();
@@ -104,7 +120,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
     for (; scale_it != scale_map_end; ++scale_it, ++depth_it)
     {
-      if (finite(*depth_it))
+      if ( finite(*depth_it) && *depth_it > 0 )
       {
         float s = f / *depth_it;
         *scale_it = s;
@@ -119,9 +135,12 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
     if (!finite(min_scale_fac) || max_scale_fac == 0)
     {
-      std::cout << "error: depth data invalid." << std::endl;
+      DBG_OUT( "error: depth data invalid." );
       return;
     }
+
+    //DBG_OUT( "min_scale_fac" << min_scale_fac );
+    //DBG_OUT( "max_scale_fac" << max_scale_fac );
 
     double delta_n_min = det_params_.min_px_scale_
         / (max_scale_fac * det_params_.base_scale_);
@@ -157,35 +176,18 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   	octaves.insert(octave+desc_params_.octave_offset_+1);
   }
 
+  TIMER_STOP
+
   std::map< int, Mat1f > smoothed_imgs;
   std::map< int, Mat1f> smoothed_depth_maps;
   std::map< int, Mat4f > affine_maps; // entries are (major_len, minor_len, major_x, major_y)
 
+  computeAffineMaps( octaves, depth_map, scale_map, f, smoothed_depth_maps, affine_maps );
+
   // compute depth-normalized image pyramid
 
-  TIMER_STOP
 
-  std::cout << "Computing smooth depth + gradient" << std::endl;
-
-  TIMER_START
-  for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
-  {
-  	int octave = *it;
-  	double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
-
-    smoothed_imgs[octave] = Mat1f();
-    smoothed_depth_maps[octave] = Mat1f();
-    affine_maps[octave] = Mat4f();
-
-    Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
-    Mat4f& affine_map = affine_maps[octave];
-
-    smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
-    computeAffineMap( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, affine_map );
-  }
-  TIMER_STOP
-
-  std::cout << "Computing gaussians" << std::endl;
+  DBG_OUT( "Computing gaussians" );
 
   TIMER_START
   for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
@@ -195,30 +197,17 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     Mat1f& smoothed_img = smoothed_imgs[octave];
     Mat4f& affine_map = affine_maps[octave];
 
-#ifdef SHOW_DEBUG_WIN
-    {
-    std::stringstream s; s<<" s="<<scale;
-
-    imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
-    std::vector<cv::Mat> affine_map_channels;
-    cv::split(affine_map,affine_map_channels);
-    imshowNorm( "major.x" + s.str(), affine_map_channels[0]*0.5+0.5, 0 );
-    imshowNorm( "major.y" + s.str(), affine_map_channels[1]*0.5+0.5, 0 );
-    imshowNorm( "minor_ratio" + s.str(), affine_map_channels[2], 0 );
-    }
-#endif
-
     // compute filter response for all pixels
     switch (det_params_.det_type_) {
     case DetectorParams::DET_FELINE:
       if (det_params_.affine_) {
-        convolveAffine<feline>(ii, affine_map, 1, smoothed_img );
+        convolveAffine<feline>(ii, scale_map, affine_map, scale, 1, smoothed_img );
       } else {
         convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
     default:
-      std::cout << "error: invalid detector type: " << det_params_.det_type_ << std::endl;
+      DBG_OUT( "error: invalid detector type: " << det_params_.det_type_ );
       return;
     }
 
@@ -232,8 +221,8 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
       //cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
       s.str("");
-      s << "Smooth Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
-      imshow( s.str(), cv::Mat( display_image * (1.0f/0.73469f) ) );
+      s << "Smoothed Image - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
+      imshow( s.str(), display_image );
 
       /*
        cv::imshow( "dep orig", depth_map_orig );
@@ -251,7 +240,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   Mat1f response_map;
   response_map.create(gray_image.rows, gray_image.cols);
 
-  std::cout << "Computing response & finding max" << std::endl;
+  DBG_OUT( "Computing response & finding max" );
 
   TIMER_START
   // compute abs. difference of gaussians and detect maxima
@@ -269,7 +258,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     switch (det_params_.max_search_algo_) {
     case DetectorParams::MAX_WINDOW:
       if ( det_params_.affine_ ) {
-        findMaximaAffine(response_map, affine_map,
+        findMaximaAffine(response_map, scale_map, affine_map,
             scale, det_params_.min_px_scale_, max_px_scale,
             det_params_.det_threshold_, kp);
       }
@@ -285,12 +274,11 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
           det_params_.det_threshold_, kp);
       break;
     default:
-      std::cout << "error: invalid max search type: " << det_params_.max_search_algo_ << std::endl;
+      DBG_OUT( "error: invalid max search type: " << det_params_.max_search_algo_ );
       return;
     }
 
-    std::cout << "octave " << octave << " scale " << scale << ": ";
-    std::cout << kp.size()-kp_first << " keypoints found." << std::endl;
+    DBG_OUT( "octave " << octave << " scale " << scale << ": " << kp.size()-kp_first << " keypoints found." );
 
     // assign octave
     for ( unsigned k=kp_first; k<kp.size(); k++ )
@@ -307,18 +295,17 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
       std::vector<KeyPoint3D> kp2;
       for ( unsigned k=kp_first; k<kp.size(); k++ )
       {
-        KeyPoint3D kp_curr = kp[k];
+        cv::KeyPoint3D kp_curr = kp[k];
         int kp_x = kp[k].pt.x;
         int kp_y = kp[k].pt.y;
 
-        Vec3f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
+        Vec4f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
 
         if ( affine_params[2] > 0.1 )
         {
-          // keypoint shall cover outer and inner and wants size not radius
-          kp_curr.affine_major = kp[k].size;
-          kp_curr.affine_minor = kp[k].size * affine_params[2];
-          kp_curr.affine_angle = atan2( affine_params[1], affine_params[0] );
+          kp_curr.affine_major = 4.0*affine_params[0];
+          kp_curr.affine_minor = 4.0*affine_params[1];
+          kp_curr.affine_angle = atan2( affine_params[3], affine_params[2] );
 
           kp2.push_back(kp_curr);
         }
@@ -331,7 +318,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
       cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
 
       s.str("");
-      s << "Response Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
+      s << "Response - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
       imshow( s.str(), cv::Mat( display_image * (1.0f/0.73469f) ) );
 
       /*
@@ -347,7 +334,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   }
   TIMER_STOP
 
-  std::cout << kp.size() << " keypoints found in first stage." << std::endl;
+  DBG_OUT( kp.size() << " keypoints found in first stage." );
 
   TIMER_START
   // filter found maxima by applying a threshold on a second criterion
@@ -377,9 +364,16 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
     return;
   }
 
-  std::cout << kp.size() << " keypoints left after post-filter." << std::endl;
+  DBG_OUT( kp.size() << " keypoints left after post-filter." );
   TIMER_STOP
+
   TIMER_START
+
+  // if we have a limitation on the number of keypoints, sort them first
+  if ( det_params_.max_num_kp_ != std::numeric_limits<unsigned>::max() )
+  {
+    std::sort( kp.begin( ), kp.end( ), compareResponse<KeyPoint3D> );
+  }
 
   // assign 3d points, normals and local affine params
   float f_inv = 1.0 / f;
@@ -396,7 +390,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   // correct keypoint size according to given octave offset
   float scale_fac = pow( 2.0, float(desc_params_.octave_offset_) );
 
-  for (unsigned k = 0; k < kp.size(); k++)
+  for (unsigned k = 0; k < kp.size() && kp2.size() < det_params_.max_num_kp_; k++)
   {
   	kp[k].size *= scale_fac;
   	kp[k].world_size *= scale_fac;
@@ -408,24 +402,32 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
 
     Vec4f affine_params = affine_maps[kp[k].octave](kp_y,kp_x);
 
-    if ( mask( kp[k].pt.y, kp[k].pt.x ) != 0 && affine_params[0]/affine_params[1] < 10.0 )
+    if ( mask( kp[k].pt.y, kp[k].pt.x ) != 0 &&
+         affine_params[0]/affine_params[1] < 10.0 )
     {
-      kp[k].affine_major = 4.0*affine_params[0];
-      kp[k].affine_minor = 4.0*affine_params[1];
+      kp[k].affine_major = kp[k].size;
+      kp[k].affine_minor = kp[k].affine_major*affine_params[1];
       kp[k].affine_angle = atan2( affine_params[3], affine_params[2] );
 
       // compute exact normal using pca
       kp[k].normal = getNormal(kp[k], depth_map, K, 2.0 / scale_fac );
 
-      Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
-      Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-
-      // reference current row from descriptor matrix
-      Mat1f curr_desc(desc_tmp, cv::Rect( 0, kp2.size(), desc_tmp.cols, 1 ) );
-
-      if ( surf_desc.getDesc( desc_params_.patch_size_, smoothed_img, smoothed_img2, kp[k], curr_desc, depth_map, K ) )
+      if ( !computeDescriptors )
       {
         kp2.push_back(kp[k]);
+      }
+      else
+      {
+        Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
+        Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
+
+        // reference current row from descriptor matrix
+        Mat1f curr_desc(desc_tmp, cv::Rect( 0, kp2.size(), desc_tmp.cols, 1 ) );
+
+        if ( surf_desc.getDesc( desc_params_.patch_size_, desc_params_.z_thickness_, smoothed_img, smoothed_img2, kp[k], curr_desc, depth_map, K ) )
+        {
+          kp2.push_back(kp[k]);
+        }
       }
     }
   }
@@ -434,7 +436,7 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   // copy descriptors to matrix
   desc = desc_tmp( cv::Rect( 0, 0, surf_desc.getDescLen(), kp.size() ) ).clone();
 
-  std::cout << kp.size() << " keypoints left after descriptor computation." << std::endl;
+  DBG_OUT( kp.size() << " keypoints left after descriptor computation." );
   TIMER_STOP
 
 
@@ -479,6 +481,99 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   imshow( "rgb", display_image );
 #endif
 
+}
+
+void DAFT::computeAffineMaps(
+    std::set<int>& octaves,
+    cv::Mat1f& depth_map,
+    cv::Mat1f& scale_map,
+    float f,
+    std::map< int, Mat1f>& smoothed_depth_maps,
+    std::map< int, Mat4f >& affine_maps )
+{
+  DBG_OUT( "Computing smooth depth + gradient" );
+
+  cv::Mat1d ii_depth_map;
+  cv::Mat_<uint32_t> ii_depth_count;
+  depthIntegral( depth_map, ii_depth_map, ii_depth_count );
+
+  if ( det_params_.affine_multiscale_ )
+  {
+    TIMER_START
+
+    for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
+    {
+      int octave = *it;
+      double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
+
+      smoothed_depth_maps[octave] = Mat1f();
+      affine_maps[octave] = Mat4f();
+
+      Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
+      Mat4f& affine_map = affine_maps[octave];
+
+      smoothDepth( scale_map, ii_depth_map, ii_depth_count, scale, smoothed_depth_map );
+      computeAffineMap( scale_map, smoothed_depth_map, scale, det_params_.min_px_scale_, affine_map );
+
+  #ifdef SHOW_DEBUG_WIN
+      {
+      std::stringstream s; s<<" s="<<scale;
+
+      //imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
+      std::vector<cv::Mat> affine_map_channels;
+      cv::split(affine_map,affine_map_channels);
+
+      double minv,maxv;
+      int tmp;
+      cv::minMaxIdx( affine_map_channels[0], &minv, &maxv, &tmp, &tmp );
+      imshow( "major" + s.str(), affine_map_channels[0] / maxv );
+
+      Mat ratio_map;
+      cv::divide( affine_map_channels[1], affine_map_channels[0], ratio_map, 1.0 );
+
+      //imshow( "minor" + s.str(), affine_map_channels[1] / maxv );
+      imshow( "minor/major" + s.str(), ratio_map );
+      imshow( "major.x" + s.str(), affine_map_channels[2]*0.5+0.5 );
+      imshow( "major.y" + s.str(), affine_map_channels[3]*0.5+0.5 );
+      }
+  #endif
+    }
+  }
+  else
+  {
+    float win_size = 10.0;
+    Mat1f smoothed_depth_map;
+
+    Mat1f fake_scale_map( scale_map.rows, scale_map.cols, 1.0f );
+
+    smoothDepth( fake_scale_map, ii_depth_map, ii_depth_count, win_size, smoothed_depth_map );
+
+    Mat4f affine_map;
+    computeAffineMapFixed( smoothed_depth_map, win_size/2, f, affine_map );
+    for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
+    {
+      int octave = *it;
+      smoothed_depth_maps[octave] = smoothed_depth_map;
+      affine_maps[octave] = affine_map;
+    }
+
+#ifdef SHOW_DEBUG_WIN
+    {
+    std::stringstream s;
+
+    //imshowNorm( "smoothed_depth_map"+s.str(), smoothed_depth_map, 0 );
+    std::vector<cv::Mat> affine_map_channels;
+    cv::split(affine_map,affine_map_channels);
+
+    //imshow( "minor" + s.str(), affine_map_channels[1] / maxv );
+    imshow( "smooth depth" + s.str(), smoothed_depth_map );
+    imshow( "minor/major" + s.str(), affine_map_channels[1] );
+    imshow( "major.x" + s.str(), affine_map_channels[2]*0.5+0.5 );
+    imshow( "major.y" + s.str(), affine_map_channels[3]*0.5+0.5 );
+    }
+#endif
+  }
+  TIMER_STOP
 }
 
 
@@ -528,6 +623,17 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   {
     return false;
   }
+
+  cv::Mat old_depth_map = depth_map;
+
+  closeGaps<100>( old_depth_map, depth_map, 0.5 );
+
+  /*
+#ifdef SHOW_DEBUG_WIN
+  imshow( "old_depth_map", old_depth_map );
+  imshow( "depth_map", depth_map );
+#endif
+*/
 
   return true;
 }

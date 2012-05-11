@@ -56,8 +56,9 @@ template <float (*F)( const Mat1d &ii,
     float sw, float major_x, float major_y,
     float minor_ratio, float min_sp )>
 void convolveAffine( const Mat1d &ii,
+    const Mat1f& scale_map,
     const Mat4f& affine_map,
-    float sw,
+    float base_scale,
     float min_px_scale,
     Mat1f &img_out );
 
@@ -91,6 +92,7 @@ void findMaximaMipMap( const Mat1d &img,
 /*! Like findMaxima, but do non-max suppression in affine neighborhood */
 void findMaximaAffine(
     const cv::Mat1d &img,
+    const Mat1f &scale_map,
     const Mat4f &affine_map,
     double base_scale,
     double min_px_scale,
@@ -169,7 +171,9 @@ template <float (*F)( const Mat1d &ii,
     float major_len,  float minor_len,
     float major_x, float major_y )>
 void convolveAffine( const Mat1d &ii,
+    const Mat1f& scale_map,
     const Mat4f& affine_map,
+    float base_scale,
     float min_px_scale,
     Mat1f &img_out )
 {
@@ -181,8 +185,8 @@ void convolveAffine( const Mat1d &ii,
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
-      const float& major_len = affine_map[y][x][0];
-      const float& minor_len = affine_map[y][x][1];
+      const float& major_len = base_scale * scale_map[y][x];
+      const float& minor_len = major_len * affine_map[y][x][1];
       const float& major_x = affine_map[y][x][2];
       const float& major_y = affine_map[y][x][3];
 

@@ -19,7 +19,7 @@ include_directories (${PROJECT_SOURCE_DIR}/include/daft2/)
 # Find OpenCV
 find_package(OpenCV REQUIRED)
 include_directories (${OpenCV_INCLUDE_DIR})
-
+message("-- OpenCV_LIBS = ${OpenCV_LIBS}\n" )
 
 # Make shared library
 rosbuild_add_library (opencv_extra

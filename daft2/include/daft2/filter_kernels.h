@@ -19,52 +19,60 @@ namespace cv
 namespace daft2
 {
 
-inline float felineImpl( const Mat1d &ii,
-    float major_len, float minor_len,
-    float major_x, float major_y,
-    int box_size, int x, int y)
-{
-  const int num_steps = 2.0*major_len/minor_len + 0.8;
-
-  if ( num_steps == 1 )
-  {
-    return integrate( ii, x-box_size, y-box_size, x+box_size, y+box_size ) / float(4*box_size*box_size) * 0.73469f;
-  }
-
-  float start_x = major_x * (major_len-minor_len);
-  float start_y = major_y * (major_len-minor_len);
-
-  float val = 0;
-  for ( int step=0; step<num_steps; step++ )
-  {
-    float t = float(step)/float(num_steps-1) * 2.0 - 1.0;
-    int x1 = (float)x - t*start_x + 0.5;
-    int y1 = (float)y - t*start_y + 0.5;
-    val += integrate( ii, x1-box_size, y1-box_size, x1+box_size, y1+box_size );
-  }
-
-  return val / float( num_steps * 4*box_size*box_size );
-}
-
 inline float feline( const Mat1d &ii,
     int x, int y,
     float major_len,  float minor_len,
     float major_x, float major_y )
 {
-  if ( !checkBounds( ii, x, y, major_len+1 ) )
+  if ( !checkBounds( ii, x, y, major_len+2 ) )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
 
-  float box_size = minor_len * 0.886f;
+  const float half_axis_len = major_len-minor_len;
+  const int num_steps = float(half_axis_len / (float)minor_len + 2.0f);
 
-  const int box_size_int = box_size;
-  float t1 = box_size - box_size_int;
+  assert( num_steps >= 2 );
 
-  float f1 = felineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int, x, y );
-  float f2 = felineImpl( ii, major_len, minor_len, major_x, major_y, box_size_int+1, x, y );
+  //return float(num_steps) * 0.25;
 
-  return interpolateLinear(t1,f1,f2);
+  const int minor_len_floor = minor_len;
+  const int minor_len_ceil = minor_len_floor + 1;
+
+  float start_x = major_x * half_axis_len;
+  float start_y = major_y * half_axis_len;
+
+  float val_floor = 0;
+  float val_ceil = 0;
+
+  if ( num_steps == 2 )
+  {
+    for ( int step=0; step<2; step++ )
+    {
+      float t = float(step) * 2.0 - 1.0;
+      int x1 = (float)x - t*start_x + 0.5;
+      int y1 = (float)y - t*start_y + 0.5;
+      val_floor += integrate( ii, x1-minor_len_floor, y1-minor_len_floor, x1+minor_len_floor, y1+minor_len_floor );
+      val_ceil += integrate( ii, x1-minor_len_ceil, y1-minor_len_ceil, x1+minor_len_ceil, y1+minor_len_ceil );
+    }
+    val_floor /= float( 8*minor_len_floor*minor_len_floor );
+    val_ceil /= float( 8*minor_len_ceil*minor_len_ceil );
+    return interpolateLinear( minor_len - minor_len_floor, val_floor, val_ceil );
+  }
+  else
+  {
+    for ( int step=0; step<num_steps; step++ )
+    {
+      float t = float(step)/float(num_steps-1) * 2.0 - 1.0;
+      int x1 = (float)x - t*start_x + 0.5;
+      int y1 = (float)y - t*start_y + 0.5;
+      val_floor += integrate( ii, x1-minor_len_floor, y1-minor_len_floor, x1+minor_len_floor, y1+minor_len_floor );
+      val_ceil += integrate( ii, x1-minor_len_ceil, y1-minor_len_ceil, x1+minor_len_ceil, y1+minor_len_ceil );
+    }
+    val_floor /= float( num_steps * 4*minor_len_floor*minor_len_floor );
+    val_ceil /= float( num_steps * 4*minor_len_ceil*minor_len_ceil );
+    return interpolateLinear( minor_len - minor_len_floor, val_floor, val_ceil );
+  }
 }
 
 /* Compute box mean with sub-integer scale interpolation */

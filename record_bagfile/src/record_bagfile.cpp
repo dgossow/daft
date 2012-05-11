@@ -16,6 +16,7 @@ RecordBagfile::RecordBagfile(std::string bagfile_name, ros::NodeHandle comm_nh, 
         subscribed_(false)
 {
   std::cout << "Writing a bagfile to "<< bagfile_name.c_str() << " " << std::endl;
+  std::cout << "Press 'q' to exit." << std::endl;
 
   bag_.open(bagfile_name, rosbag::bagmode::Write);
 
@@ -60,14 +61,14 @@ btVector3 getPt3D( int u, int v, float z, float f_inv, float cx, float cy )
   return p;
 }
 
-tf::StampedTransform getTransform( cv::Mat1f& depth_img,
-    std::vector<cv::Point2f> img_pos, cv::Matx33f K )
+bool getTransform( cv::Mat1f& depth_img,
+    std::vector<cv::Point2f> img_pos, cv::Matx33f K,
+    tf::StampedTransform& transform )
 {
   float f_inv = 1.0 / K(0,0);
   float cx  = K(0,2);
   float cy  = K(1,2);
 
-  tf::StampedTransform transform_original;
   std::vector<btVector3> CooPoint;
   btVector3 center;
 
@@ -91,7 +92,7 @@ tf::StampedTransform getTransform( cv::Mat1f& depth_img,
     if (num_zval == 0)
     {
       std::cout << "no depth value available!!!" << std::endl;
-      return transform_original;
+      return false;
     }
 
     float z = z_sum / num_zval;
@@ -118,10 +119,10 @@ tf::StampedTransform getTransform( cv::Mat1f& depth_img,
   basis[2] = w.normalize();
   basis=basis.transpose();
 
-  transform_original.setOrigin( center );
-  transform_original.setBasis( basis );
+  transform.setOrigin( center );
+  transform.setBasis( basis );
 
-  return transform_original;
+  return true;
 
 }
 
@@ -179,32 +180,39 @@ void RecordBagfile::recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img_m
   img_pos.push_back( cv::Point2f(depth_img.cols/2-w,depth_img.rows/2-w) );
   img_pos.push_back( cv::Point2f(depth_img.cols/2-w,depth_img.rows/2+w) );
   img_pos.push_back( cv::Point2f(depth_img.cols/2+w,depth_img.rows/2+w) );
-  tf::StampedTransform transform = getTransform(depth_img, img_pos ,K);
+  tf::StampedTransform transform;
+  bool transform_valid = getTransform( depth_img, img_pos ,K, transform );
 
   btVector3 zvec = transform.getBasis() * btVector3(0,0,1);
   //btVector3 xvec = transform.getBasis() * btVector3(1,0,0);
   float dist = transform.getOrigin().length();
 
-  std::stringstream s;
-  s.precision( 3 );
-  s << "dist = " << dist << " m";
-  cv::putText( bgr_img, s.str( ), cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
+  if ( transform_valid )
+  {
+    std::stringstream s;
+    s.precision( 3 );
+    s << "dist = " << dist << " m";
+    cv::putText( bgr_img, s.str( ), cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
 
-  //s.str("");
-  //s << "rot  = " << xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
-  //cv::putText( bgr_img, s.str( ), cv::Point(210,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
+    //s.str("");
+    //s << "rot  = " << xvec.angle( btVector3(1,0,0) ) / M_PI*180.0;
+    //cv::putText( bgr_img, s.str( ), cv::Point(210,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
 
-  s.str("");
-  s << "angle= " << zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0 << " deg";
-  cv::putText( bgr_img, s.str( ), cv::Point(310,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
-
+    s.str("");
+    s << "angle= " << zvec.angle( btVector3(0,0,-1) ) / M_PI*180.0 << " deg";
+    cv::putText( bgr_img, s.str( ), cv::Point(310,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0) );
+  }
+  else
+  {
+    cv::putText( bgr_img, "Cannot determine transform.", cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,255) );
+  }
 
   cv::imshow( "image", bgr_img );
 
   int kb_input = cv::waitKey(100);
   //std::cout << kb_input << std::endl;
 
-  if ( kb_input == 537919601 )
+  if ( kb_input == 1048689 )
   {
     ros::shutdown();
   }

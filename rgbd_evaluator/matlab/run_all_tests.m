@@ -1,6 +1,7 @@
 
-detectors = {'DAFT';'SIFT';'SURF'};
-is_affine = {1,0,0,0,0};
+detectors = {'DAFT';'DAFT New'};
+%detectors = {'DAFT';'DAFT New'};
+is_affine = {1,1,0,0,0};
 
 %detectors = {'ORB';'SIFT'};
 %is_affine = {0,0};
@@ -13,15 +14,17 @@ bagpath = '/work/gossow/bags/';
 %complete_evaluation( [bagpath 'world_map/'], {'scale_2'}, detectors, 'scaling' );
 %return;
 
-complete_evaluation( [bagpath 'granada/'], {'rotate60_1'}, detectors, is_affine, 'rotation' );
-return;
+%complete_evaluation( [bagpath 'granada/'], {'rotate60_1'}, detectors, is_affine, 'rotation' );
+
+%complete_evaluation( [bagpath 'honeyloops/'], {'viewpoint'}, detectors, is_affine, 'viewpoint angle' );
 
 %complete_evaluation( [bagpath 'granada/'], {'viewpoint_1'}, detectors, is_affine, 'viewpoint angle' );
 
 complete_evaluation( [bagpath 'tum_poster/'], {'viewpoint'}, detectors, is_affine, 'viewpoint angle' );
+return;
+
 complete_evaluation( [bagpath 'tum_poster/'], {'scale'}, detectors, is_affine, 'scaling' );
 complete_evaluation( [bagpath 'tum_poster/'], {'rotate'}, detectors, is_affine, 'rotation' );
-return;
 
 complete_evaluation( [bagpath 'granada/'], {'rotate40_1','rotate60_1'}, detectors, is_affine, 'rotation' );
 

@@ -45,7 +45,7 @@ vector<KeyPoint> makeKeyPoints( vector<KeyPoint3D> kp );
 template<class KeyPointT >
 bool compareResponse( const KeyPointT& kp1, const KeyPointT& kp2 )
 {
-  return kp1.response < kp2.response;
+  return kp1.response > kp2.response;
 }
 
 template<class KeyPointT>

@@ -59,7 +59,7 @@ void getSiftKp(
     std::vector<cv::KeyPoint3D>& keypoints,
     cv::Mat1f& descriptors );
 
-#if 0
+#ifdef USE_ORB
 void getOrbKp(
     const cv::Mat& gray_img,
     const cv::Mat1b& mask_img,

@@ -31,7 +31,9 @@ void sysCmd( std::string cmd )
   }
 }
 
-ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool verbose,
+ExtractDetectorFile::ExtractDetectorFile(std::string file_path,
+    bool reset_files,
+    bool verbose,
     int num_kp) {
   verbose_ = verbose;
   target_num_kp_ = num_kp;
@@ -46,8 +48,8 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path, bool verbose,
   sysCmd("mkdir "+extra_folder_);
   sysCmd("mkdir "+kp_folder_);
 
-  sysCmd("rm "+extra_folder_+"/*.*");
-  sysCmd("rm "+kp_folder_+"/*.*");
+  //sysCmd("rm "+extra_folder_+"/*.*");
+  //sysCmd("rm "+kp_folder_+"/*.*");
 
   readDataFiles();
   extractAllKeypoints();
@@ -102,7 +104,7 @@ void ExtractDetectorFile::readDataFiles() {
     }
   }
 
-  cv::imshow("mask_img_",mask_img_);
+  //cv::imshow("mask_img_",mask_img_);
 
   // create image paths
   std::string image_rgb_name;
@@ -438,11 +440,11 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
 
 void ExtractDetectorFile::extractAllKeypoints()
 {
-  daft_ns::DAFT::DetectorParams det_p;
-  daft_ns::DAFT::DescriptorParams desc_p;
+  cv::daft2::DAFT::DetectorParams det_p;
+  cv::daft2::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  //det_p.min_px_scale_ = 2.5;
-  //det_p.base_scale_ = 0.025;
+  //det_p.min_px_scale_ = 2;
+  //det_p.base_scale_ = 0.008;
   //det_p.scale_levels_ = 1;
   //det_p.pf_type_ = det_p.PF_NONE;
   //det_p.pf_threshold_ = 5;
@@ -450,12 +452,14 @@ void ExtractDetectorFile::extractAllKeypoints()
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 3.16326 );
+  //desc_p.octave_offset_ = -1;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT New", 3.14 );
+  return;
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=false;
   det_p.max_search_algo_=det_p.MAX_FAST;
-  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Non-Affine", 3.16326 );
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4, _5, _6, _7 ), "DAFT Non-Affine", 3.14 );
 
   //det_p.det_type_=det_p.DET_BOX;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );
@@ -464,7 +468,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   //desc_p.octave_offset_ = -1;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT -1" );
 
-  extractKeypoints( &getSurfKp, "SURF", 107.981 );
+  //extractKeypoints( &getSurfKp, "SURF", 107.981 );
   //extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
   extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
@@ -509,6 +513,50 @@ void ExtractDetectorFile::storeKeypoints(
     return;
   }
 
+  // draw keypoints
+  cv::Mat kp_img,warped_kp_img;
+
+  cv::drawKeypoints3D(warped_img, keypoints, warped_kp_img, cv::Scalar(255, 255, 255),
+      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255, 255, 255),
+      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+  /*
+  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
+      cv::Scalar(0, 0, 0), 5, CV_AA);
+  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
+      cv::Scalar(255, 255, 255), 2, CV_AA);
+  */
+
+  if (verbose_) {
+    cv::imshow("kp", kp_img);
+    cv::imshow("kp warped", warped_kp_img);
+    cv::waitKey(50);
+    return;
+  }
+
+  /*
+   std::stringstream s;
+   s.width(3);
+   s.fill('0');
+   s << img_count;
+   std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
+   img_count++;
+   */
+
+  std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name
+      + ".ppm";
+  std::cout << "Writing " << img_file_name << std::endl;
+  cv::imwrite(img_file_name, kp_img);
+
+  std::string warped_img_file_name = extra_folder_ + "/warped " + extension + "_" + img_name
+      + ".ppm";
+  std::cout << "Writing " << warped_img_file_name << std::endl;
+  cv::imwrite(warped_img_file_name, warped_kp_img);
+
+
+  // store keypoint files
+
   std::vector<cv::KeyPoint3D>::iterator it;
   int k;
 
@@ -519,6 +567,7 @@ void ExtractDetectorFile::storeKeypoints(
       + extension;
 
   // open file
+  std::cout << "Writing keypoints to " << filePath.c_str() << std::endl;
   std::fstream file;
   file.open(filePath.c_str(), std::ios::out);
 
@@ -557,7 +606,7 @@ void ExtractDetectorFile::storeKeypoints(
 
     file << it->pt.x << "  " << it->pt.y << "  " << A << "  " << B << "  " << C;
 
-    // write world scale as "feature component"
+    // write world scale as part of the feature vector,
     // so keypoints of different size don't get matched
     if (it->world_size != 0) {
       float s_log = log2(it->world_size);
@@ -575,46 +624,6 @@ void ExtractDetectorFile::storeKeypoints(
   }
 
   file.close();
-
-  // draw keypoints
-  cv::Mat kp_img,warped_kp_img;
-
-  cv::drawKeypoints3D(warped_img, keypoints, warped_kp_img, cv::Scalar(255, 255, 255),
-      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-  cv::drawKeypoints3D(rgb_img, keypoints, kp_img, cv::Scalar(255, 255, 255),
-      cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-  /*
-  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
-      cv::Scalar(0, 0, 0), 5, CV_AA);
-  cv::putText(kp_img, extension, cv::Point(10, 40), cv::FONT_HERSHEY_SIMPLEX, 1,
-      cv::Scalar(255, 255, 255), 2, CV_AA);
-  */
-
-  if (verbose_) {
-    cv::imshow("kp", kp_img);
-    cv::imshow("kp warped", warped_kp_img);
-    cv::waitKey(50);
-  }
-
-  /*
-   std::stringstream s;
-   s.width(3);
-   s.fill('0');
-   s << img_count;
-   std::string img_file_name = extra_folder_ + "/" + s.str() + ".ppm";
-   img_count++;
-   */
-
-  std::string img_file_name = extra_folder_ + "/" + extension + "_" + img_name
-      + ".ppm";
-  std::cout << "Writing " << img_file_name << std::endl;
-  cv::imwrite(img_file_name, kp_img);
-
-  std::string warped_img_file_name = extra_folder_ + "/warped " + extension + "_" + img_name
-      + ".ppm";
-  std::cout << "Writing " << warped_img_file_name << std::endl;
-  cv::imwrite(warped_img_file_name, warped_kp_img);
 }
 
 void ExtractDetectorFile::splitFileName(const std::string& str) {
@@ -648,14 +657,18 @@ int main(int argc, char** argv) {
   }
 
   bool verbose = false;
+  bool reset_files = false;
   int num_kp = 0;
   std::vector<std::string> bagfiles;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = std::string(argv[i]);
     if (arg == "-v") {
-      std::cout << "verbose on" << std::endl;
+      std::cout << "Verbose on" << std::endl;
       verbose = true;
+    } else if (arg == "-r") {
+      std::cout << "Deleting old output files!" << std::endl;
+      reset_files = true;
     } else if (i < argc - 1 && arg == "-k") {
       num_kp = atoi(argv[i + 1]);
       std::cout << "num_kp = " << num_kp << std::endl;
@@ -667,10 +680,11 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "num_kp = " << num_kp << std::endl;
+  std::cout << "----------------------------------------" << std::endl << std::endl;
 
   for (unsigned i = 0; i < bagfiles.size(); i++) {
     rgbd_evaluator::ExtractDetectorFile extract_detector_file(bagfiles[i],
-        verbose, num_kp);
+        reset_files, verbose, num_kp);
   }
 
   std::cout << "Exiting.." << std::endl;

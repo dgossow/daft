@@ -152,7 +152,7 @@ void getSiftKp(
   keypoints = makeKp3d(kps);
 }
 
-#if 0
+#ifdef USE_ORB
 void getOrbKp(
     const cv::Mat& gray_img,
     const cv::Mat1b& mask_img,
@@ -162,6 +162,7 @@ void getOrbKp(
     std::vector<cv::KeyPoint3D>& keypoints,
     cv::Mat1f& descriptors )
 {
+#if 0
   //cv::Mat gray_img_small;
   //cv::resize( gray_img, gray_img_small, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR);
   //cv::imshow("gray_img_small",gray_img_small);
@@ -175,8 +176,8 @@ void getOrbKp(
 
 //  explicit ORB(int nfeatures = 500, float scaleFactor = 1.2f, int nlevels = 8, int edgeThreshold = 31,
 //                   int firstLevel = 0, int WTA_K=2, int scoreType=0, int patchSize=31 )
+#else
 
-  /*
   int nfeatures = (int)(t);
   float scaleFactor = 1.2f;
   int nlevels = 30;
@@ -187,7 +188,6 @@ void getOrbKp(
   int patchSize=31;
 
   cv::ORB orb( nfeatures, scaleFactor, nlevels, edgeThreshold, firstLevel, WTA_K, scoreType, patchSize );
-  */
 
   std::vector<cv::KeyPoint> kps;
   cv::Mat1b desc;
@@ -196,7 +196,8 @@ void getOrbKp(
 
   //cv::imshow();
 
-  orb( gray_img, empty_mask, kps, desc, false );
+  orb( gray_img, mask_img, kps, desc, false );
+#endif
 
   std::cout << desc.type() << std::endl;
   std::cout << desc.rows << std::endl;
@@ -229,7 +230,7 @@ void getOrbKp(
 
   keypoints = makeKp3d(kps);
 }
-#endif
+#endif // USE_ORB
 
 void getDaftKp(
     daft_ns::DAFT::DetectorParams p_det,
@@ -246,8 +247,8 @@ void getDaftKp(
 
   daft_ns::DAFT daft1( p_det, p_desc );
   daft1( gray_img, mask_img, depth_img, K, keypoints, descriptors );
-  /*
 
+  /*
    p_det.base_scale_ *= sqrt(2);
 
    std::vector<cv::KeyPoint3D> kp2;

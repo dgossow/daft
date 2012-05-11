@@ -14,7 +14,7 @@ rosbuild_check_for_sse ()
 # Find OpenCV
 find_package(OpenCV REQUIRED)
 
-message("-- OpenCV_LIBS = ${OpenCV_LIBS}" )
+message("-- OpenCV_LIBS = ${OpenCV_LIBS}\n" )
 
 # Find Eigen
 #find_package(Eigen REQUIRED)

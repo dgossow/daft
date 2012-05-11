@@ -91,6 +91,7 @@ void findMaxima( const cv::Mat1d &img,
 
 void findMaximaAffine(
     const cv::Mat1d &img,
+    const Mat1f &scale_map,
     const Mat4f &affine_map,
     double base_scale,
     double min_px_scale,
@@ -110,9 +111,9 @@ void findMaximaAffine(
         continue;
       }
 
-      // compute ellipse parameters
-      const float& major_len = affine_map[y][x][0];
-      const float& minor_len = affine_map[y][x][1];
+      // get ellipse parameters
+      const float& major_len = base_scale * scale_map[y][x];
+      const float& minor_len = major_len * affine_map[y][x][1];
       const float& major_x = affine_map[y][x][2];
       const float& major_y = affine_map[y][x][3];
 

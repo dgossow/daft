@@ -356,7 +356,7 @@ inline float Gaussian2(float sigma, float x, float y, float z) {
 }
 
 template< int Sigma3 >
-inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D& kp,
+inline void getGradPatch( int patch_size, float thickness, Mat1f& smoothed_img, const KeyPoint3D& kp,
     const cv::Mat1f depth_map, cv::Matx33f& K, vector<PtInfo>& ptInfos, float& coverage,
     float step_size, cv::Matx33f kp_ori_rot, float max_dist_2,
     bool show_win=false )
@@ -415,7 +415,7 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
   v1 = v1  * fastInverseLen( v1 );
   Point3f v2 = v1.cross( normal );
 
-  // transforms from local 3d coords [-0.5...0.5] to 3d
+  // transforms from local 3d coords to 3d
   cv::Matx33f local_to_cam( -v1.x, -v2.x, normal.x, -v1.y, -v2.y, normal.y, -v1.z, -v2.z, normal.z );
   local_to_cam = local_to_cam * kp_ori_rot.t();
 
@@ -424,7 +424,7 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
 
   // transforms from 3d to u/v tex coords
   float s1 = 2.0 / (step_size*kp.world_size);
-  cv::Matx33f cam_to_uvw = cv::Matx33f(s1,0,0, 0,s1,0, 0,0,1) * local_to_cam.t();
+  cv::Matx33f cam_to_uvw = cv::Matx33f(s1,0,0, 0,s1,0, 0,0,s1) * local_to_cam.t();
 
   // sample intensity values using planar assumption
   for ( int v = 0; v<patch_size+1; v++ )
@@ -487,6 +487,8 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
   ptInfos.clear();
   ptInfos.reserve(patch_size*patch_size);
 
+  const float thickness2 = thickness*thickness;
+
   // compute gradients
   for ( int v = 0; v<patch_size; v++ )
   {
@@ -518,14 +520,14 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
 
       // normalized patch coords [-1,1]
       Point3f pt3d_uvw1 = pt3d_uvw * (2.0f/float(patch_size));
-      float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y + 3*pt3d_uvw1.z*pt3d_uvw1.z;
+      float dist_2 = pt3d_uvw1.x*pt3d_uvw1.x + pt3d_uvw1.y*pt3d_uvw1.y + (pt3d_uvw1.z*pt3d_uvw1.z)/(thickness2);
 
       if ( isnan(dist_2) || dist_2 > max_dist_2 )
       {
         continue;
       }
 
-      const float weight = Gaussian2(Sigma, pt3d_uvw1.x, pt3d_uvw1.y, pt3d_uvw1.z);
+      const float weight = Gaussian2(Sigma, dist_2);
 
 
       sum_weights += weight;
@@ -599,6 +601,7 @@ inline void getGradPatch( int patch_size, Mat1f& smoothed_img, const KeyPoint3D&
 
 bool SurfDescriptor::getDesc(
     int patch_size,
+    float thickness,
     Mat1f& smoothed_img,
     Mat1f& smoothed_img2,
     KeyPoint3D& kp,
@@ -610,7 +613,7 @@ bool SurfDescriptor::getDesc(
   // get gradients from larger scale
   std::vector<PtInfo> pt_infos_ori;
   float coverage;
-  getGradPatch<1>( patch_size, smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5, cv::Matx33f::eye(), 1.0, show_win );
+  getGradPatch<1>( patch_size, thickness, smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5, cv::Matx33f::eye(), 1.0, show_win );
 
   if ( coverage < 0.5 * 0.86 )
   {
@@ -645,7 +648,7 @@ bool SurfDescriptor::getDesc(
       0,0,1 );
 
   std::vector<PtInfo> pt_infos_desc;
-  getGradPatch<2>( patch_size, smoothed_img, kp, depth_map, K, pt_infos_desc, coverage, 1.0, kp_ori_rot, 2.0, show_win );
+  getGradPatch<2>( patch_size, thickness, smoothed_img, kp, depth_map, K, pt_infos_desc, coverage, 1.0, kp_ori_rot, 2.0, show_win );
 
   if ( coverage < 0.5 )
   {

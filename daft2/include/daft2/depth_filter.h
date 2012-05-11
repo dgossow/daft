@@ -33,6 +33,12 @@ void computeAffineMap(
     float min_px_scale,
     Mat4f& affine_map );
 
+void computeAffineMapFixed(
+    const Mat1f &depth_map,
+    float sp,
+    float f,
+    Mat4f& affine_map );
+
 }
 }
 

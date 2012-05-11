@@ -53,4 +53,6 @@ private:
     int img_count_;
 
     bool subscribed_;
+
+    bool valid_;
 };

@@ -32,7 +32,7 @@ class SurfDescriptor
 public:
   int getDescLen() { return 64; }
 
-  bool getDesc( int patch_size, Mat1f& smoothed_img, Mat1f& smoothed_img2,
+  bool getDesc( int patch_size, float thickness, Mat1f& smoothed_img, Mat1f& smoothed_img2,
       KeyPoint3D& kp, Mat1f& desc,
       const cv::Mat1f depth_map, cv::Matx33f& K, bool show_win=false );
 };

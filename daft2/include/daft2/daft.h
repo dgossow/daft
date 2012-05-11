@@ -9,6 +9,8 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/features3d/features3d.hpp>
 
+#include <set>
+
 namespace cv
 {
 namespace daft2
@@ -31,6 +33,7 @@ public:
 
     /** default constructor */
     DetectorParams(
+        bool affine_multiscale = false,
         float base_scale = 1,
         float scale_factor = 2.0,
         int scale_levels = AUTO,
@@ -39,9 +42,11 @@ public:
         int detector_type = DET_FELINE,
         float det_threshold = 0.02,
         int postfilter_type = PF_PRINC_CURV_RATIO,
-        float pf_threshold = 5.0,
+        float pf_threshold = 10.0,
         int max_search_algo = MAX_WINDOW,
-        bool affine = true):
+        bool affine = true,
+        unsigned max_num_kp = std::numeric_limits<unsigned>::max() ):
+          affine_multiscale_(affine_multiscale),
           base_scale_(base_scale),
           scale_step_(scale_factor),
           scale_levels_(scale_levels),
@@ -52,9 +57,13 @@ public:
           pf_type_(postfilter_type),
           pf_threshold_(pf_threshold),
           max_search_algo_(max_search_algo),
-          affine_(affine)
+          affine_(affine),
+          max_num_kp_(max_num_kp)
     {
     }
+
+    /** If true, compute affine parameters for each scale separately (slower, but maybe more correct) */
+    bool affine_multiscale_;
 
     /** The smallest scale (in meters) at which to search for features */
     double base_scale_;
@@ -85,6 +94,9 @@ public:
 
     /** Use local affine transformation for detection */
     bool affine_;
+
+    /** If > 0, limit the number of keypoints */
+    unsigned max_num_kp_;
   };
 
 
@@ -95,7 +107,8 @@ public:
         int patch_size=20,
         int octave_offset=0 ) :
           patch_size_(patch_size),
-          octave_offset_(octave_offset)
+          octave_offset_(octave_offset),
+          z_thickness_(0.3)
     {
     }
 
@@ -104,6 +117,9 @@ public:
 
     /** Sampling for the descriptor is done on the scale level 2^octave_offset_ * keypoint.world_size */
     int octave_offset_;
+
+    /** defines the thickness of the ellipsiod from where points are considered (1.0 for a sphere) */
+    float z_thickness_;
   };
 
 
@@ -125,6 +141,8 @@ public:
    */
   void operator()(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
+  void operator()(const cv::Mat &image, const cv::Mat &depth_map, cv::Matx33f K,
+      std::vector<cv::KeyPoint3D> & keypoints );
 
   /** Detect salient keypoints using a pair of depth and intensity images
    * @param image     the image to compute the features and descriptors on
@@ -136,11 +154,24 @@ public:
    */
   void operator()(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc );
+  void operator()(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
+      std::vector<cv::KeyPoint3D> & keypoints );
 
 private:
 
+  void computeImpl(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
+      std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc, bool computeDescriptors );
+
   bool prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
       Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map );
+
+  void computeAffineMaps(
+      std::set<int>& octaves,
+      cv::Mat1f& depth_map,
+      cv::Mat1f& scale_map,
+      float f,
+      std::map< int, Mat1f>& smoothed_depth_maps,
+      std::map< int, Mat4f >& affine_maps );
 
   /** Parameters tuning RgbdFeatures */
   DetectorParams det_params_;

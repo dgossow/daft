@@ -33,7 +33,7 @@ namespace rgbd_evaluator
 class ExtractDetectorFile
 {
 public:
-  ExtractDetectorFile(std::string file_path,bool verbose,int num_kp);
+  ExtractDetectorFile(std::string file_path,bool reset_files,bool verbose,int num_kp);
   virtual ~ExtractDetectorFile();
 
 private:

@@ -15,7 +15,7 @@ namespace daft2
 {
 
 template< int MaxGapSize >
-void improveDepthMap( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, float max_depth_delta )
+void closeGaps( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, float max_depth_delta )
 {
   if ( depth_map_in.type() == CV_16U )
   {
