@@ -6,7 +6,6 @@
 
 #include "stuff.h"
 #include "depth_filter.h"
-#include "kernel2d.h"
 
 namespace cv
 {
@@ -17,7 +16,7 @@ void computeAffineMapFixed(
     const Mat1f &depth_map,
     float sp,
     float f,
-    Mat4f& affine_map )
+    Mat3f& affine_map )
 {
   affine_map.create( depth_map.rows, depth_map.cols );
 
@@ -26,8 +25,6 @@ void computeAffineMapFixed(
 
   for ( int y = 0; y < depth_map.rows; y++ )
   {
-    int left = 0;
-    int right = 0;
     for ( int x = 0; x < depth_map.cols; ++x )
     {
       Vec2f grad;
@@ -42,9 +39,8 @@ void computeAffineMapFixed(
         if ( grad[0] == 0 && grad[1] == 0 )
         {
           affine_map[y][x][0] = 1;
-          affine_map[y][x][1] = 1;
-          affine_map[y][x][2] = 1.0f;
-          affine_map[y][x][3] = 0.0f;
+          affine_map[y][x][1] = 1.0f;
+          affine_map[y][x][2] = 0.0f;
           continue;
         }
 
@@ -53,13 +49,12 @@ void computeAffineMapFixed(
         float sw = sp_div_f * depth_map[y][x];
 
         // major/minor axis lengths
-        affine_map[y][x][0] = 1;
-        affine_map[y][x][1] = fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
+        affine_map[y][x][0] = fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
 
         // major axis as unit vector
         const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
-        affine_map[y][x][2] = -grad[1] * grad_len_inv;
-        affine_map[y][x][3] = grad[0] * grad_len_inv;
+        affine_map[y][x][1] = -grad[1] * grad_len_inv;
+        affine_map[y][x][2] = grad[0] * grad_len_inv;
       }
     }
   }
@@ -71,7 +66,7 @@ void computeAffineMap(
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    Mat4f& affine_map )
+    Mat3f& affine_map )
 {
   if ( affine_map.rows != 0 )
   {
@@ -99,22 +94,20 @@ void computeAffineMap(
         if ( grad[0] == 0 && grad[1] == 0 )
         {
           affine_map[y][x][0] = sp;
-          affine_map[y][x][1] = sp;
-          affine_map[y][x][2] = 1.0f;
-          affine_map[y][x][3] = 0.0f;
+          affine_map[y][x][1] = 1.0f;
+          affine_map[y][x][2] = 0.0f;
           continue;
         }
 
         const float grad_len_sqr = grad[0]*grad[0] + grad[1]*grad[1];
 
         // major/minor axis lengths
-        affine_map[y][x][0] = sp;
-        affine_map[y][x][1] = sp * fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
+        affine_map[y][x][0] = sp * fastInverseSqrt( grad_len_sqr / (sw*sw) + 1.0f );
 
         // major axis as unit vector
         const float grad_len_inv = fastInverseSqrt(grad_len_sqr);
-        affine_map[y][x][2] = -grad[1] * grad_len_inv;
-        affine_map[y][x][3] = grad[0] * grad_len_inv;
+        affine_map[y][x][1] = -grad[1] * grad_len_inv;
+        affine_map[y][x][2] = grad[0] * grad_len_inv;
       }
     }
   }

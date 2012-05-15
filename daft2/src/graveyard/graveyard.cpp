@@ -18,6 +18,171 @@
 //       \              \\|           |//                   \____\____\
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+template <float (*F)(const Mat1d&, int, int, int)>
+inline float interpolateKernel( const Mat1d &ii,
+    int x, int y, float s )
+{
+  int s_floor = s;
+  float t = s - s_floor;
+  return (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
+}
+
+
+template <float (*F)(const Mat1d&, int, int, float)>
+void filterKpKernel( const Mat1d& ii,
+    double thresh,
+    std::vector< KeyPoint3D >& kp )
+{
+  std::vector< KeyPoint3D > kp_in = kp;
+
+  kp.clear();
+  kp.reserve( kp_in.size() );
+
+  for ( unsigned k=0; k<kp_in.size(); k++ )
+  {
+    float response = F( ii,
+        kp_in[k].pt.x, kp_in[k].pt.y,
+        kp_in[k].size / 4.0f);
+
+    if ( response < thresh )
+    {
+      //kp_in[k].response = response;
+      kp.push_back( kp_in[k] );
+    }
+  }
+}
+
+void filterKpNeighbours( const cv::Mat1d& response_map,
+    double center_factor,
+    std::vector< KeyPoint3D >& kp )
+{
+  std::vector< KeyPoint3D > kp_in = kp;
+
+  kp.clear();
+  kp.reserve( kp_in.size() );
+
+  for ( unsigned k=0; k<kp_in.size(); k++ )
+  {
+    int x = kp_in[k].pt.x;
+    int y = kp_in[k].pt.y;
+    int s = int(kp_in[k].size * 0.25 + 0.5);
+
+    if ( checkBounds( response_map, x, y, s ) )
+    {
+      float center_val = kp_in[k].response * center_factor;
+      if (  response_map[y-s][x-s] < center_val &&
+            response_map[y-s][x  ] < center_val &&
+            response_map[y-s][x+s] < center_val &&
+            response_map[y  ][x-s] < center_val &&
+            response_map[y  ][x+s] < center_val &&
+            response_map[y+s][x-s] < center_val &&
+            response_map[y+s][x  ] < center_val &&
+            response_map[y+s][x+s] < center_val )
+      {
+        kp.push_back( kp_in[k] );
+      }
+    }
+  }
+}
+
+inline float princCurvRatioImpl( const Mat1d &ii, int x, int y, int a )
+{
+  if (!checkBounds( ii, x, y, 6*a ) )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+
+  float dxx = sDxxKernel.convolve(values);
+  float dyy = sDyyKernel.convolve(values);
+  float dxy = sDxyKernel.convolve(values);
+
+  float trace = dxx + dyy;
+  float det = dxx*dyy - (dxy*dxy);
+
+  if ( det <= 0 )
+  {
+    return std::numeric_limits<float>::max();
+  }
+
+  return trace*trace/det;
+}
+
+inline float princCurvRatio( const Mat1d &ii, int x, int y, float s )
+{
+  float a = 0.5893f * s; // sqrt(2)/1.2/2
+  int ai = int(a);
+  float t = a - float(ai);
+  float v1 = princCurvRatioImpl(ii, x, y, ai);
+  float v2 = princCurvRatioImpl(ii, x, y, ai + 1);
+  return interpolateLinear(t, v1, v2);
+}
+
+inline float princCurvRatioAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )
+{
+  if (!checkBounds( ii, x, y, 6*a ) )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+
+  float values[9][9];
+  integrateGridCentered<double,9>(ii, x, y, a, (float*)values);
+
+  float dxx = sDxxKernelCache.convolve(values, ratio, angle);
+  float dyy = sDyyKernelCache.convolve(values, ratio, angle);
+  float dxy = sDxyKernelCache.convolve(values, ratio, angle);
+
+#if 0
+  Eigen::Matrix2f M;
+  M << dxx, dxy, dxy, dyy;
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> es( M );
+
+  float ev1 = std::fabs(es.eigenvalues()[0]);
+  float ev2 = std::fabs(es.eigenvalues()[1]);
+
+  float er = std::max(ev1,ev2) / std::min(ev2,ev1);
+  //std::cout << er << std::endl;
+
+  float det = es.eigenvalues()[0]*es.eigenvalues()[1];
+  if ( det <= 0 )
+  {
+    return -1;//std::numeric_limits<float>::max();
+  }
+
+  return (er+1)*(er+1)/er -3;
+#else
+  float trace = dxx + dyy;
+  float det = dxx*dyy - (dxy*dxy);
+
+  if ( det <= 0 )
+  {
+    return std::numeric_limits<float>::max();
+  }
+  return trace*trace/det;
+#endif
+
+}
+
+
+
+inline float princCurvRatioAffine( const Mat1d &ii,
+    int x, int y,
+    float major,  float minor,
+    float major_x, float major_y )
+{
+  float angle = atan2( major_y, major_x );
+  float a = 0.5893f * major; // sqrt(2)/1.2/2
+  int ai = int(a);
+  float t = a - float(ai);
+  float ratio = minor / major;
+  return 0.5 + 0.5 / princCurvRatioAffineImpl(ii, x, y, ai, ratio, angle);
+  //float v2 = princCurvRatioAffineImpl(ii, x, y, ai + 1, ratio, angle);
+  //return interpolateLinear(t, v1, v2);
+}
+
 
 // sp : pixel scale
 // sw : world scale

@@ -136,9 +136,9 @@ float dominantOri( std::vector< PtGradient >& gradients, bool show_win )
 
 Vec3f getNormal( const KeyPoint3D& kp, const cv::Mat1f depth_map, cv::Matx33f& K, float size_mult )
 {
-  float angle = kp.affine_angle;
-  float major = kp.affine_major * 0.25;
-  float minor = kp.affine_minor * 0.25;
+  float angle = kp.aff_angle;
+  float major = kp.aff_major * 0.25;
+  float minor = kp.aff_minor * 0.25;
 
   int s_round = int( sqrt(major*minor) + 0.5 );
   if ( s_round < 1 ) s_round = 1;
@@ -288,7 +288,7 @@ bool computeDesc( const vector<PtInfo>& ptInfos, cv::Mat1f& desc, bool show_win 
       // disallow 4 central bins to be empty
       if ( !entries[j][i].normalize() )// && i>=1 && i<=2 && j>=1 && j<=2 )
       {
-        return false;
+        //return false;
       }
 
       desc(idx++) = entries[j][i].sum_dx;
@@ -453,8 +453,8 @@ inline void getGradPatch( int patch_size, float thickness, Mat1f& smoothed_img, 
         if ( show_win && !isnan( patch[v][u] ) )
         {
           float s = 0.5 * kp.world_size * K(0,0) / depth_map(int(pixel.y),int(pixel.x));
-          Size2f bsize( s, kp.affine_minor/kp.affine_major*s );
-          cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
+          Size2f bsize( s, kp.aff_minor/kp.aff_major*s );
+          cv::RotatedRect box(pixel, bsize, kp.aff_angle/M_PI*180.0 );
           ellipse( display_img, box, cv::Scalar(0,0,255), 1, CV_AA );
         }
       }
@@ -555,16 +555,17 @@ inline void getGradPatch( int patch_size, float thickness, Mat1f& smoothed_img, 
 
           if (!isnan(val))
           {
-            //Size2f bsize( float(PATCH_MUL)*weight,float(PATCH_MUL)*weight );
-            Size2f bsize( float(PATCH_MUL)*1.0,float(PATCH_MUL)*1.0 );
+            float circle_size = 1.0 - ( pt3d_uvw1.z/thickness );
+            Size2f bsize( float(PATCH_MUL)*circle_size,float(PATCH_MUL)*circle_size );
+            //Size2f bsize( float(PATCH_MUL)*1.0,float(PATCH_MUL)*1.0 );
             //Size2f bsize( float(PATCH_MUL),float(PATCH_MUL) );
-            cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, kp.affine_angle/M_PI*180.0 );
+            cv::RotatedRect box(uv_reproj*PATCH_MUL, bsize, kp.aff_angle/M_PI*180.0 );
             ellipse( points3d_img, box, cv::Scalar(val*255,val*255,val*255),-1, CV_AA );
             //ellipse( points3d_img, box, cv::Scalar(128,0,0),1, CV_AA );
           }
 
           Size2f bsize( 3,3 );
-          cv::RotatedRect box(pixel, bsize, kp.affine_angle/M_PI*180.0 );
+          cv::RotatedRect box(pixel, bsize, kp.aff_angle/M_PI*180.0 );
           ellipse( display_img, box, cv::Scalar(0,255,0), 1, CV_AA );
         }
       }
@@ -613,7 +614,7 @@ bool SurfDescriptor::getDesc(
   // get gradients from larger scale
   std::vector<PtInfo> pt_infos_ori;
   float coverage;
-  getGradPatch<1>( patch_size, thickness, smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5, cv::Matx33f::eye(), 1.0, show_win );
+  getGradPatch<1>( patch_size, thickness*2.0, smoothed_img2, kp, depth_map, K, pt_infos_ori, coverage, 0.5, cv::Matx33f::eye(), 1.0, show_win );
 
   if ( coverage < 0.5 * 0.86 )
   {

@@ -4,6 +4,7 @@ include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (ROS_BUILD_TYPE RelWithDebInfo)
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
+
 #set (ROS_BUILD_TYPE Debug)
 
 rosbuild_init ()

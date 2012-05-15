@@ -26,7 +26,6 @@ public:
   struct DetectorParams
   {
     enum { DET_FELINE=0 };
-    enum { PF_NONE=0, PF_NEIGHBOURS=2, PF_PRINC_CURV_RATIO=3 };
     enum { MAX_WINDOW=0, MAX_FAST=2 };
 
     enum { AUTO=-1 };
@@ -39,10 +38,10 @@ public:
         int scale_levels = AUTO,
         float min_px_scale = 2.5,
         float max_px_scale = AUTO,
+        float min_dist = 2.0,
         int detector_type = DET_FELINE,
         float det_threshold = 0.02,
-        int postfilter_type = PF_PRINC_CURV_RATIO,
-        float pf_threshold = 10.0,
+        double max_princ_curv_ratio = 10.0,
         int max_search_algo = MAX_WINDOW,
         bool affine = true,
         unsigned max_num_kp = std::numeric_limits<unsigned>::max() ):
@@ -52,10 +51,10 @@ public:
           scale_levels_(scale_levels),
           min_px_scale_(min_px_scale),
           max_px_scale_(max_px_scale),
+          min_dist_(min_dist),
           det_type_(detector_type),
           det_threshold_(det_threshold),
-          pf_type_(postfilter_type),
-          pf_threshold_(pf_threshold),
+          max_princ_curv_ratio_(max_princ_curv_ratio),
           max_search_algo_(max_search_algo),
           affine_(affine),
           max_num_kp_(max_num_kp)
@@ -77,17 +76,17 @@ public:
     float min_px_scale_;
     float max_px_scale_;
 
+    /** Minimal distance between two keypoints on the same scale */
+    float min_dist_;
+
     /** Which detector to use */
     int det_type_;
 
     /** Minimal response threshold for the detector */
     double det_threshold_;
 
-    /** Postfilter applied to output of first detector */
-    int pf_type_;
-
-    /** Minimal response threshold for the post filter */
-    double pf_threshold_;
+    /** Max. principal curvature ratio ( no check if < 1.0) */
+    double max_princ_curv_ratio_;
 
     /** How to search for maxima? */
     int max_search_algo_;
@@ -108,7 +107,7 @@ public:
         int octave_offset=0 ) :
           patch_size_(patch_size),
           octave_offset_(octave_offset),
-          z_thickness_(0.3)
+          z_thickness_(0.1)
     {
     }
 
@@ -171,7 +170,7 @@ private:
       cv::Mat1f& scale_map,
       float f,
       std::map< int, Mat1f>& smoothed_depth_maps,
-      std::map< int, Mat4f >& affine_maps );
+      std::map< int, Mat3f >& affine_maps );
 
   /** Parameters tuning RgbdFeatures */
   DetectorParams det_params_;

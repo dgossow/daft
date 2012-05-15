@@ -17,11 +17,12 @@ namespace cv
 namespace daft2
 {
 
-void findMaxima( const cv::Mat1d &img,
-    const cv::Mat1d &scale_map,
+void findExtrema( const cv::Mat1f &img,
+    const cv::Mat1f &scale_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
+    double min_dist,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
@@ -30,14 +31,20 @@ void findMaxima( const cv::Mat1d &img,
   {
     for ( int x = 3; x < img.cols-3; ++x )
     {
-      if ( img[y][x] < thresh || isnan( img[y][x] ) )
+      const float sign = img[y][x] > 0 ? 1 : -1;
+      const float val = img[y][x] * sign;
+
+      if ( val < thresh || isnan( val ) )
       {
         continue;
       }
 
-      double sp = scale_map[y][x] * base_scale;// * 0.25 - 1;
+      double sp = scale_map[y][x] * base_scale;
 
-      if ( sp < min_px_scale || sp > max_px_scale || x-sp < 0 || x+sp >= img.cols || y-sp < 0 || y+sp > img.rows )
+      int window = sp * min_dist;
+      if ( window < 1 ) window = 1;
+
+      if ( sp < min_px_scale || sp > max_px_scale || x-window < 0 || x+window >= img.cols || y-window < 0 || y+window > img.rows )
       {
         continue;
       }
@@ -55,25 +62,21 @@ void findMaxima( const cv::Mat1d &img,
         continue;
       }
 
-      // Round scale, substract the one extra pixel we have in the center
-      int window = sp; //(s+0.5) / 2.0 - 0.5;
-      if ( window < 1 ) window = 1;
-
       bool isMax = true;
       for ( int v = 0; isMax && v <= window; v++ )
       {
         // w = width of circle at that y coordinate
-        int w=cos(asin(double(v)/double(window+0.5))) * (double)window + 0.5;
+        int w=cos(asin(double(v)/(double(window)+0.5))) * (double)window + 0.5;
         for ( int u = 0; isMax && u <= w; u++ )
         {
           if (u==0 && v==0)
           {
             continue;
           }
-          if ( ( img[y+v][x+u] >= img[y][x] ) ||
-              ( img[y+v][x-u] >= img[y][x] ) ||
-              ( img[y-v][x+u] >= img[y][x] ) ||
-              ( img[y-v][x-u] >= img[y][x] ) )
+          if ( ( sign*img[y+v][x+u] >= val ) ||
+              ( sign*img[y+v][x-u] >= val ) ||
+              ( sign*img[y-v][x+u] >= val ) ||
+              ( sign*img[y-v][x-u] >= val ) )
           {
             isMax=false;
           }
@@ -82,29 +85,33 @@ void findMaxima( const cv::Mat1d &img,
 
       if ( isMax )
       {
-        kp.push_back( KeyPoint3D ( x, y, sp*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D( x, y, base_scale*4.0, sp*4.0, sp*4.0, 0.0, -1, val ) );
       }
     }
   }
 }
 
 
-void findMaximaAffine(
-    const cv::Mat1d &img,
+void findExtremaAffine(
+    const cv::Mat1f &img,
     const Mat1f &scale_map,
-    const Mat4f &affine_map,
+    const Mat3f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
+    double min_dist,
     double thresh,
     std::vector< KeyPoint3D >& kp )
 {
+  float min_px_scale_sqr = min_px_scale* min_px_scale;
+
   //find maxima in sxs neighbourhood
   for ( int y = 3; y < img.rows-3; y++ )
   {
     for ( int x = 3; x < img.cols-3; ++x )
     {
-      float val = img[y][x];
+      const float sign = img[y][x] > 0 ? 1 : -1;
+      const float val = img[y][x] * sign;
 
       if ( val < thresh || isnan(val) )
       {
@@ -113,16 +120,17 @@ void findMaximaAffine(
 
       // get ellipse parameters
       const float& major_len = base_scale * scale_map[y][x];
-      const float& minor_len = major_len * affine_map[y][x][1];
-      const float& major_x = affine_map[y][x][2];
-      const float& major_y = affine_map[y][x][3];
+      const float& minor_len = major_len * affine_map[y][x][0];
+      const float& major_x = affine_map[y][x][1];
+      const float& major_y = affine_map[y][x][2];
 
-      if (major_len < min_px_scale ||
-          major_len > max_px_scale ||
-          x-major_len < 0 ||
-          x+major_len >= img.cols ||
-          y-major_len < 0 ||
-          y+major_len >= img.rows )
+      if ( isnan(major_len) ||
+           major_len*minor_len < min_px_scale_sqr ||
+           major_len > max_px_scale ||
+           x-major_len < 0 ||
+           x+major_len >= img.cols ||
+           y-major_len < 0 ||
+           y+major_len >= img.rows )
       {
         continue;
       }
@@ -139,66 +147,40 @@ void findMaximaAffine(
         continue;
       }
 
-      // break if ellipse is too small or thin
-      if( isnan(major_x) || minor_len < min_px_scale ) {
-        continue;
-      }
-
       const float angle = std::atan2( major_y, major_x );
 
       float A, B, C;
-      computeEllipseParams(angle, major_len, minor_len, A, B, C);
+      computeEllipseParams(angle, major_len*min_dist, minor_len*min_dist, A, B, C);
 
-      int window = major_len;
+      int window = major_len*min_dist;
       if ( window < 1 ) window = 1;
 
       float cos_angle = cos(angle);
 
-      bool is_max = true;
-      for ( int v = 0; is_max && v <= window; v++ )
+      bool is_extremum = true;
+      for ( int v = 0; is_extremum && v <= window; v++ )
       {
-        int c = float(v) * cos_angle;
         //std::cout << " v " << v << " C " << c;
-        for ( int u = 0; is_max && u <= window; u++ )
+        for ( int u = 0; is_extremum && u <= window; u++ )
         {
-          int u2 = c+u;
-          // check if point is in ellipse
-          if(!ellipseContains(u2, v, A, B, C)) {
-            break;
-          }
-          if (u2==0 && v==0)
+          if (u==0 && v==0)
           {
             continue;
           }
-          // check if other maximum found
-          if(img[y+v][x+u2] >= val || img[y-v][x+u2] >= val) {
-            // not a maximum -> search finished
-            is_max = false;
-          }
-        }
-        for ( int u = 0; is_max && u <= window; u++ )
-        {
-          int u2 = c-u;
-          // check if point is in ellipse
-          if(!ellipseContains(u2, v, A, B, C)) {
-            break;
-          }
-          if (u2==0 && v==0)
+          if ( ellipseContains(u, v, A, B, C) && (sign*img[y+v][x+u] >= val || sign*img[y-v][x-u] >= val) )
           {
-            continue;
+            is_extremum = false;
           }
-          // check if other maximum found
-          if(img[y+v][x+u2] >= val || img[y-v][x+u2] >= val) {
-            // not a maximum -> search finished
-            is_max = false;
+          if ( ellipseContains(-u, v, A, B, C) && (sign*img[y+v][x-u] >= val || sign*img[y-v][x+u] >= val) )
+          {
+            is_extremum = false;
           }
         }
       }
-      //std::cout << std::endl;
 
-      if(is_max) {
+      if(is_extremum) {
         // is a maximum -> add keypoint
-        kp.push_back( KeyPoint3D ( x, y, major_len*4.0, base_scale*4.0, -1, img[y][x] ) );
+        kp.push_back( KeyPoint3D( x, y, base_scale*4.0, major_len*4.0, minor_len*4.0, atan2(major_y,major_x), -1, val ) );
       }
     }
   }
@@ -281,8 +263,8 @@ inline bool isLocalMax( float cv, const T& max_map,
 
 //define DGB_F
 
-void findMaximaMipMap( const cv::Mat1d &img,
-    const cv::Mat1d &scale_map,
+void findMaximaMipMap( const cv::Mat1f &img,
+    const cv::Mat1f &scale_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -448,38 +430,74 @@ void findMaximaMipMap( const cv::Mat1d &img,
 }
 
 
-void filterKpNeighbours( const cv::Mat1d& response_map,
-    double center_factor,
-    std::vector< KeyPoint3D >& kp )
-{
-  std::vector< KeyPoint3D > kp_in = kp;
 
-  kp.clear();
-  kp.reserve( kp_in.size() );
+void princCurvFilter(
+    const Mat1f& response,
+    const Mat1f& scale_map,
+    const Mat3f& affine_map,
+    double max_ratio,
+    const std::vector< KeyPoint3D >& kp_in,
+    std::vector< KeyPoint3D >& kp_out )
+{
+  kp_out.reserve( kp_out.size() + kp_in.size() );
+
+  if ( max_ratio < 1.0 )
+  {
+    // ratio is always >= 1.0, so in this case we don't need to do anything
+    for ( unsigned k=0; k<kp_in.size(); k++ )
+    {
+      kp_out.push_back( kp_in[k] );
+    }
+    return;
+  }
+
+  float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
-    int x = kp_in[k].pt.x;
-    int y = kp_in[k].pt.y;
-    int s = int(kp_in[k].size * 0.25 + 0.5);
+    const int x = kp_in[k].pt.x;
+    const int y = kp_in[k].pt.y;
+    const float major_len = kp_in[k].aff_major * 0.5;
+    const float minor_len = kp_in[k].aff_minor * 0.5;
 
-    if ( checkBounds( response_map, x, y, s ) )
+    if (checkBounds( response, x, y, major_len ))
     {
-      float center_val = kp_in[k].response * center_factor;
-      if (  response_map[y-s][x-s] < center_val &&
-            response_map[y-s][x  ] < center_val &&
-            response_map[y-s][x+s] < center_val &&
-            response_map[y  ][x-s] < center_val &&
-            response_map[y  ][x+s] < center_val &&
-            response_map[y+s][x-s] < center_val &&
-            response_map[y+s][x  ] < center_val &&
-            response_map[y+s][x+s] < center_val )
+      const float major_x = major_len * -sin(kp_in[k].aff_angle);
+      const float major_y = major_len * cos(kp_in[k].aff_angle);
+      const float minor_x = minor_len * cos(kp_in[k].aff_angle);
+      const float minor_y = minor_len * sin(kp_in[k].aff_angle);
+
+
+
+      float values[3][3];
+
+      for( int u=-1;u<=1;u++ )
       {
-        kp.push_back( kp_in[k] );
+        for( int v=-1;v<=1;v++ )
+        {
+          values[v+1][u+1] = response( y + u*major_y + v*minor_y, x + u*major_x + v*minor_x );
+        }
+      }
+
+      float dxx = values[1][2] + values[1][0] - 2*values[1][1];
+      float dyy = values[2][1] + values[0][1] - 2*values[1][1];
+      float dxy = values[2][2] + values[0][0] - values[2][0] - values[0][2];
+
+      float trace = dxx + dyy;
+      float det = dxx*dyy - (dxy*dxy);
+
+      float r_val = trace*trace/det;
+
+      std::cout << r_val << std::endl;
+
+      if ( r_val > 0 && r_val <= r_thresh )
+      {
+        kp_out.push_back( kp_in[k] );
       }
     }
   }
 }
+
 
 } 
 }

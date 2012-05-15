@@ -12,7 +12,6 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include "stuff.h"
-#include "kernel2d.h"
 
 namespace cv
 {
@@ -31,13 +30,13 @@ void computeAffineMap(
     const Mat1f &depth_map,
     float sw,
     float min_px_scale,
-    Mat4f& affine_map );
+    Mat3f& affine_map );
 
 void computeAffineMapFixed(
     const Mat1f &depth_map,
     float sp,
     float f,
-    Mat4f& affine_map );
+    Mat3f& affine_map );
 
 }
 }

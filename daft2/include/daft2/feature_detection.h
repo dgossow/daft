@@ -72,17 +72,18 @@ void convolveAffine( const Mat1d &ii,
  @param[in]  thresh     Minimum threshold for local maxima
  @param[out] kp         The keypoints (input & output)
  */
-void findMaxima( const Mat1d &img,
-     const Mat1d &scale_map,
+void findExtrema( const Mat1f &img,
+     const Mat1f &scale_map,
      double base_scale,
      double min_px_scale,
      double max_px_scale,
+     double min_dist,
      double thresh,
      std::vector< KeyPoint3D >& kp );
 
 /*! Like findMaxima, but faster and a little less accurate */
-void findMaximaMipMap( const Mat1d &img,
-    const Mat1d &scale_map,
+void findMaximaMipMap( const Mat1f &img,
+    const Mat1f &scale_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
@@ -90,55 +91,29 @@ void findMaximaMipMap( const Mat1d &img,
     std::vector< KeyPoint3D >& kp );
 
 /*! Like findMaxima, but do non-max suppression in affine neighborhood */
-void findMaximaAffine(
-    const cv::Mat1d &img,
+void findExtremaAffine(
+    const cv::Mat1f &img,
     const Mat1f &scale_map,
-    const Mat4f &affine_map,
+    const Mat3f &affine_map,
     double base_scale,
     double min_px_scale,
     double max_px_scale,
+    double min_dist,
     double thresh,
     std::vector< KeyPoint3D >& kp );
 
-/*!
- Compute the kernel response for each keypoint and reject those
- with a response below the threshold.
- The kernel size at (x,y) will be scale_map(x,y) * base_scale.
- The template argument specifies the filter kernel, which takes as
- arguments the integral image, x, y, and the scaling factor.
- @tparam        F       The kernel function f(ii,x,y,s)
- @param[in]     ii      The integral image
- @param[in]     thresh  Keypoint with a lower kernel response below this will be
- @param[in,out] kp      The keypoints (input & output)
- */
-template <double (*F)(const Mat1d&, int, int, int)>
-void filterKpKernel( const Mat1d& ii,
-                      double thresh,
-                      std::vector< KeyPoint3D >& kp );
-
-/*!
- Check how strong the maximum is in its local neighbourhood
- @param[in]     response   The original kernel response image
- @param[in]     center_fac If this is lower, less keypoints get accepted (range: 0..1)
- @param[in,out] kp         The keypoints (input & output)
- */
-void filterKpNeighbours( const Mat1d& response,
-    double center_fac,
-    std::vector< KeyPoint3D >& kp );
-
+/*! Reject keypoints with a principal curvature ratio above max_ratio */
+void princCurvFilter(
+    const Mat1f& response,
+    const Mat1f& scale_map,
+    const Mat3f& affine_map,
+    double max_ratio,
+    const std::vector< KeyPoint3D >& kp_in,
+    std::vector< KeyPoint3D >& kp_out );
 
 // ----------------------------------------------------
 // -- Implementation ----------------------------------
 // ----------------------------------------------------
-
-template <float (*F)(const Mat1d&, int, int, int)>
-inline float interpolateKernel( const Mat1d &ii,
-    int x, int y, float s )
-{
-  int s_floor = s;
-  float t = s - s_floor;
-  return (1.0-t) * F( ii, x, y, s_floor ) + t * F( ii, x, y, s_floor+1 );
-}
 
 template <float (*F)(const Mat1d&, int, int, float)>
 void convolve( const Mat1d &ii,
@@ -172,7 +147,7 @@ template <float (*F)( const Mat1d &ii,
     float major_x, float major_y )>
 void convolveAffine( const Mat1d &ii,
     const Mat1f& scale_map,
-    const Mat4f& affine_map,
+    const Mat3f& affine_map,
     float base_scale,
     float min_px_scale,
     Mat1f &img_out )
@@ -186,66 +161,21 @@ void convolveAffine( const Mat1d &ii,
     for ( int x = 0; x < ii.cols-1; ++x )
     {
       const float& major_len = base_scale * scale_map[y][x];
-      const float& minor_len = major_len * affine_map[y][x][1];
-      const float& major_x = affine_map[y][x][2];
-      const float& major_y = affine_map[y][x][3];
+      const float& minor_len = major_len * affine_map[y][x][0];
+      const float& major_x = affine_map[y][x][1];
+      const float& major_y = affine_map[y][x][2];
 
-      if ( isnan( major_len ) || minor_len < min_px_scale )
+      if ( isnan( minor_len ) || minor_len < min_px_scale )
       {
         img_out(y,x) = nan;
         continue;
       }
 
+      assert( !isnan( minor_len ) );
+      assert( !isnan( major_x ) );
+      assert( !isnan( major_y ) );
+
       img_out(y,x) = F( ii, x, y, major_len, minor_len, major_x, major_y );
-    }
-  }
-}
-
-
-template <float (*F)(const Mat1d&, int, int, float)>
-void filterKpKernel( const Mat1d& ii,
-    double thresh,
-    std::vector< KeyPoint3D >& kp )
-{
-  std::vector< KeyPoint3D > kp_in = kp;
-
-  kp.clear();
-  kp.reserve( kp_in.size() );
-
-  for ( unsigned k=0; k<kp_in.size(); k++ )
-  {
-    float response = F( ii,
-        kp_in[k].pt.x, kp_in[k].pt.y,
-        kp_in[k].size / 4.0f);
-
-    if ( response < thresh )
-    {
-      //kp_in[k].response = response;
-      kp.push_back( kp_in[k] );
-    }
-  }
-}
-
-template <float (*F)(const Mat1d &ii, int x, int y, float major, float minor, float angle)>
-void filterKpKernelAffine( const Mat1d& ii,
-    double thresh,
-    std::vector< KeyPoint3D >& kp )
-{
-  std::vector< KeyPoint3D > kp_in = kp;
-
-  kp.clear();
-  kp.reserve( kp_in.size() );
-
-  for ( unsigned k=0; k<kp_in.size(); k++ )
-  {
-    float response = F( ii,
-        kp_in[k].pt.x, kp_in[k].pt.y,
-        kp_in[k].affine_major / 4.0, kp_in[k].affine_minor / 4.0, kp_in[k].affine_angle );
-
-    if ( response < thresh )
-    {
-      //kp_in[k].response = response;
-      kp.push_back( kp_in[k] );
     }
   }
 }
