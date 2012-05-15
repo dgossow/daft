@@ -53,7 +53,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   p1.affine_ = true;
   p1.min_px_scale_ = 1.5;
   p1.det_threshold_ = 0.001;
-  p1.pf_threshold_ = 7.5;
+  //p1.pf_threshold_ = 7.5;
   p1.max_num_kp_ = 100;
   //p1.base_scale_ = 0.06;
   //p1.scale_levels_ = 1;

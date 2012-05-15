@@ -14,11 +14,11 @@ function display_projected_features(imf1,feat1,feat2)
 
 clf;imshow(imf1);
 
-for c1=1:size(feat2,2)
-    drawellipse([feat2(3,c1) feat2(4,c1); feat2(4,c1) feat2(5,c1) ], feat2(1,c1), feat2(2,c1),'y',0);
-end
 for c1=1:size(feat1,2)
-    drawellipse([feat1(3,c1) feat1(4,c1); feat1(4,c1) feat1(5,c1) ], feat1(1,c1), feat1(2,c1),'g',0);
+    drawellipse([feat1(3,c1) feat1(4,c1); feat1(4,c1) feat1(5,c1) ], feat1(1,c1), feat1(2,c1),'r',0);
+end
+for c1=1:size(feat2,2)
+    drawellipse([feat2(3,c1) feat2(4,c1); feat2(4,c1) feat2(5,c1) ], feat2(1,c1), feat2(2,c1),'w',0);
 end
 
 end

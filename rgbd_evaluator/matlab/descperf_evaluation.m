@@ -67,7 +67,7 @@ grid on;
 hold on;
 
 for d=1:num_det
-    plot(x_vals,f1scores(d,:),mark{d},'LineWidth',3);
+    smooth_plot(3,x_vals,f1scores(d,:),mark{d},'LineWidth',3);
 end
 
 print(sfigure(1),'-dpdf',sprintf('%sf1score.pdf',graph_path))

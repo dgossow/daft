@@ -33,7 +33,7 @@ namespace rgbd_evaluator
 class ExtractDetectorFile
 {
 public:
-  ExtractDetectorFile(std::string file_path,bool reset_files,bool verbose,int num_kp);
+  ExtractDetectorFile(std::string file_path,bool reset_files,bool verbose,bool small,int num_kp);
   virtual ~ExtractDetectorFile();
 
 private:
@@ -78,6 +78,7 @@ private:
   int target_num_kp_;
 
   bool verbose_;
+  bool small_;
 
   struct ImageData
   {

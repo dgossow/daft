@@ -34,9 +34,11 @@ void sysCmd( std::string cmd )
 ExtractDetectorFile::ExtractDetectorFile(std::string file_path,
     bool reset_files,
     bool verbose,
+    bool small,
     int num_kp) {
   verbose_ = verbose;
   target_num_kp_ = num_kp;
+  small_ = small;
 
   std::cout << "Starting extract_detector_file..." << std::endl;
 
@@ -48,8 +50,11 @@ ExtractDetectorFile::ExtractDetectorFile(std::string file_path,
   sysCmd("mkdir "+extra_folder_);
   sysCmd("mkdir "+kp_folder_);
 
-  //sysCmd("rm "+extra_folder_+"/*.*");
-  //sysCmd("rm "+kp_folder_+"/*.*");
+  if ( reset_files )
+  {
+    sysCmd("rm "+extra_folder_+"/*.*");
+    sysCmd("rm "+kp_folder_+"/*.*");
+  }
 
   readDataFiles();
   extractAllKeypoints();
@@ -103,6 +108,15 @@ void ExtractDetectorFile::readDataFiles() {
       }
     }
   }
+
+  if ( small_ )
+  {
+    cv::resize( mask_img_.clone(), mask_img_, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR );
+
+    K_ = K_ * 0.5;
+    K_(2,2) = 1;
+  }
+
 
   //cv::imshow("mask_img_",mask_img_);
 
@@ -164,6 +178,18 @@ void ExtractDetectorFile::readDataFiles() {
     readDepth(tmp_depth_name, depth_image);
 
     img_data.depth_image = depth_image;
+
+    if ( small_ )
+    {
+      cv::Matx33f scale_mat1 = cv::Matx33f::eye();
+      cv::Matx33f scale_mat2 = cv::Matx33f::eye();
+      scale_mat1(0,0) = scale_mat1(1,1) = 2.0;
+      scale_mat2(0,0) = scale_mat2(1,1) = 0.5;
+      img_data.hom = scale_mat2 * img_data.hom * scale_mat1;
+
+      cv::resize( img_data.rgb_image.clone(), img_data.rgb_image, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR );
+      cv::resize( img_data.depth_image.clone(), img_data.depth_image, cv::Size(), 0.5, 0.5, CV_INTER_LINEAR );
+    }
 
     image_store_.push_back(img_data);
   }
@@ -425,7 +451,6 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
       cv::warpPerspective(first_kp_img, first_kp_img_warped, cv::Mat(it->hom),
           cv::Size(rgb_img.cols, rgb_img.rows));
 
-      printMat(it->hom);
 
       storeKeypoints(kp, desc, s.str(), name, rgb_img, first_kp_img_warped);
     }
@@ -443,22 +468,20 @@ void ExtractDetectorFile::extractAllKeypoints()
   cv::daft2::DAFT::DetectorParams det_p;
   cv::daft2::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
-  //det_p.min_px_scale_ = 2;
-  //det_p.base_scale_ = 0.008;
-  //det_p.scale_levels_ = 1;
-  //det_p.pf_type_ = det_p.PF_NONE;
+  //det_p.min_px_scale_ = 1.5;
+  det_p.base_scale_ = 0.025;
+  det_p.scale_levels_ = 1;
+  det_p.det_threshold_ = 0.0;
   //det_p.pf_threshold_ = 5;
+  desc_p.z_thickness_ = 0.3;
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   //desc_p.octave_offset_ = -1;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT New", 3.14 );
-  return;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 3.14 );
 
-  det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=false;
-  det_p.max_search_algo_=det_p.MAX_FAST;
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4, _5, _6, _7 ), "DAFT Non-Affine", 3.14 );
 
   //det_p.det_type_=det_p.DET_BOX;
@@ -470,7 +493,7 @@ void ExtractDetectorFile::extractAllKeypoints()
 
   //extractKeypoints( &getSurfKp, "SURF", 107.981 );
   //extractKeypoints( &getOrbKp, "ORB", target_num_kp_ );
-  extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
+  //extractKeypoints( &getSiftKp, "SIFT", 5.78627 );
 }
 
 void ExtractDetectorFile::printMat(cv::Matx33f M) {
@@ -579,16 +602,16 @@ void ExtractDetectorFile::storeKeypoints(
     //hack
     //it->affine_minor = it->affine_major;
 
-    ax = cos(it->affine_angle);
-    ay = sin(it->affine_angle);
+    ax = cos(it->aff_angle);
+    ay = sin(it->aff_angle);
     bx = -ay;
     by = ax;
 
     alpha_a = atan2(ay, ax);
     alpha_b = atan2(by, bx);
 
-    a_length = 0.5 * it->affine_major;
-    b_length = 0.5 * it->affine_minor;
+    a_length = 0.5 * it->aff_major;
+    b_length = 0.5 * it->aff_minor;
 
     ax = cos(alpha_a);
     bx = cos(alpha_b);
@@ -658,6 +681,7 @@ int main(int argc, char** argv) {
 
   bool verbose = false;
   bool reset_files = false;
+  bool small = false;
   int num_kp = 0;
   std::vector<std::string> bagfiles;
 
@@ -669,6 +693,9 @@ int main(int argc, char** argv) {
     } else if (arg == "-r") {
       std::cout << "Deleting old output files!" << std::endl;
       reset_files = true;
+    } else if (arg == "-s") {
+      std::cout << "Using half-size images!" << std::endl;
+      small = true;
     } else if (i < argc - 1 && arg == "-k") {
       num_kp = atoi(argv[i + 1]);
       std::cout << "num_kp = " << num_kp << std::endl;
@@ -684,7 +711,7 @@ int main(int argc, char** argv) {
 
   for (unsigned i = 0; i < bagfiles.size(); i++) {
     rgbd_evaluator::ExtractDetectorFile extract_detector_file(bagfiles[i],
-        reset_files, verbose, num_kp);
+        reset_files, verbose, small, num_kp);
   }
 
   std::cout << "Exiting.." << std::endl;

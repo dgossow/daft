@@ -1,4 +1,4 @@
-function [ ind ] = find_unmasked_regions( feat, im, mask )
+function [ ind ] = find_unmasked_regions( feat, im, mask, show_keypoints )
 
 h=size(im,1);
 w=size(im,2);
@@ -27,11 +27,11 @@ fprintf(1,'%d features are outside the mask.\n', (size(ind1,1)-size(ind,1)) );
 fprintf(1,'%d features remaining.\n', size(ind,1) );
 
 
-
-%figure(7);
-%imshow(mask2);
-%drawnow;
-%pause(2);
+if show_keypoints==1
+sfigure(7);
+imshow(mask2);
+drawnow;
+end
 
 end
 
