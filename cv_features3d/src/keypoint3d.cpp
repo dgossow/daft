@@ -23,10 +23,10 @@ static inline void _drawKeypoint3D( Mat& img, const KeyPoint3D& p, const Scalar&
 
   if( flags & DrawMatchesFlags::DRAW_RICH_KEYPOINTS )
   {
-    if ( p.affine_major >= 0 && p.affine_minor >= 0 )
+    if ( p.aff_major >= 0 && p.aff_minor >= 0 )
     {
-      Size2f bsize( p.affine_major, p.affine_minor );
-      cv::RotatedRect box( p.pt, bsize, p.affine_angle/M_PI*180.0 );
+      Size2f bsize( p.aff_major, p.aff_minor );
+      cv::RotatedRect box( p.pt, bsize, p.aff_angle/M_PI*180.0 );
       ellipse( img, box, color, 1, 16 );
     }
     else
@@ -89,7 +89,7 @@ std::vector<KeyPoint> makeKeyPoints( vector<KeyPoint3D> kp )
   for( std::vector<KeyPoint3D>::iterator it=kp.begin(); it!=kp.end(); ++it )
   {
     KeyPoint k = *it;
-    k.size = sqrt( it->affine_major * it->affine_minor );
+    k.size = sqrt( it->aff_major * it->aff_minor );
     kp_out.push_back( k );
   }
   return kp_out;
