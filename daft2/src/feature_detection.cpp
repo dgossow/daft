@@ -453,42 +453,21 @@ void princCurvFilter(
 
   float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
 
+  //std::cout << "r_thresh=" << r_thresh << std::endl;
+
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
     const int x = kp_in[k].pt.x;
     const int y = kp_in[k].pt.y;
-    const float major_len = kp_in[k].aff_major * 0.5;
-    const float minor_len = kp_in[k].aff_minor * 0.5;
+    const float major_len = kp_in[k].aff_major * 0.25;
+    const float minor_len = kp_in[k].aff_minor * 0.25;
 
     if (checkBounds( response, x, y, major_len ))
     {
-      const float major_x = major_len * -sin(kp_in[k].aff_angle);
-      const float major_y = major_len * cos(kp_in[k].aff_angle);
-      const float minor_x = minor_len * cos(kp_in[k].aff_angle);
-      const float minor_y = minor_len * sin(kp_in[k].aff_angle);
+      const float major_x1 = -sin(kp_in[k].aff_angle);
+      const float major_y1 = cos(kp_in[k].aff_angle);
 
-
-
-      float values[3][3];
-
-      for( int u=-1;u<=1;u++ )
-      {
-        for( int v=-1;v<=1;v++ )
-        {
-          values[v+1][u+1] = response( y + u*major_y + v*minor_y, x + u*major_x + v*minor_x );
-        }
-      }
-
-      float dxx = values[1][2] + values[1][0] - 2*values[1][1];
-      float dyy = values[2][1] + values[0][1] - 2*values[1][1];
-      float dxy = values[2][2] + values[0][0] - values[2][0] - values[0][2];
-
-      float trace = dxx + dyy;
-      float det = dxx*dyy - (dxy*dxy);
-
-      float r_val = trace*trace/det;
-
-      std::cout << r_val << std::endl;
+      float r_val = princCurvRatio( response, x, y, major_len, minor_len, major_x1, major_y1 );
 
       if ( r_val > 0 && r_val <= r_thresh )
       {

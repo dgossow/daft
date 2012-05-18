@@ -6,13 +6,11 @@ function [ x_smooth, y_smooth ] = smooth_data( X, Y, gauss_sigma )
 
  A=sortrows([X',Y']);
  
- min_x = min(X)
- max_x = max(X)
+ min_x = min(X);
+ max_x = max(X);
  
- num_values = size(X,2)
- 
- gauss_sigma = (max_x - min_x) / num_values * 2;
- %gauss_sigma = (max_x - min_x) / 4;
+ num_values = size(X,2);
+ gauss_sigma = (max_x - min_x) / 10;%num_values;% * 1.5;
  
  num_bins = 100;
  buffer_width = (max_x-min_x) * (num_bins+1)/num_bins;

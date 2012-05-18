@@ -8,6 +8,7 @@
 
 #include "rgbd_evaluator/extract_keypoints.h"
 
+daft_ns::DAFT daft1 = daft_ns::DAFT();
 
 std::vector<cv::KeyPoint3D> makeKp3d(std::vector<cv::KeyPoint> kp) {
   std::vector<cv::KeyPoint3D> kp_3d;
@@ -232,6 +233,7 @@ void getOrbKp(
 }
 #endif // USE_ORB
 
+
 void getDaftKp(
     daft_ns::DAFT::DetectorParams p_det,
     daft_ns::DAFT::DescriptorParams p_desc,
@@ -245,8 +247,11 @@ void getDaftKp(
 {
   p_det.det_threshold_ *= t;
 
-  daft_ns::DAFT daft1( p_det, p_desc );
+  //daft_ns::DAFT daft1( p_det, p_desc );
+  daft1 = daft_ns::DAFT( p_det, p_desc );
   daft1( gray_img, mask_img, depth_img, K, keypoints, descriptors );
+
+  std::cout << "......................." << daft1.response_maps.size() << std::endl;
 
   /*
    p_det.base_scale_ *= sqrt(2);

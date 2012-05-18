@@ -35,7 +35,7 @@ function [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,fil
 %d1 d2 d3 ... - descriptor invariants
 %if descriptor_size<=1 the descriptor is ignored
 
-show_keypoints = 0
+show_keypoints = 0;
 
 fprintf(1,'Reading and sorting the regions...\n');
 
@@ -117,8 +117,10 @@ im2x=im2x(2);
 %min([scales1;scales2])
 %pause(2);
 
+min_scale = 4;
+
 %.. scales1'>9 & ..
-%ind=find(scales1t'>6 & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+%ind=find(scales1>min_scale & scales1t'>min_scale & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
@@ -133,7 +135,7 @@ feat1t=feat1t(ind,:);
 
 %scales1=scales1(ind);
 
-%ind=find(scales2t'>6 & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
+%ind=find(scales2>min_scale & scales2t'>min_scale & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);

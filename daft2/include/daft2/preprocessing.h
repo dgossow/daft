@@ -14,6 +14,76 @@ namespace cv
 namespace daft2
 {
 
+inline float getMeanDx( const cv::Mat1f &depth_map, int y, int x1, int x2 )
+{
+  x1 = std::min( std::max( 0, x1 ), depth_map.cols-1 );
+  x2 = std::min( std::max( 0, x2 ), depth_map.cols-1 );
+
+  float dx_sum=0;
+  float dx_num=0;
+
+  for ( int x = x1; x<x2; x++ )
+  {
+    if ( !isnan( depth_map(y,x) ) && !isnan( depth_map(y,x+1) ) )
+    {
+      dx_sum += depth_map(y,x+1) - depth_map(y,x);
+      dx_num++;
+    }
+  }
+  return dx_sum / dx_num;
+}
+
+template< int MaxGapSize >
+void closeGapsX( cv::Mat1f &depth_map_out, cv::Mat1f &inter_x, cv::Mat1i &inter_x_dist )
+{
+  for ( int y=0; y<depth_map_out.rows; y++ )
+  {
+    int x_right=0;
+    int gap_size = 0;
+
+    for ( ; x_right<depth_map_out.cols; x_right++ )
+    {
+      if ( x_right<depth_map_out.cols-1 && isnan( depth_map_out[y][x_right] ) )
+      {
+        gap_size++;
+        inter_x[y][x_right] = std::numeric_limits<float>::quiet_NaN();
+        inter_x_dist[y][x_right] = 1;
+      }
+      else
+      {
+        int x_left = x_right-gap_size-1;
+
+        float left_val = depth_map_out[y][x_left];
+        float right_val = depth_map_out[y][x_right];
+
+        const int delta_offs = 30;
+
+        if ( isnan(right_val) || left_val > right_val )
+        {
+          float dx = getMeanDx( depth_map_out, y, x_left-delta_offs, x_left );
+
+          for ( int delta = 1; delta<=gap_size && delta <= MaxGapSize; delta++ )
+          {
+            inter_x[y][x_left + delta] = left_val + delta * dx;
+            inter_x_dist[y][x_left + delta] = delta;
+          }
+        }
+        else if ( isnan(left_val) || left_val <= right_val )
+        {
+          float dx = getMeanDx( depth_map_out, y, x_right, x_right+delta_offs);
+
+          for ( int delta = 1; delta<=gap_size && delta <= MaxGapSize; delta++ )
+          {
+            inter_x[y][x_right - delta] = right_val - delta * dx;
+            inter_x_dist[y][x_right - delta] = delta;
+          }
+        }
+        gap_size = 0;
+      }
+    }
+  }
+}
+
 template< int MaxGapSize >
 void closeGaps( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, float max_depth_delta )
 {
@@ -27,103 +97,18 @@ void closeGaps( const cv::Mat &depth_map_in, cv::Mat1f &depth_map_out, float max
   }
 
   cv::Mat1f inter_x(depth_map_in.rows, depth_map_in.cols);
-  cv::Mat1f inter_y(depth_map_in.rows, depth_map_in.cols);
-
   cv::Mat1i inter_x_dist(depth_map_in.rows, depth_map_in.cols);
-  cv::Mat1i inter_y_dist(depth_map_in.rows, depth_map_in.cols);
 
-  for ( int y=0; y<depth_map_out.rows; y++ )
-  {
-    int x=0;
-    while( x<depth_map_out.cols && isnan(depth_map_out[y][x]))
-    {
-      inter_x[y][x] = std::numeric_limits<float>::quiet_NaN();
-      x++;
-    }
+  closeGapsX<MaxGapSize>( depth_map_out, inter_x, inter_x_dist );
 
-    int gap_size = 0;
+  cv::Mat1f inter_y(depth_map_in.cols, depth_map_in.rows);
+  cv::Mat1i inter_y_dist(depth_map_in.cols, depth_map_in.rows);
 
-    for ( ; x<depth_map_out.cols; x++ )
-    {
-      if ( isnan( depth_map_out[y][x] ) )
-      {
-        gap_size++;
-        inter_x[y][x] = std::numeric_limits<float>::quiet_NaN();
-        inter_x_dist[y][x] = 1;
-      }
-      else
-      {
-        //inter_y[y][x] = std::numeric_limits<float>::quiet_NaN();
-        if ( gap_size < MaxGapSize )
-        {
-          int x_left = x-gap_size-1;
+  cv::Mat1f depth_map_out_t = depth_map_out.t();
+  closeGapsX<MaxGapSize>( depth_map_out_t, inter_y, inter_y_dist );
 
-          float left_val = depth_map_out[y][x_left];
-          float right_val = depth_map_out[y][x];
-
-          float depth_delta = std::abs(left_val - right_val) / ( left_val + right_val );
-
-          if (depth_delta < max_depth_delta )
-          {
-
-            for ( int delta = 1; delta<=gap_size; delta++ )
-            {
-              float t = float(delta) / float(gap_size+2);
-              inter_x[y][x_left + delta] = (1.0-t) * left_val + t * right_val;
-              inter_x_dist[y][x] = gap_size;
-            }
-          }
-        }
-        gap_size = 0;
-      }
-    }
-  }
-
-  for ( int x=0; x<depth_map_out.cols; x++ )
-  {
-    int y=0;
-    while( y<depth_map_out.rows && isnan(depth_map_out[y][x]) )
-    {
-      inter_y[y][x] = std::numeric_limits<float>::quiet_NaN();
-      inter_y_dist[y][x] = 1;
-      y++;
-    }
-
-    int gap_size = 0;
-
-    for ( ; y<depth_map_out.rows; y++ )
-    {
-      if ( isnan( depth_map_out[y][x] ) )
-      {
-        gap_size++;
-        inter_y[y][x] = std::numeric_limits<float>::quiet_NaN();
-      }
-      else
-      {
-        //inter_y[y][x] = std::numeric_limits<float>::quiet_NaN();
-        if ( gap_size < MaxGapSize )
-        {
-          int y_top = y-gap_size-1;
-
-          float top_val = depth_map_out[y_top][x];
-          float bottom_val = depth_map_out[y][x];
-
-          float depth_delta = std::abs(top_val - bottom_val) / ( top_val + bottom_val );
-
-          if (depth_delta < max_depth_delta )
-          {
-            for ( int delta = 1; delta<=gap_size; delta++ )
-            {
-              float t = float(delta) / float(gap_size+2);
-              inter_y[y_top + delta][x] = (1.0-t) * top_val + t * bottom_val;
-              inter_y_dist[y][x] = gap_size;
-            }
-          }
-        }
-        gap_size = 0;
-      }
-    }
-  }
+  inter_y = inter_y.t();
+  inter_y_dist = inter_y_dist.t();
 
   for ( int y=0; y<depth_map_out.rows; y++ )
   {

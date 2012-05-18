@@ -28,6 +28,7 @@ boost::timer t;
 //
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
+//#define SHOW_MASK
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_START t.restart();
@@ -46,14 +47,14 @@ DAFT::~DAFT() {
 void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
 {
-  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)1 );
+  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)255 );
   computeImpl(image,mask,depth_map_orig,K,kp,desc,true);
 }
 
 void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp )
 {
-  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)1 );
+  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)255 );
   cv::Mat1f desc;
   computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
 }
@@ -73,7 +74,8 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
 }
 
-void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
+void DAFT::computeImpl( const cv::Mat &image,
+    const cv::Mat1b &mask_orig,
     const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc,
     bool computeDescriptors )
@@ -82,7 +84,6 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
 
   kp.clear();
   desc = cv::Mat1f();
-
 
   TIMER_START
 
@@ -94,7 +95,10 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
   Mat gray_image;
   Mat1d ii;
   Mat1f depth_map;
-  prepareData( image, depth_map_orig, gray_image, ii, depth_map );
+  Mat1f depth_map_raw;
+  cv::Mat1b mask = mask_orig.clone();
+
+  prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask );
 
   // Initialize parameters
   int n_octaves = det_params_.scale_levels_;
@@ -111,6 +115,7 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
   Mat1f::iterator scale_it = scale_map.begin();
   Mat1f::iterator scale_map_end = scale_map.end();
   Mat1f::iterator depth_it = depth_map.begin();
+  Mat1b::const_iterator mask_it = mask.begin();
 
   int min_octave = 0;
 
@@ -120,16 +125,20 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
     float min_scale_fac = std::numeric_limits<float>::infinity();
     float max_scale_fac = 0;
 
-    for (; scale_it != scale_map_end; ++scale_it, ++depth_it)
+    for (; scale_it != scale_map_end; ++scale_it, ++depth_it, ++mask_it )
     {
-      if ( finite(*depth_it) && *depth_it > 0 )
+      if ( *mask_it != 0 && finite(*depth_it) && *depth_it > 0.4 )
       {
         float s = f / *depth_it;
         *scale_it = s;
         if (s > max_scale_fac)
+        {
           max_scale_fac = s;
+        }
         if (s < min_scale_fac)
+        {
           min_scale_fac = s;
+        }
       } else {
         *scale_it = std::numeric_limits<float>::quiet_NaN();
       }
@@ -141,8 +150,8 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
       return;
     }
 
-    //DBG_OUT( "min_scale_fac" << min_scale_fac );
-    //DBG_OUT( "max_scale_fac" << max_scale_fac );
+    DBG_OUT( "min_scale_fac" << min_scale_fac );
+    DBG_OUT( "max_scale_fac" << max_scale_fac );
 
     double delta_n_min = det_params_.min_px_scale_
         / (max_scale_fac * det_params_.base_scale_);
@@ -180,7 +189,7 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
 
   TIMER_STOP
 
-  std::map< int, Mat1f > smoothed_imgs;
+  //std::map< int, Mat1f > smoothed_imgs;
   std::map< int, Mat1f> smoothed_depth_maps;
   std::map< int, Mat3f > affine_maps; // entries are (major_len, minor_len, major_x, major_y)
 
@@ -238,7 +247,7 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
   }
   TIMER_STOP
 
-  std::map< int, Mat1f > response_maps;
+  //std::map< int, Mat1f > response_maps;
 
   DBG_OUT( "Computing response & finding max" );
 
@@ -307,6 +316,10 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
       for ( unsigned k=old_kp_size; k<kp.size(); k++ )
       {
         cv::KeyPoint3D kp_curr = kp[k];
+        kp2.push_back(kp_curr);
+
+        kp_curr.aff_major *= 0.5;
+        kp_curr.aff_minor *= 0.5;
         kp2.push_back(kp_curr);
 
         kp_curr.aff_major = 1.5;
@@ -380,6 +393,7 @@ void DAFT::computeImpl( const cv::Mat &image, const cv::Mat1b &mask,
     if ( mask( kp[k].pt.y, kp[k].pt.x ) != 0 &&
          kp[k].size > min_size )
     {
+      kp[k].aff_minor = affine_params[0] * kp[k].aff_major;
       kp[k].aff_angle = atan2( affine_params[2], affine_params[1] );
 
       // compute exact normal using pca
@@ -514,7 +528,7 @@ void DAFT::computeAffineMaps(
   }
   else
   {
-    float win_size = 10.0;
+    float win_size = 15.0;
     Mat1f smoothed_depth_map;
 
     Mat1f fake_scale_map( scale_map.rows, scale_map.cols, 1.0f );
@@ -530,6 +544,7 @@ void DAFT::computeAffineMaps(
       affine_maps[octave] = affine_map;
     }
 
+//#if 1
 #ifdef SHOW_DEBUG_WIN
     {
     std::stringstream s;
@@ -551,7 +566,7 @@ void DAFT::computeAffineMaps(
 
 
 bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
-    Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map )
+    Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map, cv::Mat1b& mask )
 {
   gray_image = image;
 
@@ -590,23 +605,41 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   if (depth_map_orig.type() == CV_16U) {
     depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
   } else if (depth_map_orig.type() == CV_32F) {
-    depth_map = depth_map_orig;
+    depth_map= depth_map_orig;
   }
   else
   {
     return false;
   }
 
-  cv::Mat old_depth_map = depth_map;
+#ifdef SHOW_MASK
+  imshow( "mask", mask*255 );
+#endif
 
-  closeGaps<100>( old_depth_map, depth_map, 0.5 );
+  for ( int y=0; y<depth_map.rows; y++ )
+  {
+    for ( int x=0; x<depth_map.cols; x++ )
+    {
+      if ( isnan(depth_map(y,x)) || depth_map(y,x) < 0.4 )
+      {
+        mask(y,x) = 0;
+      }
+    }
+  }
 
-  /*
+#ifdef SHOW_MASK
+  imshow( "mask new", mask*255 );
+#endif
+
 #ifdef SHOW_DEBUG_WIN
-  imshow( "old_depth_map", old_depth_map );
   imshow( "depth_map", depth_map );
 #endif
-*/
+
+  closeGaps<50>( depth_map, depth_map, 0.5 );
+
+#ifdef SHOW_DEBUG_WIN
+  imshow( "depth_map closed", depth_map );
+#endif
 
   return true;
 }

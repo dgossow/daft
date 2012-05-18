@@ -104,10 +104,11 @@ public:
     /** default constructor */
     DescriptorParams(
         int patch_size=20,
-        int octave_offset=0 ) :
+        int octave_offset=0,
+        float z_thickness=0.3 ) :
           patch_size_(patch_size),
           octave_offset_(octave_offset),
-          z_thickness_(0.1)
+          z_thickness_(z_thickness)
     {
     }
 
@@ -162,7 +163,7 @@ private:
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc, bool computeDescriptors );
 
   bool prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
-      Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map );
+      Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map, cv::Mat1b& mask );
 
   void computeAffineMaps(
       std::set<int>& octaves,
@@ -175,6 +176,10 @@ private:
   /** Parameters tuning RgbdFeatures */
   DetectorParams det_params_;
   DescriptorParams desc_params_;
+
+public:
+  std::map< int, Mat1f > smoothed_imgs;
+  std::map< int, Mat1f > response_maps;
 };
 
 }

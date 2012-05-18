@@ -30,6 +30,8 @@ typedef boost::function< void (
     std::vector<cv::KeyPoint3D>& keypoints,
     cv::Mat1f& descriptors ) > GetKpFunc;
 
+extern daft_ns::DAFT daft1;
+
 void getDaftKp(
     daft_ns::DAFT::DetectorParams p_det,
     daft_ns::DAFT::DescriptorParams p_desc,

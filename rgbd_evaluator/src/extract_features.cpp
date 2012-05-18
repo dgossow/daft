@@ -96,7 +96,7 @@ void ExtractDetectorFile::readDataFiles() {
 
   for ( int y=0; y<mask_tmp.rows; y++ )
   {
-    for ( int x=0; x<mask_tmp.rows; x++ )
+    for ( int x=0; x<mask_tmp.cols; x++ )
     {
       if ( mask_tmp.at<cv::Vec3b>(y,x)[0] > 128 )
       {
@@ -435,6 +435,8 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
 
     if (first_image) {
       getKp(gray_img, mask_img_, depth_img, K_, t, kp, desc );
+      std::cout << "......................." << daft1.response_maps.size() << std::endl;
+
       std::cout << name << " " << s.str() << " #filtered kp = " << kp.size() << std::endl;
 
       first_image = false;
@@ -442,6 +444,15 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
       cv::drawKeypoints3D(rgb_img, kp, first_kp_img, cv::Scalar(0, 0, 255),
           cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
       storeKeypoints(kp, desc, s.str(), name, rgb_img, rgb_img);
+
+      if ( daft1.response_maps.size() > 0 )
+      {
+        cv::Mat resp;
+        cv::drawKeypoints3D(daft1.response_maps.begin()->second * 2.0 + 0.5, kp, resp, cv::Scalar(0, 0, 255),
+            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::imshow( "daft1.response_maps[0]", resp );
+        cv::imshow( "daft1.smoothed_imgs[0]", daft1.smoothed_imgs.begin()->second );
+      }
     } else {
       cv::Mat1b fake_mask( (int)gray_img.rows, (int)gray_img.cols, (cv::Mat1b::value_type)1 );
       getKp(gray_img, fake_mask, depth_img, K_, t, kp, desc );
@@ -451,6 +462,16 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
       cv::warpPerspective(first_kp_img, first_kp_img_warped, cv::Mat(it->hom),
           cv::Size(rgb_img.cols, rgb_img.rows));
 
+      if ( daft1.response_maps.size() > 0 )
+      {
+        cv::Mat resp_warped,smooth_warped;
+        cv::warpPerspective(daft1.response_maps.begin()->second, resp_warped, cv::Mat(it->hom.inv()),
+            cv::Size(rgb_img.cols, rgb_img.rows));
+        cv::warpPerspective(daft1.smoothed_imgs.begin()->second, smooth_warped, cv::Mat(it->hom.inv()),
+            cv::Size(rgb_img.cols, rgb_img.rows));
+        cv::imshow( "daft1.response_maps[0] warped", resp_warped*2+0.5 );
+        cv::imshow( "daft1.smoothed_imgs[0] warped", smooth_warped );
+      }
 
       storeKeypoints(kp, desc, s.str(), name, rgb_img, first_kp_img_warped);
     }
@@ -471,9 +492,10 @@ void ExtractDetectorFile::extractAllKeypoints()
   //det_p.min_px_scale_ = 1.5;
   det_p.base_scale_ = 0.025;
   det_p.scale_levels_ = 1;
-  det_p.det_threshold_ = 0.0;
+  //det_p.max_princ_curv_ratio_ = 0.0;
+  //det_p.det_threshold_ = 0.0;
   //det_p.pf_threshold_ = 5;
-  desc_p.z_thickness_ = 0.3;
+  //desc_p.z_thickness_ = 0.3;
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
@@ -482,7 +504,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 3.14 );
 
   det_p.affine_=false;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4, _5, _6, _7 ), "DAFT Non-Affine", 3.14 );
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4, _5, _6, _7 ), "DAFT Non-Affine", 3.14 );
 
   //det_p.det_type_=det_p.DET_BOX;
   //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4 ), "DAFT Box" );

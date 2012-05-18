@@ -5,7 +5,7 @@ function smooth_plot( gauss_sigma, X, Y, varargin )
 
   [ x_smooth, y_smooth ] = smooth_data( X, Y, gauss_sigma );
   plot( x_smooth, y_smooth, varargin{:} );
-  h=plot( X, Y, varargin{:}, 'LineStyle', 'none', 'Marker','+' );
+  h=plot( X, Y, varargin{:}, 'LineStyle', 'none', 'Marker','+', 'LineWidth', 2 );
   hasbehavior(h,'legend',false);
 
 end

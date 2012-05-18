@@ -1,11 +1,10 @@
-function matrepeat = repeatability_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
+function [ matrepeat matcorresp ] = repeatability_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
 
 data_path = [base_path dataset_name '/'];
 graph_path = [data_path 'results/'];
 
 fprintf(1,'Data path: %s\n', data_path);
 fprintf(1,'Graph path: %s\n', graph_path);
-
 
 mkdir(data_path);
 mkdir(graph_path);
@@ -15,7 +14,6 @@ mark=get_marks();
 num_det = size(det_suffix,1);
 [ x_label x_label_full x_unit x_vals ] = get_vals( data_path, x_val_file );
 num_img = size( x_vals, 2 ) + 1;
-
 
 setup_figure(1);
 ylabel('repeatability')
@@ -35,6 +33,7 @@ set(gca,'YTick',[0.0 0.2 0.4 0.6 0.8 1.0]);
 hold on;
 
 matrepeat=[];
+matcorresp=[];
 
 for d=1:num_det
     
@@ -59,17 +58,18 @@ for d=1:num_det
         %return;
     end
     
-    sfigure(1);  smooth_plot(3,x_vals,seqrepeat*0.01,mark{d},'LineWidth',4);
-    sfigure(2);  smooth_plot(3,x_vals,seqcorresp,mark{d},'LineWidth',4);
-    sfigure(3);  smooth_plot(3,x_vals,seqmatchscore*0.01,mark{d},'LineWidth',4);
+    sfigure(1);  smooth_plot(5,x_vals,seqrepeat*0.01,mark{d},'LineWidth',4);
+    sfigure(2);  smooth_plot(5,x_vals,seqcorresp,mark{d},'LineWidth',4);
+    sfigure(3);  smooth_plot(5,x_vals,seqmatchscore*0.01,mark{d},'LineWidth',4);
     
     matrepeat=[matrepeat; seqrepeat];
+    matcorresp=[matcorresp; seqcorresp];
 
 end
 
 for f=1:3
     sfigure(f);
-    setup_axes( x_vals, num_img, [0 1] );
+    setup_axes( x_vals, [0 1] );
 end
 
 sfigure(2);

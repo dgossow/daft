@@ -288,7 +288,7 @@ bool computeDesc( const vector<PtInfo>& ptInfos, cv::Mat1f& desc, bool show_win 
       // disallow 4 central bins to be empty
       if ( !entries[j][i].normalize() )// && i>=1 && i<=2 && j>=1 && j<=2 )
       {
-        //return false;
+        return false;
       }
 
       desc(idx++) = entries[j][i].sum_dx;
