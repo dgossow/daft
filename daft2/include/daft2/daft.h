@@ -25,7 +25,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_FELINE=0 };
+    enum { DET_FELINE=0, DET_GAUSS9x9=1 };
     enum { MAX_WINDOW=0, MAX_FAST=2 };
 
     enum { AUTO=-1 };

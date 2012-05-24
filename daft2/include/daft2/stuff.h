@@ -172,8 +172,8 @@ inline T integrate( const Mat_<T> &ii, int start_x, int start_y, int end_x, int 
 // Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
 // using the given integral image
 // + Use bilinear interpolation for real-valued coords
-template<typename T>
-inline T integrateBilinear( const Mat_<T> &ii, float start_x, float start_y, float end_x, float end_y )
+//template<typename T>
+inline float integrateRounded( const Mat1d &ii, float start_x, float start_y, float end_x, float end_y )
 {
   assert( start_x>=0 );
   assert( end_x>start_x );
@@ -181,12 +181,30 @@ inline T integrateBilinear( const Mat_<T> &ii, float start_x, float start_y, flo
   assert( start_y>=0 );
   assert( end_y>start_y );
   assert( end_y<ii.rows );
-  //return ii(start_y,start_x) + ii(end_y,end_x) - ii(end_y,start_x) - ii(start_y,end_x);
-  const T v1 = interpBilinear(ii,start_x,start_y);
+  return
+      ( ii(start_y+0.5,start_x+0.5) + ii(end_y+0.5,end_x+0.5) - ii(end_y+0.5,start_x+0.5) - ii(start_y+0.5,end_x+0.5) )
+      / double( (int(end_y+0.5)-int(start_y+0.5) ) * (int(end_x+0.5)-int(start_x+0.5) ) );
+}
+
+inline float integrateBilinear( const Mat1d &ii, float start_x, float start_y, float end_x, float end_y )
+{
+  assert( start_x>=0 );
+  assert( end_x>start_x );
+  assert( end_x<ii.cols );
+  assert( start_y>=0 );
+  assert( end_y>start_y );
+  assert( end_y<ii.rows );
+  return
+      ( ii(start_y+0.5,start_x+0.5) + ii(end_y+0.5,end_x+0.5) - ii(end_y+0.5,start_x+0.5) - ii(start_y+0.5,end_x+0.5) )
+      / double( (int(end_y+0.5)-int(start_y+0.5) ) * (int(end_x+0.5)-int(start_x+0.5) ) );
+
+  /*
+  const double v1 = interpBilinear(ii,start_x,start_y);
   const T v2 = interpBilinear(ii,end_x,end_y);
   const T v3 = - interpBilinear(ii,start_x,end_y);
   const T v4 = - interpBilinear(ii,end_x,start_y);
   return v1+v2+v3+v4;
+  */
 }
 
 /** Gets integration value of NxN cells of size step x step in a grid starting with point (start_x,start_y)*/

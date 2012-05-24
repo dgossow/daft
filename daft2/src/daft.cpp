@@ -26,9 +26,10 @@ boost::timer t;
 
 //DEBUG FLAGS (To be removed) ----
 //
-//#define SHOW_DEBUG_WIN
+#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 //#define SHOW_MASK
+#define SHOW_RESPONSE
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_START t.restart();
@@ -216,6 +217,14 @@ void DAFT::computeImpl( const cv::Mat &image,
         convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
+    case DetectorParams:: DET_GAUSS9x9:
+      if (det_params_.affine_) {
+        convolveAffine<gaussAffine>(ii, scale_map, affine_map, scale, 1, smoothed_img );
+      } else {
+        //convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
+        return;
+      }
+      break;
     default:
       DBG_OUT( "error: invalid detector type: " << det_params_.det_type_ );
       return;
@@ -306,11 +315,11 @@ void DAFT::computeImpl( const cv::Mat &image,
     princCurvFilter( response_map, scale_map, affine_map, det_params_.max_princ_curv_ratio_, kp_init, kp );
     DBG_OUT( "octave " << octave << " scale " << scale << ": " << kp.size()-old_kp_size << " keypoints left after principal curvature filter." );
 
-#ifdef SHOW_DEBUG_WIN
+#ifdef SHOW_RESPONSE
     {
       static int i=0;
       cv::Mat display_image;
-      response_map.convertTo( display_image, CV_8UC1, 255, 128 );
+      response_map.convertTo( display_image, CV_8UC1, 512, 128 );
 
       std::vector<KeyPoint3D> kp2;
       for ( unsigned k=old_kp_size; k<kp.size(); k++ )
@@ -318,6 +327,7 @@ void DAFT::computeImpl( const cv::Mat &image,
         cv::KeyPoint3D kp_curr = kp[k];
         kp2.push_back(kp_curr);
 
+        /*
         kp_curr.aff_major *= 0.5;
         kp_curr.aff_minor *= 0.5;
         kp2.push_back(kp_curr);
@@ -325,6 +335,7 @@ void DAFT::computeImpl( const cv::Mat &image,
         kp_curr.aff_major = 1.5;
         kp_curr.aff_minor = 1.5;
         kp2.push_back(kp_curr);
+        */
       }
 
       cv::drawKeypoints3D( display_image, kp_init, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
@@ -336,7 +347,7 @@ void DAFT::computeImpl( const cv::Mat &image,
 
       s.str("");
       s << "Response - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
-      imshow( s.str(), cv::Mat( display_image * (1.0f/0.73469f) ) );
+      imshow( s.str(), cv::Mat( display_image ) );
 
       /*
        cv::imshow( "dep orig", depth_map_orig );

@@ -160,10 +160,10 @@ void convolveAffine( const Mat1d &ii,
   {
     for ( int x = 0; x < ii.cols-1; ++x )
     {
-      const float& major_len = base_scale * scale_map[y][x];
-      const float& minor_len = major_len * affine_map[y][x][0];
-      const float& major_x = affine_map[y][x][1];
-      const float& major_y = affine_map[y][x][2];
+      const float major_len = base_scale * scale_map[y][x];
+      const float minor_len = major_len * affine_map[y][x][0];
+      const float major_x = affine_map[y][x][1];
+      const float major_y = affine_map[y][x][2];
 
       if ( isnan( minor_len ) || minor_len < min_px_scale )
       {

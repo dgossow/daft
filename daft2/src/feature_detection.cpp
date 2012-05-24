@@ -119,10 +119,10 @@ void findExtremaAffine(
       }
 
       // get ellipse parameters
-      const float& major_len = base_scale * scale_map[y][x];
-      const float& minor_len = major_len * affine_map[y][x][0];
-      const float& major_x = affine_map[y][x][1];
-      const float& major_y = affine_map[y][x][2];
+      const float major_len = base_scale * scale_map[y][x];
+      const float minor_len = major_len * affine_map[y][x][0];
+      const float major_x = affine_map[y][x][1];
+      const float major_y = affine_map[y][x][2];
 
       if ( isnan(major_len) ||
            major_len*minor_len < min_px_scale_sqr ||
@@ -155,8 +155,6 @@ void findExtremaAffine(
       int window = major_len*min_dist;
       if ( window < 1 ) window = 1;
 
-      float cos_angle = cos(angle);
-
       bool is_extremum = true;
       for ( int v = 0; is_extremum && v <= window; v++ )
       {
@@ -180,7 +178,7 @@ void findExtremaAffine(
 
       if(is_extremum) {
         // is a maximum -> add keypoint
-        kp.push_back( KeyPoint3D( x, y, base_scale*4.0, major_len*4.0, minor_len*4.0, atan2(major_y,major_x), -1, val ) );
+        kp.push_back( KeyPoint3D( x, y, base_scale*4.0, major_len*4.0, minor_len*4.0, angle, -1, val ) );
       }
     }
   }
@@ -451,23 +449,26 @@ void princCurvFilter(
     return;
   }
 
-  float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
+  //cv::Mat display_image;
+  //response.convertTo( display_image, CV_8UC1, 512, 128 );
+  //cv::drawKeypoints3D( display_image, kp_in, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
+  float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
   //std::cout << "r_thresh=" << r_thresh << std::endl;
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
   {
     const int x = kp_in[k].pt.x;
     const int y = kp_in[k].pt.y;
-    const float major_len = kp_in[k].aff_major * 0.25;
-    const float minor_len = kp_in[k].aff_minor * 0.25;
+    const float major_len = kp_in[k].world_size * 0.25 * scale_map[y][x];
+    const float minor_len = affine_map[y][x][0] * major_len;
 
     if (checkBounds( response, x, y, major_len ))
     {
-      const float major_x1 = -sin(kp_in[k].aff_angle);
-      const float major_y1 = cos(kp_in[k].aff_angle);
+      const float major_x1 = affine_map[y][x][1];
+      const float major_y1 = affine_map[y][x][2];
 
-      float r_val = princCurvRatio( response, x, y, major_len, minor_len, major_x1, major_y1 );
+      float r_val = princCurvRatio( response, x, y, major_len, minor_len, major_x1, major_y1 );//, display_image );
 
       if ( r_val > 0 && r_val <= r_thresh )
       {
@@ -475,6 +476,8 @@ void princCurvFilter(
       }
     }
   }
+
+  //cv::imshow( "princ_curv", display_image );
 }
 
 

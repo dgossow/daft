@@ -273,7 +273,7 @@ private:
 };
 
 
-static Kernel2DCache sGaussianKernelCache = Kernel2DCache::Create<detail::Gaussian2, false, 1>(1.2f, "Gaussian2");
+static Kernel2DCache sGaussianKernelCache = Kernel2DCache::Create<detail::Gaussian2, false, 1>(2.4f, "Gaussian2");
 static Kernel2DCache sLaplaceKernelCache = Kernel2DCache::Create<detail::LoG2, false, 1>(1.2f, "LoG2");
 static Kernel2DCache sDxxKernelCache = Kernel2DCache::Create<detail::DxxKernel, false, 1>(1.2f, "DxxKernel");
 static Kernel2DCache sDyyKernelCache = Kernel2DCache::Create<detail::DyyKernel, false, 1>(1.2f, "DyyKernel");
