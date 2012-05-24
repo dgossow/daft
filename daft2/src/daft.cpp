@@ -26,10 +26,10 @@ boost::timer t;
 
 //DEBUG FLAGS (To be removed) ----
 //
-#define SHOW_DEBUG_WIN
+//#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 //#define SHOW_MASK
-#define SHOW_RESPONSE
+//#define SHOW_RESPONSE
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_START t.restart();
