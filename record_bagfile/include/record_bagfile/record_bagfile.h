@@ -33,9 +33,14 @@ public:
     void recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img,
                          const sensor_msgs::Image::ConstPtr depth_img,
                          const sensor_msgs::CameraInfo::ConstPtr cam_info);
+
+    static void mouseCb( int event, int x, int y, int flags, void* param );
+
 private:
 
     rosbag::Bag bag_;
+
+    std::string win_name_;
 
     ros::NodeHandle comm_nh_;
     NodeHandle param_nh_;
@@ -55,4 +60,6 @@ private:
     bool subscribed_;
 
     bool valid_;
+
+    int cx_,cy_;
 };

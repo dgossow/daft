@@ -21,12 +21,47 @@ RecordBagfile::RecordBagfile(std::string bagfile_name, ros::NodeHandle comm_nh, 
   bag_.open(bagfile_name, rosbag::bagmode::Write);
 
   rgbd_sync_.registerCallback( boost::bind( &RecordBagfile::recordBagfileCB, this, _1, _2 , _3 ) );
+
+  win_name_ = "Click to select measurement point / Press q to quit";
+  // Set up the callback for choosing polygon
+  cv::namedWindow(win_name_);
+  cv::setMouseCallback( win_name_, mouseCb, this);
+
+  cx_ = 0;
+  cy_ = 0;
+
 }
 
 RecordBagfile::~RecordBagfile()
 {
   std::cout << "Finishing bagfile.." << std::endl;
   bag_.close();
+}
+
+void RecordBagfile::mouseCb( int event, int x, int y, int flags, void* param )
+{
+  RecordBagfile* this_ = static_cast<RecordBagfile*>( param );
+
+  if ( !this_ )
+  {
+    return;
+  }
+
+  switch( event )
+  {
+    case  CV_EVENT_LBUTTONDOWN:
+      this_->cx_ = x;
+      this_->cy_ = y;
+      break;
+
+    case  CV_EVENT_RBUTTONDOWN:
+      this_->cx_ = 0;
+      this_->cy_ = 0;
+      break;
+
+    default:
+      break;
+  }
 }
 
 void RecordBagfile::subscribe()
@@ -164,22 +199,28 @@ void RecordBagfile::recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img_m
 
   const int w = 40;
 
+  if ( cx_ == 0 )
+  {
+    cx_ = depth_img.cols/2;
+    cy_ = depth_img.rows/2;
+  }
+
   cv::line( bgr_img,
-      cv::Point2f(depth_img.cols/2-w,depth_img.rows/2),
-      cv::Point2f(depth_img.cols/2+w,depth_img.rows/2),
+      cv::Point2f(cx_-w,cy_),
+      cv::Point2f(cx_+w,cy_),
       cv::Scalar(0,255,0),
       3 );
   cv::line( bgr_img,
-      cv::Point2f(depth_img.cols/2,depth_img.rows/2-w),
-      cv::Point2f(depth_img.cols/2,depth_img.rows/2+w),
+      cv::Point2f(cx_,cy_-w),
+      cv::Point2f(cx_,cy_+w),
       cv::Scalar(0,255,0),
       3 );
 
   std::vector<cv::Point2f> img_pos;
-  img_pos.push_back( cv::Point2f(depth_img.cols/2+w,depth_img.rows/2-w) );
-  img_pos.push_back( cv::Point2f(depth_img.cols/2-w,depth_img.rows/2-w) );
-  img_pos.push_back( cv::Point2f(depth_img.cols/2-w,depth_img.rows/2+w) );
-  img_pos.push_back( cv::Point2f(depth_img.cols/2+w,depth_img.rows/2+w) );
+  img_pos.push_back( cv::Point2f(cx_+w,cy_-w) );
+  img_pos.push_back( cv::Point2f(cx_-w,cy_-w) );
+  img_pos.push_back( cv::Point2f(cx_-w,cy_+w) );
+  img_pos.push_back( cv::Point2f(cx_+w,cy_+w) );
   tf::StampedTransform transform;
   bool transform_valid = getTransform( depth_img, img_pos ,K, transform );
 
@@ -207,7 +248,7 @@ void RecordBagfile::recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img_m
     cv::putText( bgr_img, "Cannot determine transform.", cv::Point(10,40), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,255) );
   }
 
-  cv::imshow( "image", bgr_img );
+  cv::imshow( win_name_, bgr_img );
 
   int kb_input = cv::waitKey(100);
   //std::cout << kb_input << std::endl;
