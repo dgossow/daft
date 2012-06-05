@@ -30,7 +30,7 @@ struct KeyPoint3D: public cv::KeyPoint
         world_size(_world_size), aff_major(_affine_major), aff_minor(_affine_minor), aff_angle(_affine_angle) {}
 
   KeyPoint3D( const KeyPoint& kp ): KeyPoint( kp ),
-        world_size(0), aff_angle(0), aff_major(kp.size), aff_minor(kp.size) {}
+        world_size(0), aff_major(kp.size), aff_minor(kp.size), aff_angle(0) {}
 
   float world_size; //!< diameter (in meters) of the meaningful keypoint neighborhood
 
