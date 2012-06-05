@@ -38,14 +38,16 @@ class RgbdEvaluatorPreprocessing
 {
 public:
 
-  RgbdEvaluatorPreprocessing(std::string, bool reverse_order, int start_img);
+  RgbdEvaluatorPreprocessing(std::string, bool reverse_order, int start_img );
   virtual ~RgbdEvaluatorPreprocessing();
 
-  void createTestFiles();
-  void calculateHomography();
+  void readBag();
+  void estimateHomographies();
+  void recomputeImages();
 
-  std::vector<cv::Point2f> mouseKeypointsOrigin_;
-  std::vector<cv::Point2f> mouseKeypointsImageX_;
+  std::vector<cv::Point2f> mouse_kp_first_;
+  std::vector<cv::Point2f> mouse_kp_current_;
+  std::vector<cv::Point2f> opt_kp_last_;
   std::vector<cv::Point2f> mousePointsROI_;
 
   cv::Mat imageChooseROI_;
@@ -72,7 +74,6 @@ private:
 
   void writeMaskPointsToFile( std::vector<cv::Point2f> maskPoints );
 
-
   void writeDepth( cv::Mat& depth_img_orig, std::string count_str );
 
   void markMissingDepthInfo( cv::Mat& rgb_image, cv::Mat& depth_image );
@@ -93,7 +94,10 @@ private:
   static void imgMouseCallbackKP( int event, int x, int y, int flags, void* param );
   static void imgMouseCallbackROI( int event, int x, int y, int flags, void* param );
 
+  void writeImage( const cv::Mat& imgx, const cv::Mat& img1, cv::Matx33f homography_final,
+      std::string count_str  );
 
+  bool readMatrix(const std::string & fileName, cv::Matx33f& K);
 
   std::string file_path_;
   std::string file_name_;
@@ -119,12 +123,13 @@ private:
   static const uint32_t KP_NEIGHBOURHOOD_WINDOW = 35;
   static const uint32_t KP_TEXT_PIXEL_OFFSET = 10;
 
-  static const float_t  NCC_MAX_VAL = 0.98;
+  static const float_t  MIN_NCC_VAL = 0.98;
 
   struct ImageData
   {
     cv::Mat rgb_image;
     cv::Mat depth_image;
+    cv::Matx33f homography;
 
     bool isComplete()
     {
