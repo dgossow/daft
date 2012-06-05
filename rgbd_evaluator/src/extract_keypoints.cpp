@@ -247,11 +247,11 @@ void getDaftKp(
 {
   p_det.det_threshold_ *= t;
 
-  //daft_ns::DAFT daft1( p_det, p_desc );
+  //descriptors = cv::Mat1f( keypoints.size(), 64 );
+
+  daft_ns::DAFT daft1( p_det, p_desc );
   daft1 = daft_ns::DAFT( p_det, p_desc );
   daft1( gray_img, mask_img, depth_img, K, keypoints, descriptors );
-
-  std::cout << "......................." << daft1.response_maps.size() << std::endl;
 
   /*
    p_det.base_scale_ *= sqrt(2);
