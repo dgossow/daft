@@ -189,6 +189,12 @@ void RecordBagfile::recordBagfileCB(const sensor_msgs::Image::ConstPtr rgb_img_m
       {
         bgr_img(y,x) = cv::Vec3b( bgr_img(y,x)[1]*(((y+x)/2)%2), 0, 0 );
       }
+      if ( x%100 == 50 || y%100 == 50 )
+      {
+        bgr_img(y,x)[0] = bgr_img(y,x)[0]/2 + 127;
+        bgr_img(y,x)[1] = bgr_img(y,x)[1]/2 + 127;
+        bgr_img(y,x)[2] = bgr_img(y,x)[2]/2 + 127;
+      }
     }
   }
 
