@@ -24,7 +24,12 @@ function [ x_smooth, y_smooth ] = smooth_data( X, Y, gauss_sigma )
      x = A(i,1);
      y = A(i,2);
      x_bin = round((x - min_x) * buffer_res) + 1;
-     if ~isnan(x_bin) && ~isnan(y)
+     
+     if isnan(y)
+         y = 0;
+     end
+     
+     if ~isnan(x_bin)
          %if x_bin == 0
              %x_bin = 1
          %end

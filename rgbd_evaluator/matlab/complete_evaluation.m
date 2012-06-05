@@ -11,6 +11,7 @@ mkdir(graph_path);
 
 matrepeat = [];
 matcorresp = [];
+matf1scores = [];
 matxvals = [];
 
 for dataset_name = dataset_names
@@ -23,22 +24,29 @@ for dataset_name = dataset_names
     matrepeat = [ matrepeat r ];
     matcorresp = [ matcorresp c ];
     matxvals = [ matxvals x_vals ];
-    pause(3);
-    %descperf_evaluation( base_path, char(dataset_name), det_suffix, is_affine, x_val_file );
+    
+    f1 = descperf_evaluation( base_path, char(dataset_name), det_suffix, is_affine, x_val_file );
+    matf1scores = [ matf1scores f1 ];
     
 end
 
 % plot repeatability
 
 setup_figure(1);
-ylabel('repeatability')
 xlabel(x_label_full);
+ylabel('repeatability')
 set(gca,'YTick',[0.0 0.2 0.4 0.6 0.8 1.0]);
 hold on;
 
 setup_figure(2);
-ylabel('nb of correspondences')
 xlabel(x_label_full);
+ylabel('nb of correspondences')
+hold on;
+
+setup_figure(3);
+xlabel(x_label_full);
+ylabel('max f1 score');
+%set(gca,'YTick',[0.0 0.2 0.4 0.6 0.8 1.0]);
 hold on;
 
 mark=get_marks();
@@ -52,12 +60,9 @@ for d=1:num_det
     
     sfigure(2);
     smooth_plot(5,matxvals,matcorresp(d,:),mark{d},'LineWidth',4);
-    
-end
 
-for f=1:2
-    sfigure(f);
-    setup_axes( x_vals, [0 1] );
+    sfigure(3);
+    smooth_plot(3,matxvals,matf1scores(d,:),mark{d},'LineWidth',4);
 end
 
 sfigure(2);
@@ -66,6 +71,7 @@ pause(0.1);
 
 print(sfigure(1),'-dpdf',sprintf('%srepeatability.pdf',graph_path))
 print(sfigure(2),'-dpdf',sprintf('%snum_correspondences.pdf',graph_path))
+print(sfigure(3),'-dpdf',sprintf('%sf1score.pdf',graph_path))
 
 figure(1)
 legend(det_suffix,'Location','NorthOutside');

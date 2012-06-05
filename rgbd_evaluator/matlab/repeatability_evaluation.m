@@ -58,9 +58,9 @@ for d=1:num_det
         %return;
     end
     
-    sfigure(1);  smooth_plot(5,x_vals,seqrepeat*0.01,mark{d},'LineWidth',4);
-    sfigure(2);  smooth_plot(5,x_vals,seqcorresp,mark{d},'LineWidth',4);
-    sfigure(3);  smooth_plot(5,x_vals,seqmatchscore*0.01,mark{d},'LineWidth',4);
+    sfigure(1);  plot(x_vals,seqrepeat*0.01,mark{d},'LineWidth',4);
+    sfigure(2);  plot(x_vals,seqcorresp,mark{d},'LineWidth',4);
+    sfigure(3);  plot(x_vals,seqmatchscore*0.01,mark{d},'LineWidth',4);
     
     matrepeat=[matrepeat; seqrepeat];
     matcorresp=[matcorresp; seqcorresp];

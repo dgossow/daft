@@ -1,8 +1,8 @@
 function setup_axes( x_vals, y_range )
 
-num_xvals = size(x_vals,2);
+num_xvals = max(size(x_vals))
 
-%fprintf('x axis: %f %f\n', x_vals(1), x_vals(num_img-1));
+fprintf('x axis: %f %f\n', x_vals(1), x_vals(num_xvals));
 
 x1 = min(x_vals(1), x_vals(num_xvals));
 x2 = max(x_vals(1), x_vals(num_xvals));

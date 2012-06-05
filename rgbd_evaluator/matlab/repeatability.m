@@ -117,11 +117,11 @@ im2x=im2x(2);
 %min([scales1;scales2])
 %pause(2);
 
-min_scale = 4;
+min_scale = 5;
 
 %.. scales1'>9 & ..
-%ind=find(scales1>min_scale & scales1t'>min_scale & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
-ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+ind=find(scales1>min_scale & scales1t'>min_scale & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
+%ind=find((feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);
 feat1=feat1(ind,:);
 feat1t=feat1t(ind,:);
 
@@ -135,8 +135,8 @@ feat1t=feat1t(ind,:);
 
 %scales1=scales1(ind);
 
-%ind=find(scales2>min_scale & scales2t'>min_scale & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
-ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
+ind=find(scales2>min_scale & scales2t'>min_scale & (feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
+%ind=find((feat2(:,1)+feat2(:,8))<im2x & (feat2(:,1)-feat2(:,8))>0 & (feat2(:,2)+feat2(:,9))<im2y & (feat2(:,2)-feat2(:,9))>0);
 feat2t=feat2t(ind,:);
 feat2=feat2(ind,:);
 

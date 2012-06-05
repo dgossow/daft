@@ -1,4 +1,4 @@
-function [precision, recall] = descperf_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
+function f1scores = descperf_evaluation( base_path, dataset_name, det_suffix, is_affine, x_val_file )
 
 data_path = [base_path, dataset_name, '/'];
 graph_path = [data_path, 'results/'];
@@ -58,7 +58,7 @@ end
 
 setup_figure(1);
 sfigure(1);
-setup_axes( x_vals, num_img, [0 1] );
+setup_axes( x_vals, [0 1] );
 %axis([0 1 0 1]);
 xlabel(x_label_full);
 ylabel('max f1 score');
@@ -67,7 +67,7 @@ grid on;
 hold on;
 
 for d=1:num_det
-    smooth_plot(3,x_vals,f1scores(d,:),mark{d},'LineWidth',3);
+    plot(x_vals,f1scores(d,:),mark{d},'LineWidth',4);
 end
 
 print(sfigure(1),'-dpdf',sprintf('%sf1score.pdf',graph_path))
