@@ -169,23 +169,6 @@ inline T integrate( const Mat_<T> &ii, int start_x, int start_y, int end_x, int 
   return ii(start_y,start_x) + ii(end_y,end_x) - ii(end_y,start_x) - ii(start_y,end_x);
 }
 
-// Compute the integral of the rectangle (start_x,start_y),(end_x,end_y)
-// using the given integral image
-// + Use bilinear interpolation for real-valued coords
-//template<typename T>
-inline float integrateRounded( const Mat1d &ii, float start_x, float start_y, float end_x, float end_y )
-{
-  assert( start_x>=0 );
-  assert( end_x>start_x );
-  assert( end_x<ii.cols );
-  assert( start_y>=0 );
-  assert( end_y>start_y );
-  assert( end_y<ii.rows );
-  return
-      ( ii(start_y+0.5,start_x+0.5) + ii(end_y+0.5,end_x+0.5) - ii(end_y+0.5,start_x+0.5) - ii(start_y+0.5,end_x+0.5) )
-      / double( (int(end_y+0.5)-int(start_y+0.5) ) * (int(end_x+0.5)-int(start_x+0.5) ) );
-}
-
 inline float integrateBilinear( const Mat1d &ii, float start_x, float start_y, float end_x, float end_y )
 {
   assert( start_x>=0 );
