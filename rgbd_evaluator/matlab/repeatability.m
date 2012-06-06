@@ -36,21 +36,19 @@ function [erro,repeat,corresp, match_score,matches, twi]=repeatability(file1,fil
 %if descriptor_size<=1 the descriptor is ignored
 
 show_keypoints = 0;
+min_scale = 5;
 
 fprintf(1,'Reading and sorting the regions...\n');
-
 
 [f1 s1 dimdesc1]=loadFeatures(file1);
 [f2 s2 dimdesc2]=loadFeatures(file2);
 
 H=load(Hom);
 
-
 fprintf(1,'nb of regions in file1 %d - descriptor dimension %d.\n',s1,dimdesc1);
 fprintf(1,'nb of regions in file2 %d - descriptor dimension %d.\n',s2,dimdesc2);
 
-
-if size(f1,1)==5 & size(f1,1)==size(f2,1) 
+if size(f1,1)==5 & size(f1,1)==size(f2,1)
 fprintf(1,'%s looks like file with affine regions...\n',file1);
   if  size(f1,1)~= 5 | size(f1,1) ~= 5
     error('Wrong ascii format of %s or %s files.',file1,file2);
@@ -116,8 +114,6 @@ im2x=im2x(2);
 
 %min([scales1;scales2])
 %pause(2);
-
-min_scale = 5;
 
 %.. scales1'>9 & ..
 ind=find(scales1>min_scale & scales1t'>min_scale & (feat1(:,1)+feat1(:,8))<im1x & (feat1(:,1)-feat1(:,8))>0 & (feat1(:,2)+feat1(:,9))<im1y & (feat1(:,2)-feat1(:,9))>0);

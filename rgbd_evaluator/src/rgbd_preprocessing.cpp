@@ -640,30 +640,30 @@ void RgbdEvaluatorPreprocessing::estimateHomographies()
 void RgbdEvaluatorPreprocessing::writeImage(
     const cv::Mat& imgx,
     const cv::Mat& img1,
-    cv::Matx33f homography_final,
+    cv::Matx33f hom_xto1,
     std::string count_str )
 {
-  cv::imshow("img1", img1);
-  cv::imshow("imgx", imgx);
+  //cv::imshow("img1", img1);
+  //cv::imshow("imgx", imgx);
 
   cv::Mat1b mask( imgx.rows, imgx.cols, 255 );
 
   // perspective warping
   cv::Mat imgx_warped;
-  cv::warpPerspective( imgx, imgx_warped, cv::Mat(homography_final.inv()), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
-  cv::imshow("imgx_warped", imgx_warped);
+  cv::warpPerspective( imgx, imgx_warped, cv::Mat(hom_xto1), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
+  //cv::imshow("imgx_warped", imgx_warped);
 
   cv::Mat img1_warped;
   cv::Mat img1_rewarped;
-  cv::warpPerspective( img1, img1_warped, cv::Mat(homography_final), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
-  cv::warpPerspective( img1_warped, img1_rewarped, cv::Mat(homography_final.inv()), cv::Size( img1.cols,img1.rows ), CV_INTER_AREA );
-  cv::imshow("img1_warped", img1_warped);
-  cv::imshow("img1_rewarped", img1_rewarped );
+  cv::warpPerspective( img1, img1_warped, cv::Mat(hom_xto1.inv()), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
+  cv::warpPerspective( img1_warped, img1_rewarped, cv::Mat(hom_xto1), cv::Size( img1.cols,img1.rows ), CV_INTER_AREA );
+  //cv::imshow("img1_warped", img1_warped);
+  //cv::imshow("img1_rewarped", img1_rewarped );
 
   cv::Mat1b tmp;
-  cv::warpPerspective( mask, tmp, cv::Mat(homography_final), cv::Size( img1.cols,img1.rows ), CV_INTER_NN );
-  cv::warpPerspective( tmp, mask, cv::Mat(homography_final.inv()), cv::Size( img1.cols,img1.rows ), CV_INTER_NN );
-  cv::imshow("mask", mask );
+  cv::warpPerspective( mask, tmp, cv::Mat(hom_xto1.inv()), cv::Size( img1.cols,img1.rows ), CV_INTER_NN );
+  cv::warpPerspective( tmp, mask, cv::Mat(hom_xto1), cv::Size( img1.cols,img1.rows ), CV_INTER_NN );
+  //cv::imshow("mask", mask );
 
   // normalize lightness
   cv::Scalar mean_img1_rewarped;
@@ -699,14 +699,8 @@ void RgbdEvaluatorPreprocessing::writeImage(
   cv::imshow("imgx_norm", imgx_norm );
 
   cv::Mat imgx_warped_norm;
-  cv::warpPerspective( imgx_norm, imgx_warped_norm, cv::Mat(homography_final.inv()), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
+  cv::warpPerspective( imgx_norm, imgx_warped_norm, cv::Mat(hom_xto1), cv::Size(imgx.cols,imgx.rows), CV_INTER_AREA );
   cv::imshow("imgx_warped_norm", imgx_warped_norm);
-
-  /*
-  std::cout << "Press key..";
-  while (cv::waitKey(1000) < 0) { std::cout << "." << std::flush; };
-  std::cout << std::endl;
-  */
 
   std::string fname = file_created_folder_ + "/" + "warped" + count_str + ".ppm";
   std::cout << "Writing " << fname << std::endl;
@@ -715,10 +709,31 @@ void RgbdEvaluatorPreprocessing::writeImage(
   fname = file_created_folder_ + "/" + "img" + count_str + ".ppm";
   std::cout << "Writing " << fname << std::endl;
   cv::imwrite( fname, imgx_norm );
+
+  cv::waitKey(50);
+}
+
+float RgbdEvaluatorPreprocessing::getCamRotation( cv::Mat imgx, cv::Matx33f homography_final )
+{
+  cv::Point3f v1( imgx.cols/2, imgx.rows/2, 1 );
+  cv::Point3f v2( imgx.cols/2 + 100, imgx.rows/2, 1 );
+
+  v1 = homography_final * v1;
+  v2 = homography_final * v2;
+  v1 *= 1.0/v1.z;
+  v2 *= 1.0/v2.z;
+  cv::Point3f delta = v2 - v1;
+
+  float angle = fabs( atan2( delta.y, delta.x ) / M_PI * 180.0 );
+  std::cout << "camera rotation = " << angle << std::endl;
+
+  return angle;
 }
 
 void RgbdEvaluatorPreprocessing::recomputeImages()
 {
+  std::vector< float > cam_rotations;
+
   uint32_t count = 1;
 
   std::vector< ImageData >::iterator it;
@@ -729,6 +744,10 @@ void RgbdEvaluatorPreprocessing::recomputeImages()
   for (it = it_begin; it != it_end; it++, count++)
   {
     cv::Matx33f homography_final;
+    cv::Mat imgx = it->rgb_image;
+    cv::Mat img1 = it_begin->rgb_image;
+    std::string count_str = int2str(count);
+
     if ( it == it_begin )
     {
       homography_final = cv::Matx33f::eye();
@@ -747,13 +766,21 @@ void RgbdEvaluatorPreprocessing::recomputeImages()
         std::cout << "ERROR: Cannot read homography " << homographyName << std::endl;
         return;
       }
-      cv::Mat imgx = it->rgb_image;
-      cv::Mat img1 = it_begin->rgb_image;
-      std::string count_str = int2str(count);
-      writeImage( imgx, img1,homography_final, count_str );
+
+      cam_rotations.push_back( getCamRotation( imgx, homography_final ) );
     }
 
+    writeImage( imgx, img1,homography_final.inv(), count_str );
+    writeDepth( it->depth_image, count_str );
+
+    /*
+    std::cout << "Press any key to continue.";
+    while (cv::waitKey(1000) < 0) { std::cout << "." << std::flush; };
+    std::cout << std::endl;
+    */
   } // end for
+
+  writeVectorToFile( cam_rotations, "camera rotation" );
 }
 
 cv::Matx33f RgbdEvaluatorPreprocessing::calculateInitialHomography(btTransform transform_camx_to_original, btTransform transform_camx)

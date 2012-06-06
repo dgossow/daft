@@ -60,6 +60,8 @@ public:
 
 private:
 
+  float getCamRotation( cv::Mat imgx, cv::Matx33f homography_final );
+
   cv::Matx33f calculateInitialHomography( btTransform transform_camx_to_original, btTransform transform_original );
 
   bool checkBoarderKP( cv::Mat image, float_t x_pos, float_t y_pos );

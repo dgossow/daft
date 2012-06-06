@@ -2,16 +2,15 @@ function [ axis_label, axis_label_full, axis_unit, axis_vals ] = get_vals( data_
 
 axis_vals = load( sprintf( '%s%s', data_path, val_file ) );
 axis_unit = '';
-axis_label = '';
+axis_label = val_file;
 
 if ( strcmp(val_file,'viewpoint angle') )
-    axis_label = 'viewpoint angle';
     axis_unit = '\circ';
 elseif ( strcmp(val_file,'scaling') )
-    axis_label = 'scaling';
     axis_unit = '';
 elseif ( strcmp(val_file,'rotation') )
-    axis_label = 'rotation';
+    axis_unit = '\circ';
+elseif ( strcmp(val_file,'camera rotation') )
     axis_unit = '\circ';
 end
 
