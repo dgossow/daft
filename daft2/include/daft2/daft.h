@@ -25,7 +25,7 @@ public:
 
   struct DetectorParams
   {
-    enum { DET_FELINE=0, DET_GAUSS9x9=1 };
+    enum { DET_FELINE=0 };
     enum { MAX_WINDOW=0, MAX_FAST=2 };
 
     enum { AUTO=-1 };
@@ -34,7 +34,7 @@ public:
     DetectorParams(
         bool affine_multiscale = false,
         float base_scale = 1,
-        float scale_factor = 2.0,
+        float scale_step = 2.0,
         int scale_levels = AUTO,
         float min_px_scale = 2.5,
         float max_px_scale = AUTO,
@@ -47,7 +47,7 @@ public:
         unsigned max_num_kp = std::numeric_limits<unsigned>::max() ):
           affine_multiscale_(affine_multiscale),
           base_scale_(base_scale),
-          scale_step_(scale_factor),
+          scale_step_(scale_step),
           scale_levels_(scale_levels),
           min_px_scale_(min_px_scale),
           max_px_scale_(max_px_scale),
@@ -158,6 +158,10 @@ public:
       std::vector<cv::KeyPoint3D> & keypoints );
 
 private:
+
+  void computeScaleMap( const Mat1f &depth_map, const Mat1b &mask, float f, Mat1f &scale_map );
+
+  void getOctaves( const Mat1f &scale_map, float max_px_scale, std::set<int> &pyr_octaves, std::set<int> &det_octaves );
 
   void computeImpl(const cv::Mat &image, const cv::Mat1b &mask, const cv::Mat &depth_map, cv::Matx33f K,
       std::vector<cv::KeyPoint3D> & keypoints, cv::Mat1f& desc, bool computeDescriptors );

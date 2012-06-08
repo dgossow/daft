@@ -5,17 +5,11 @@
 #ifndef __DAFT2_FILTER_KERNELS_H__
 #define __DAFT2_FILTER_KERNELS_H__
 
-#include "gauss9x9.h"
-#include "feline.h"
-
-#include <opencv2/core/core.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <iostream>
-#include <opencv2/highgui/highgui.hpp>
-
+#include "feline.h"
 #include "stuff.h"
-#include "kernel2d.h"
+
 
 namespace cv
 {
@@ -78,9 +72,6 @@ inline float princCurvRatio( const Mat1f &response,
 
   return r_val;
 }
-
-
-
 
 
 }

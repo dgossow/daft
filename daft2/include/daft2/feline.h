@@ -8,7 +8,6 @@
 #ifndef FELINE_H_
 #define FELINE_H_
 
-#include "gauss9x9.h"
 #include "feline.h"
 
 #include <opencv2/opencv.hpp>

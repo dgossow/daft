@@ -23,26 +23,28 @@ namespace cv {
 namespace daft2 {
 
 boost::timer t;
+std::string dbg_msg;
 
 //DEBUG FLAGS (To be removed) ----
 //
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 //#define SHOW_MASK
+//#define SHOW_PYR
 //#define SHOW_RESPONSE
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
-#define TIMER_START t.restart();
-#define TIMER_STOP DBG_OUT( "++++++ Time elapsed: " << t.elapsed()*1000.0 << "ms ++++++" );
+#define TIMER_STOP if(dbg_msg.length()!=0) { DBG_OUT( "++++++ " << dbg_msg << ": " << t.elapsed()*1000.0 << "ms ++++++" ); }
+#define TIMER_START( MSG ) TIMER_STOP dbg_msg=MSG; t.restart();
 
-//--------------------------------
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
-    det_params_(detector_params), desc_params_(descriptor_params) {
-
+    det_params_(detector_params), desc_params_(descriptor_params)
+{
 }
 
-DAFT::~DAFT() {
+DAFT::~DAFT()
+{
 }
 
 void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
@@ -75,10 +77,13 @@ void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
   computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
 }
 
-void DAFT::computeImpl( const cv::Mat &image,
+void DAFT::computeImpl(
+    const cv::Mat &image,
     const cv::Mat1b &mask_orig,
     const cv::Mat &depth_map_orig,
-    cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc,
+    cv::Matx33f K,
+    std::vector<KeyPoint3D> & kp,
+    cv::Mat1f& desc,
     bool computeDescriptors )
 {
   boost::timer t2;
@@ -86,7 +91,7 @@ void DAFT::computeImpl( const cv::Mat &image,
   kp.clear();
   desc = cv::Mat1f();
 
-  TIMER_START
+  TIMER_START( "Data Preparation" );
 
   if (image.size != depth_map_orig.size) {
     return;
@@ -96,15 +101,13 @@ void DAFT::computeImpl( const cv::Mat &image,
   Mat gray_image;
   Mat1d ii;
   Mat1f depth_map;
-  Mat1f depth_map_raw;
   cv::Mat1b mask = mask_orig.clone();
 
   prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask );
 
-  // Initialize parameters
-  int n_octaves = det_params_.scale_levels_;
-
+  // put an upper limit on the max. pixel scale
   float max_px_scale = 4.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
+
   if ( det_params_.max_px_scale_ != det_params_.AUTO )
   {
     max_px_scale = std::min( max_px_scale, det_params_.max_px_scale_ );
@@ -112,96 +115,30 @@ void DAFT::computeImpl( const cv::Mat &image,
 
   const float f = K(0, 0);
 
+  // compute scale map (inverse depth map)
   Mat1f scale_map(gray_image.rows, gray_image.cols);
-  Mat1f::iterator scale_it = scale_map.begin();
-  Mat1f::iterator scale_map_end = scale_map.end();
-  Mat1f::iterator depth_it = depth_map.begin();
-  Mat1b::const_iterator mask_it = mask.begin();
+  computeScaleMap( depth_map, mask, f, scale_map );
 
-  int min_octave = 0;
-
-  // Compute scale map from depth map & optionally determine min/max possible octave
-  if (det_params_.scale_levels_ == det_params_.AUTO)
-  {
-    float min_scale_fac = std::numeric_limits<float>::infinity();
-    float max_scale_fac = 0;
-
-    for (; scale_it != scale_map_end; ++scale_it, ++depth_it, ++mask_it )
-    {
-      if ( *mask_it != 0 && finite(*depth_it) && *depth_it > 0.4 )
-      {
-        float s = f / *depth_it;
-        *scale_it = s;
-        if (s > max_scale_fac)
-        {
-          max_scale_fac = s;
-        }
-        if (s < min_scale_fac)
-        {
-          min_scale_fac = s;
-        }
-      } else {
-        *scale_it = std::numeric_limits<float>::quiet_NaN();
-      }
-    }
-
-    if (!finite(min_scale_fac) || max_scale_fac == 0)
-    {
-      DBG_OUT( "error: depth data invalid." );
-      return;
-    }
-
-    DBG_OUT( "min_scale_fac" << min_scale_fac );
-    DBG_OUT( "max_scale_fac" << max_scale_fac );
-
-    double delta_n_min = det_params_.min_px_scale_
-        / (max_scale_fac * det_params_.base_scale_);
-    double delta_n_max = max_px_scale / (min_scale_fac * det_params_.base_scale_);
-
-    double n_min = std::ceil(log(delta_n_min) / log(2.0));
-    double n_max = std::floor(log(delta_n_max) / log(2.0));
-
-    min_octave = n_min;
-    n_octaves = n_max - n_min;
-  }
-  else
-  {
-    for (; scale_it != scale_map_end; ++scale_it, ++depth_it)
-    {
-      *scale_it = f / *depth_it;
-    }
-  }
+  // make list of all octaves that we need to compute
+  std::set<int> pyr_octaves;
+  std::set<int> det_octaves;
+  getOctaves( scale_map, max_px_scale, pyr_octaves, det_octaves );
 
   kp.clear();
   kp.reserve(50000);
 
-  // make list of all octaves that we need to compute
-  std::set<int> octaves;
-
-  // compute which octaves we need
-  for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
-  {
-    // insert octave and next bigger one (for diff-of-gaussian)
-  	octaves.insert(octave);
-  	octaves.insert(octave+1);
-  	octaves.insert(octave+desc_params_.octave_offset_);
-  	octaves.insert(octave+desc_params_.octave_offset_+1);
-  }
-
-  TIMER_STOP
+  TIMER_START( "Affine Parameters" );
 
   //std::map< int, Mat1f > smoothed_imgs;
   std::map< int, Mat1f> smoothed_depth_maps;
   std::map< int, Mat3f > affine_maps; // entries are (major_len, minor_len, major_x, major_y)
 
-  computeAffineMaps( octaves, depth_map, scale_map, f, smoothed_depth_maps, affine_maps );
+  computeAffineMaps( pyr_octaves, depth_map, scale_map, f, smoothed_depth_maps, affine_maps );
 
   // compute depth-normalized image pyramid
+  TIMER_START( "Gaussian Pyramid" );
 
-  DBG_OUT( "Computing gaussians" );
-
-  TIMER_START
-  for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
+  for (std::set<int>::iterator it = pyr_octaves.begin(); it != pyr_octaves.end(); it++ )
   {
     int octave = *it;
     double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
@@ -217,62 +154,32 @@ void DAFT::computeImpl( const cv::Mat &image,
         convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
-    case DetectorParams:: DET_GAUSS9x9:
-      if (det_params_.affine_) {
-        convolveAffine<gaussAffine>(ii, scale_map, affine_map, scale, 1, smoothed_img );
-      } else {
-        //convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
-        return;
-      }
-      break;
     default:
       DBG_OUT( "error: invalid detector type: " << det_params_.det_type_ );
       return;
     }
 
-#ifdef SHOW_DEBUG_WIN
+#ifdef SHOW_PYR
     {
-      static int i=0;
-      cv::Mat display_image;
-      smoothed_img.convertTo( display_image, CV_8UC1, 255, 0.0 );
-      std::ostringstream s;
-      s << "frame # " << i;
-      //cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
-
       s.str("");
       s << "Smoothed Image - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
-      imshow( s.str(), display_image );
-
-      /*
-       cv::imshow( "dep orig", depth_map_orig );
-       cv::imshow( "dep", depth_map );
-       cv::imshow( "det", detector_image );
-       cv::imshow( "scale", scale_map );
-       */
-
-      i++;
+      imshow( s.str(), smoothed_img );
     }
 #endif
   }
-  TIMER_STOP
 
-  //std::map< int, Mat1f > response_maps;
+  TIMER_START( "Computing response & finding max" );
 
-  DBG_OUT( "Computing response & finding max" );
-
-  TIMER_START
   // compute abs. difference of gaussians and detect maxima
-  for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
+  for (std::set<int>::iterator it = det_octaves.begin(); it != det_octaves.end(); it++ )
   {
-    response_maps[octave] = Mat1f(gray_image.rows, gray_image.cols);
-    Mat1f &response_map = response_maps[octave];
+    int octave = *it;
+    double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
 
-  	double scale = det_params_.base_scale_ * std::pow( det_params_.scale_step_, float(octave) );
+    response_maps[octave] = smoothed_imgs[octave+1] - smoothed_imgs[octave];
 
-  	response_map = smoothed_imgs[octave+1] - smoothed_imgs[octave];
     Mat3f& affine_map = affine_maps[octave];
-
-    // save index where new kps will be inserted
+    Mat1f &response_map = response_maps[octave];
 
     std::vector< KeyPoint3D > kp_init;
 
@@ -322,49 +229,22 @@ void DAFT::computeImpl( const cv::Mat &image,
       response_map.convertTo( display_image, CV_8UC1, 512, 128 );
 
       std::vector<KeyPoint3D> kp2;
-      for ( unsigned k=old_kp_size; k<kp.size(); k++ )
-      {
-        cv::KeyPoint3D kp_curr = kp[k];
-        kp2.push_back(kp_curr);
-
-        /*
-        kp_curr.aff_major *= 0.5;
-        kp_curr.aff_minor *= 0.5;
-        kp2.push_back(kp_curr);
-
-        kp_curr.aff_major = 1.5;
-        kp_curr.aff_minor = 1.5;
-        kp2.push_back(kp_curr);
-        */
-      }
+      princCurvFilter( response_map, scale_map, affine_map, det_params_.max_princ_curv_ratio_, kp_init, kp2 );
 
       cv::drawKeypoints3D( display_image, kp_init, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
       cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(255,0,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-      std::ostringstream s;
-      s << "frame # " << i;
-      cv::putText( display_image, s.str( ), Point(10,40), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,255,0) );
-
       s.str("");
       s << "Response - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
       imshow( s.str(), cv::Mat( display_image ) );
-
-      /*
-       cv::imshow( "dep orig", depth_map_orig );
-       cv::imshow( "dep", depth_map );
-       cv::imshow( "det", detector_image );
-       cv::imshow( "scale", scale_map );
-       */
-
       i++;
     }
 #endif
   }
-  TIMER_STOP
 
   DBG_OUT( kp.size() << " keypoints found." );
 
-  TIMER_START
+  TIMER_START("Descriptor computation");
 
   // if we have a limitation on the number of keypoints, sort them first
   if ( det_params_.max_num_kp_ != std::numeric_limits<unsigned>::max() )
@@ -435,53 +315,8 @@ void DAFT::computeImpl( const cv::Mat &image,
   desc = desc_tmp( cv::Rect( 0, 0, surf_desc.getDescLen(), kp.size() ) ).clone();
 
   DBG_OUT( kp.size() << " keypoints left after descriptor computation." );
-  TIMER_STOP
-
-
-#ifdef FIND_MAXKP
-  cv::Mat1f patch1, patch2;
-
-  cv::Mat display_image;
-  cv::drawKeypoints3D( image, kp, display_image, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-
-  // draw patch for strongest keypoint
-  float resp_max=0;
-  unsigned k_max=0;
-  for ( unsigned k=0; k<kp.size(); k++ )
-  {
-    if ( kp[k].response > resp_max )
-    {
-      k_max = k;
-      resp_max = kp[k].response;
-    }
-  }
-
-  if ( kp.size() > 0 )
-  {
-    vector<KeyPoint3D> kp2;
-    kp2.push_back(kp[k_max]);
-    cv::Mat tmp;
-    response_map.convertTo( tmp, CV_8UC1, 900, 0.0 );
-    cv::drawKeypoints3D( tmp, kp2, tmp, cv::Scalar(0,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-    imshow("max_kp",tmp);
-
-    int k=k_max;
-    std::stringstream s;
-    s << "max response patch";
-
-    Mat1f& smoothed_img = smoothed_imgs[kp[k].octave];
-    Mat1f& smoothed_img2 = smoothed_imgs[kp[k].octave+1];
-    Mat1f& smoothed_depth_map = smoothed_depth_maps[kp[k].octave];
-
-    Mat1f curr_desc( kp2.size(), surf_desc.getDescLen() );
-    surf_desc.getDesc( desc_params_.patch_size_, desc_params_.z_thickness_, smoothed_img, smoothed_img2, kp[k], curr_desc, depth_map, K, true );
-  }
-
-  imshow( "rgb", display_image );
-#endif
 
   DBG_OUT( "++++++ Total time elapsed: " << t2.elapsed()*1000.0 << "ms ++++++" );
-
 }
 
 void DAFT::computeAffineMaps(
@@ -500,8 +335,6 @@ void DAFT::computeAffineMaps(
 
   if ( det_params_.affine_multiscale_ )
   {
-    TIMER_START
-
     for (std::set<int>::iterator it = octaves.begin(); it != octaves.end(); it++ )
     {
       int octave = *it;
@@ -555,7 +388,6 @@ void DAFT::computeAffineMaps(
       affine_maps[octave] = affine_map;
     }
 
-//#if 1
 #ifdef SHOW_DEBUG_WIN
     {
     std::stringstream s;
@@ -572,7 +404,97 @@ void DAFT::computeAffineMaps(
     }
 #endif
   }
-  TIMER_STOP
+}
+
+void DAFT::computeScaleMap( const Mat1f &depth_map, const Mat1b &mask, float f, Mat1f &scale_map )
+{
+  Mat1f::iterator scale_it = scale_map.begin();
+  Mat1f::iterator scale_map_end = scale_map.end();
+  Mat1f::const_iterator depth_it = depth_map.begin();
+  Mat1b::const_iterator mask_it = mask.begin();
+
+  for (; scale_it != scale_map_end; ++scale_it, ++depth_it, ++mask_it )
+  {
+    if ( *mask_it != 0 && *depth_it > 0.0 )
+    {
+      float s = f / *depth_it;
+      *scale_it = s;
+    }
+    else
+    {
+      *scale_it = std::numeric_limits<float>::quiet_NaN();
+    }
+  }
+}
+
+void DAFT::getOctaves( const Mat1f &scale_map, float max_px_scale, std::set<int> &pyr_octaves, std::set<int> &det_octaves )
+{
+  pyr_octaves.clear();
+  det_octaves.clear();
+
+  int min_octave;
+  int n_octaves;
+
+  // Compute scale map from depth map & optionally determine min/max possible octave
+  if (det_params_.scale_levels_ == det_params_.AUTO)
+  {
+    float min_scale_fac = std::numeric_limits<float>::infinity();
+    float max_scale_fac = 0;
+
+    Mat1f::const_iterator scale_it = scale_map.begin();
+    Mat1f::const_iterator scale_map_end = scale_map.end();
+
+    for (; scale_it != scale_map_end; ++scale_it )
+    {
+      if ( finite(*scale_it) )
+      {
+        const float s = *scale_it;
+        if (s > max_scale_fac)
+        {
+          max_scale_fac = s;
+        }
+        if (s < min_scale_fac)
+        {
+          min_scale_fac = s;
+        }
+      }
+    }
+
+    if (!finite(min_scale_fac) || max_scale_fac == 0)
+    {
+      DBG_OUT( "error: depth data invalid." );
+      return;
+    }
+
+    DBG_OUT( "min_scale_fac" << min_scale_fac );
+    DBG_OUT( "max_scale_fac" << max_scale_fac );
+
+    double delta_n_min = det_params_.min_px_scale_
+        / (max_scale_fac * det_params_.base_scale_);
+    double delta_n_max = max_px_scale / (min_scale_fac * det_params_.base_scale_);
+
+    double n_min = std::ceil(std::log(delta_n_min) / std::log(2.0));
+    double n_max = std::floor(std::log(delta_n_max) / std::log(2.0));
+
+    min_octave = n_min;
+    n_octaves = n_max - n_min;
+  }
+  else
+  {
+    min_octave = 1;
+    n_octaves = det_params_.scale_levels_;
+  }
+
+  // compute which octaves we need
+  for (int octave = min_octave; octave < min_octave+n_octaves; octave++)
+  {
+    det_octaves.insert(octave);
+    // insert octave and next bigger one (for diff-of-gaussian)
+    pyr_octaves.insert(octave);
+    pyr_octaves.insert(octave+1);
+    pyr_octaves.insert(octave+desc_params_.octave_offset_);
+    pyr_octaves.insert(octave+desc_params_.octave_offset_+1);
+  }
 }
 
 
@@ -631,7 +553,7 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   {
     for ( int x=0; x<depth_map.cols; x++ )
     {
-      if ( isnan(depth_map(y,x)) || depth_map(y,x) < 0.4 )
+      if ( isnan(depth_map(y,x)) || depth_map(y,x) == 0.0 )
       {
         mask(y,x) = 0;
       }

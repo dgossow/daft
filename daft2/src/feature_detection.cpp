@@ -449,10 +449,6 @@ void princCurvFilter(
     return;
   }
 
-  //cv::Mat display_image;
-  //response.convertTo( display_image, CV_8UC1, 512, 128 );
-  //cv::drawKeypoints3D( display_image, kp_in, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-
   float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
   //std::cout << "r_thresh=" << r_thresh << std::endl;
 
@@ -477,7 +473,15 @@ void princCurvFilter(
     }
   }
 
-  //cv::imshow( "princ_curv", display_image );
+  /*
+  std::stringstream s;
+  s << kp_in.size();
+  cv::Mat display_image;
+  response.convertTo( display_image, CV_8UC1, 512, 128 );
+  cv::drawKeypoints3D( display_image, kp_in, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::drawKeypoints3D( display_image, kp_out, display_image, cv::Scalar(255,0,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+  cv::imshow( "princ_curv"+s.str(), display_image );
+  */
 }
 
 
