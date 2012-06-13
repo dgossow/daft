@@ -9,6 +9,7 @@
 #include "feature_detection.h"
 #include "descriptor.h"
 #include "preprocessing.h"
+#include "gauss3d.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -31,7 +32,7 @@ std::string dbg_msg;
 //#define FIND_MAXKP
 //#define SHOW_MASK
 //#define SHOW_PYR
-//#define SHOW_RESPONSE
+#define SHOW_RESPONSE
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_STOP if(dbg_msg.length()!=0) { DBG_OUT( "++++++ " << dbg_msg << ": " << t.elapsed()*1000.0 << "ms ++++++" ); }
@@ -143,7 +144,10 @@ void DAFT::computeImpl(
     int octave = *it;
     double scale = det_params_.base_scale_ * std::pow( 2.0, float(octave) );
     Mat1f& smoothed_img = smoothed_imgs[octave];
+    Mat1f& smoothed_depth_map = smoothed_depth_maps[octave];
     Mat3f& affine_map = affine_maps[octave];
+
+    DBG_OUT( "octave " << octave << " scale " << scale );
 
     // compute filter response for all pixels
     switch (det_params_.det_type_) {
@@ -154,6 +158,9 @@ void DAFT::computeImpl(
         convolve<boxMean>(ii, scale_map, scale, 1, smoothed_img);
       }
       break;
+    case DetectorParams::DET_GAUSS3D:
+      gauss3d( K, smoothed_depth_map, gray_image, scale, smoothed_img );
+      break;
     default:
       DBG_OUT( "error: invalid detector type: " << det_params_.det_type_ );
       return;
@@ -161,7 +168,7 @@ void DAFT::computeImpl(
 
 #ifdef SHOW_PYR
     {
-      s.str("");
+      std::ostringstream s;
       s << "Smoothed Image - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
       imshow( s.str(), smoothed_img );
     }
@@ -234,7 +241,7 @@ void DAFT::computeImpl(
       cv::drawKeypoints3D( display_image, kp_init, display_image, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
       cv::drawKeypoints3D( display_image, kp2, display_image, cv::Scalar(255,0,0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-      s.str("");
+      std::ostringstream s;
       s << "Response - Detector type=" << det_params_.det_type_ << " max=" << det_params_.max_search_algo_ << " scale = " << scale << " affine = " << det_params_.affine_;
       imshow( s.str(), cv::Mat( display_image ) );
       i++;
@@ -481,7 +488,7 @@ void DAFT::getOctaves( const Mat1f &scale_map, float max_px_scale, std::set<int>
   }
   else
   {
-    min_octave = 1;
+    min_octave = 0;
     n_octaves = det_params_.scale_levels_;
   }
 

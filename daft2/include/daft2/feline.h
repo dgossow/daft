@@ -36,7 +36,7 @@ inline float boxMean( const Mat1d &ii, int x, int y, float s )
   }
   const float v1 = integrate ( ii, x - si,  y - si, x + si, y + si ) / float(4*si*si);
   const float v2 = integrate ( ii, x - si1,  y - si1, x + si1, y + si1 ) / float(4*si1*si1);
-  return interpolateLinear(s - float(si), v1, v2);
+  return interpolateLinear<float,float>(s - float(si), v1, v2);
 }
 
 

@@ -155,6 +155,11 @@ void findExtremaAffine(
       int window = major_len*min_dist;
       if ( window < 1 ) window = 1;
 
+      if ( !checkBounds( img, x, y, window ) )
+      {
+        continue;
+      }
+
       bool is_extremum = true;
       for ( int v = 0; is_extremum && v <= window; v++ )
       {

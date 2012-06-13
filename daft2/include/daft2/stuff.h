@@ -9,6 +9,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <cmath>
+
 namespace cv
 {
 namespace daft2
@@ -51,6 +53,7 @@ inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
   double minv,maxv;
   int tmp;
   cv::minMaxIdx( img, &minv, &maxv, &tmp, &tmp );
+  std::cout << win_title << " min=" << minv << " max=" << maxv << std::endl;
   imshow2( win_title, (img - minv) * (1.0 / (maxv-minv)), size );
 }
 
@@ -88,26 +91,112 @@ Vec3f inline fitNormal(const std::vector<Vec3f>& points)
     return normal;
 }
 
-
-template<typename T>
-inline T interpBilinear( const Mat_<T>& img, float x, float y )
+template<typename S, typename T, S (*F)(S x)>
+inline T interp( T y1, T y2, S t )
 {
-  const int x_low = x;
-  const int y_low = y;
-  const float tx = x - float(x_low);
-  const float ty = y - float(y_low);
-  const T v1 = (1.0-tx) * img[y_low][x_low] + tx * img[y_low][x_low+1];
-  const T v2 = (1.0-tx) * img[y_low+1][x_low] + tx * img[y_low+1][x_low+1];
-  const T v = (1.0-ty) * v1 + ty * v2;
+  const S t2 = F( t );
+  return (1.0-t2) * y1 + t2 * y2;
+}
+
+template<typename S, typename T, S (*F)(S x)>
+inline T interp2d( S v00, S v01, S v10, S v11, S tx, S ty )
+{
+  const T v1 = interp<S,T,F>( v00, v01, tx );
+  const T v2 = interp<S,T,F>( v10, v11, tx );
+  const T v = interp<S,T,F>( v1, v2, ty );
   return v;
 }
 
+template<typename S, typename T, S (*F)(S x)>
+inline T interp2d( const Mat_<T>& img, S x, S y )
+{
+  //x-=0.5;
+  //y-=0.5;
+  if ( x < 0 ) x = 0;
+  if ( y < 0 ) y = 0;
+
+  int x_low = x;
+  int y_low = y;
+  int x_high = x_low + 1;
+  int y_high = y_low + 1;
+
+  if ( x >= img.cols-1 )
+  {
+    x_low = x_high = x = img.cols-1;
+  }
+  if ( y >= img.rows-1 )
+  {
+    y_low = y_high = y = img.rows-1;
+  }
+
+  const S tx = x - S(x_low);
+  const S ty = y - S(y_low);
+  return interp2d<S,T,F>(
+      img(y_low,x_low), img(y_low,x_high),
+      img(y_high,x_low), img(y_high,x_high),
+      tx, ty );
+  assert(1);
+}
+
+namespace inter
+{
+  template<typename S> inline S linear( S x ){ return x; }
+  template<typename S> inline S smooth( S x ) { return 0.5*(1.0-cos(x*M_PI)); }
+  template<typename S> inline S nearest( S x ) { return round(x); }
+}
+
+template<typename S, typename T, S (*F)(S x)>
+inline T interpMipMap( const std::vector< Mat_<T> >& mipmaps, S x, S y, S lod )
+{
+  if ( lod < 0.0 ) lod = 0.0;
+  if ( lod >= mipmaps.size()-1 ) return mipmaps[mipmaps.size()-1](0,0);
+
+  const int lod1 = lod;
+  const int pow2l = 1 << lod1;
+
+  float o1 = (1.0-pow2l) / (2.0*pow2l);
+
+  const S x1 = (float)x/((float)pow2l) + o1;
+  const S y1 = (float)y/((float)pow2l) + o1;
+  const S x2 = (x1*0.5) - 0.25;
+  const S y2 = (y1*0.5) - 0.25;
+
+  const S v1 = interp2d<S,T,F >( mipmaps[lod1], x1, y1 );
+  const S v2 = interp2d<S,T,F >( mipmaps[lod1+1], x2, y2 );
+
+  return interp< S,T,inter::linear<S> >( v1, v2, lod - (S)lod1 );
+}
+
+template<typename S, typename T>
+inline T interpBilinear( const Mat_<T>& img, S x, S y )
+{
+  return interp2d< S,T,inter::linear<S> >(img,x,y);
+}
 
 /** Interpolates linerarly between v1 and v2 given a percentage t */
-template<typename T>
-inline T interpolateLinear(T t, T v1, T v2)
+template<typename S, typename T>
+inline T interpolateLinear(S t, T v1, T v2)
 {
-  return (static_cast<T>(1) - t) * v1 + t * v2;
+  return interp< S,T, inter::linear<S> >(v1,v2,t);
+}
+
+template<typename S, typename T, S (*F)(S x)>
+void resize( const Mat_<T>& img, Mat_<T>& img_out, int rows, int cols )
+{
+  double pow2l = (double)(rows) / (double)(img.rows);
+  float o1 = (1.0-pow2l) / (2.0*pow2l);
+  double pow2l_inv = 1.0 / pow2l;
+
+  img_out = Mat_<T>( rows, cols );
+  for ( int i=0; i<rows; i++ )
+  {
+    for ( int j=0; j<cols; j++ )
+    {
+      double i1 = (double)i * pow2l_inv + o1;
+      double j1 = (double)j * pow2l_inv + o1;
+      img_out( i,j ) = interp2d<S,T,F>( img, i1, j1 );
+    }
+  }
 }
 
 template<typename T1,typename T2>

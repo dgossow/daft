@@ -29,5 +29,9 @@ src/feature_detection.cpp
 src/descriptor.cpp
 src/depth_filter.cpp
 )
-
 target_link_libraries(daft2 ${OpenCV_LIBS})
+
+add_executable (test1 
+test/test1.cpp
+)
+target_link_libraries(test1 daft2)
