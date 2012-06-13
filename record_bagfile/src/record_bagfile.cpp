@@ -30,6 +30,8 @@ RecordBagfile::RecordBagfile(std::string bagfile_name, ros::NodeHandle comm_nh, 
   cx_ = 0;
   cy_ = 0;
 
+  recording_ = true;
+  num_imgs_avg_ = 5;
 }
 
 RecordBagfile::~RecordBagfile()

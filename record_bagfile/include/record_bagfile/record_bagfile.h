@@ -38,6 +38,9 @@ public:
 
 private:
 
+    bool recording_;
+    int num_imgs_avg_;
+
     rosbag::Bag bag_;
 
     std::string win_name_;

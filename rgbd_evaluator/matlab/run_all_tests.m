@@ -1,5 +1,6 @@
 
 detectors = {'DAFT';'SIFT'};
+detectors = {'DAFT';'DAFT Gauss3D'};
 %detectors = {'DAFT';'DAFT Non-Affine'};
 is_affine = {1,1,1,1,0};
 
@@ -19,12 +20,12 @@ bagpath = '/work/gossow/bags/';
 
 %{'poster/vprotate35','poster/vprotate45','poster/vprotate55'}
 
-complete_evaluation( bagpath, 'eval/vprotation', {'poster/vprotate40'}, detectors, is_affine, 'rotation' );
+complete_evaluation( bagpath, 'eval/vprotation', {'poster/vprotate35','poster/vprotate40','poster/vprotate45','poster/vprotate55'}, detectors, is_affine, 'rotation' );
 return;
 
-complete_evaluation( bagpath, 'eval/scale', {'poster/scale'}, detectors, is_affine, 'scaling' );
+%complete_evaluation( bagpath, 'eval/scale', {'poster/scale'}, detectors, is_affine, 'scaling' );
 
-complete_evaluation( bagpath, 'eval/cam_rotate', {'poster/rotate','poster/rotate45','poster/rotate60'}, detectors, is_affine, 'camera rotation' );
+%complete_evaluation( bagpath, 'eval/cam_rotate', {'poster/rotate','poster/rotate45','poster/rotate60'}, detectors, is_affine, 'camera rotation' );
 
 viewpoint_datasets={'poster/viewpoint','poster/viewpoint22','poster/viewpoint45'};
 complete_evaluation( bagpath, 'eval/viewpoint', viewpoint_datasets, detectors, is_affine, 'viewpoint angle' );

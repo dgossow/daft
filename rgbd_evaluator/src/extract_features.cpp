@@ -506,18 +506,23 @@ void ExtractDetectorFile::extractAllKeypoints()
   //det_p.min_px_scale_ = 3.0;
   //det_p.base_scale_ = 0.025;
   //det_p.scale_levels_ = 1;
-  //det_p.max_princ_curv_ratio_ = 5.0;
+  //det_p.max_princ_curv_ratio_ = 0.0;
   //det_p.det_threshold_ = 0.0;
-  //det_p.pf_threshold_ = 5;
   //desc_p.z_thickness_ = 0.3;
 
   det_p.affine_multiscale_ = false;
+
+  det_p.det_type_=det_p.DET_GAUSS3D;
+  det_p.affine_=true;
+  det_p.max_search_algo_ = det_p.MAX_WINDOW;
+  //desc_p.octave_offset_ = -1;
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT Gauss3D", 1.0 ); //1.44445);
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   //desc_p.octave_offset_ = -1;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 5.5 ); //1.44445);
+  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT", 1.0 ); //1.44445);
 
   extractKeypoints( &getSurfKp, "SURF", 21.8753 );
   extractKeypoints( &getSiftKp, "SIFT", 3.09896 );
