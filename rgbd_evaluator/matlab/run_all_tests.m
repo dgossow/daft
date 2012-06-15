@@ -20,15 +20,18 @@ bagpath = '/work/gossow/bags/';
 
 %{'poster/vprotate35','poster/vprotate45','poster/vprotate55'}
 
-complete_evaluation( bagpath, 'eval/vprotation', {'poster/vprotate35','poster/vprotate40','poster/vprotate45','poster/vprotate55'}, detectors, is_affine, 'rotation' );
+complete_evaluation( bagpath, 'eval/test', {'poster/camrotate60'}, detectors, is_affine, 'camera rotation' );
 return;
 
-%complete_evaluation( bagpath, 'eval/scale', {'poster/scale'}, detectors, is_affine, 'scaling' );
+complete_evaluation( bagpath, 'eval/vprotation', {'poster/vprotate35','poster/vprotate40','poster/vprotate45','poster/vprotate55'}, detectors, is_affine, 'rotation' );
 
-%complete_evaluation( bagpath, 'eval/cam_rotate', {'poster/rotate','poster/rotate45','poster/rotate60'}, detectors, is_affine, 'camera rotation' );
+complete_evaluation( bagpath, 'eval/scale', {'poster/scale'}, detectors, is_affine, 'scaling' );
 
 viewpoint_datasets={'poster/viewpoint','poster/viewpoint22','poster/viewpoint45'};
 complete_evaluation( bagpath, 'eval/viewpoint', viewpoint_datasets, detectors, is_affine, 'viewpoint angle' );
+
+complete_evaluation( bagpath, 'eval/cam_rotate', {'poster/camrotate','poster/camrotate45','poster/camrotate60'}, detectors, is_affine, 'camera rotation' );
+
 return;
 
 rotate_datasets = {

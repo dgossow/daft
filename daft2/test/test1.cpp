@@ -53,13 +53,29 @@ void makeSinglePx( cv::Mat1b img, int cj, int ci )
   }
 }
 
+bool change = true;
+void chg_cb(int pos, void* userdata)
+{
+  change = true;
+}
+
 int main(int argc, char** argv)
 {
   const int cols = 256;
   const int rows = 256;
 
+  // wavelength
+  int lambda = 64;
+
   int ci = rows / 2;
   int cj = cols / 2;
+
+  cv::Mat1b img( rows, cols );
+  //makeSinoid( lambda, img );
+  makeSinglePx( img, cj, ci );
+  cv::imshow( "img", img );
+
+  ////////////////////////////////
 
   // camera matrix
   cv::Matx33f K = cv::Matx33f::eye();
@@ -67,29 +83,54 @@ int main(int argc, char** argv)
   K(1,2) = (double)rows * 0.5;
 
   cv::Mat1f depth_map( rows, cols, 1.0f );
+  cv::Mat1f scale_map( rows, cols, 1.0f );
+  cv::Mat3f affine_map( rows, cols, cv::Vec3f(1.0,1.0,0.0) );
 
-  // wavelength
-  int lambda = 64;
+  Mat1d ii;
+  integral2( img, ii, 1.0/255.0 );
 
-  cv::Mat1b img( rows, cols );
-  makeSinoid( lambda, img );
-  //makeSinglePx( img, cj, ci );
-  cv::imshow( "img", img );
+  ////////////////////////////////
 
   namedWindow( "smoothed_img" );
-  createTrackbar("lambda", "smoothed_img", &lambda, cols );
+
+  int major = lambda;
+  int minor_ratio = 100;
+  int angle = 180;
+  createTrackbar("major", "smoothed_img", &major, cols, &chg_cb );
+  createTrackbar("minor", "smoothed_img", &minor_ratio, cols, &chg_cb );
+  createTrackbar("angle", "smoothed_img", &angle, cols, &chg_cb );
 
   int old_lambda = 0;
+  bool use_gauss3d = false;
 
   while( true )
   {
-    if ( lambda != old_lambda )
+    if ( change )
     {
-      old_lambda = lambda;
+      change = false;
 
       cv::Mat1f smoothed_img;
 
-      gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, lambda/4.0, smoothed_img );
+      float scale = major/4.0;
+
+      for ( int i=0; i<img.rows; i++ )
+      {
+        for ( int j=0; j<img.cols; j++ )
+        {
+          affine_map( i, j )[0] = (float)minor_ratio * 0.01;
+          affine_map( i, j )[1] = sin((float)angle / 180.0 * M_PI);
+          affine_map( i, j )[2] = cos((float)angle / 180.0 * M_PI);
+        }
+      }
+
+      if (use_gauss3d)
+      {
+        gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, scale, smoothed_img );
+      }
+      else
+      {
+        convolveAffine<feline>(ii, scale_map, affine_map, scale, 1, smoothed_img );
+      }
       imshowNorm( "smoothed_img", smoothed_img, -1 );
       imshowDxDy( "smoothed_img", smoothed_img, -1 );
 
@@ -102,7 +143,16 @@ int main(int argc, char** argv)
       */
 
       cv::Mat1f smoothed_img2;
-      gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, lambda/2.0, smoothed_img2 );
+
+      if (use_gauss3d)
+      {
+        gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, scale*2.0, smoothed_img2 );
+      }
+      else
+      {
+        convolveAffine<feline>(ii, scale_map, affine_map, scale*2.0, 1, smoothed_img2 );
+      }
+
       imshowNorm( "smoothed_img2", smoothed_img2 );
 
       cv::Mat1f laplace = smoothed_img - smoothed_img2;

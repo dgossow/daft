@@ -516,7 +516,7 @@ void ExtractDetectorFile::extractAllKeypoints()
   det_p.affine_=true;
   det_p.max_search_algo_ = det_p.MAX_WINDOW;
   //desc_p.octave_offset_ = -1;
-  extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT Gauss3D", 1.0 ); //1.44445);
+  //extractKeypoints( boost::bind( &getDaftKp, det_p, desc_p, _1,_2,_3,_4,_5,_6,_7 ), "DAFT Gauss3D", 1.0 ); //1.44445);
 
   det_p.det_type_=det_p.DET_FELINE;
   det_p.affine_=true;
