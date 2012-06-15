@@ -68,6 +68,11 @@ inline float princCurvRatio( const Mat1f &response,
   float trace = dxx + dyy;
   float det = dxx*dyy - (dxy*dxy);
 
+  if ( det < 0.0 )
+  {
+    return 0;//std::numeric_limits<float>::max();
+  }
+
   float r_val = trace*trace/det;
 
   return r_val;
