@@ -32,7 +32,7 @@ std::string dbg_msg;
 //#define FIND_MAXKP
 //#define SHOW_MASK
 //#define SHOW_PYR
-#define SHOW_RESPONSE
+//#define SHOW_RESPONSE
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_STOP if(dbg_msg.length()!=0) { DBG_OUT( "++++++ " << dbg_msg << ": " << t.elapsed()*1000.0 << "ms ++++++" ); }
@@ -107,7 +107,7 @@ void DAFT::computeImpl(
   prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask );
 
   // put an upper limit on the max. pixel scale
-  float max_px_scale = 4.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
+  float max_px_scale = 2.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
 
   if ( det_params_.max_px_scale_ != det_params_.AUTO )
   {

@@ -92,7 +92,7 @@ inline void gauss3d( cv::Matx33f K,
   }
 
   const int lut_size = 100;
-  const float lut_1 = 35;
+  const float lut_1 = 30;
   float gaussval[lut_size];
 
   for (int i=0; i<lut_size; i++ )
@@ -101,6 +101,9 @@ inline void gauss3d( cv::Matx33f K,
     const float sigma = 0.735534255;
     gaussval[i] = gauss2( sigma, x2 );
   }
+
+  // experimentally determined:
+  base_scale *= 52.0/64.0;
 
   Mat_<Point3f> xyz_map( img.rows, img.cols );
 
@@ -123,7 +126,7 @@ inline void gauss3d( cv::Matx33f K,
         continue;
       }
 
-      float winf = 1.5 * base_scale * f / depth_map(i,j);
+      float winf = 2.0 * base_scale * f / depth_map(i,j);
       const float desired_num_steps = 6;
 
       float lodf = log2( std::sqrt(2.0) * winf / desired_num_steps );
@@ -135,6 +138,13 @@ inline void gauss3d( cv::Matx33f K,
       const int num_steps = round( winf / (float)step_size );
 
       Point3f c = xyz_map(i,j);
+
+      /*
+      if ( i==0 && j== 0 )
+      {
+        std::cout << "lodf = " << lodf << " num_steps = " << num_steps << std::endl;
+      }
+      */
 
       float sum_val0 = 0.0;
       float sum_val1 = 0.0;
@@ -160,7 +170,7 @@ inline void gauss3d( cv::Matx33f K,
           {
             Point3f d = (xyz_map(i2,j2) - c) * (1.0 / base_scale);
             float d2 = ( d.x*d.x+d.y*d.y+d.z*d.z );
-            int idx = std::min( lut_size-1, (int)(d2*lut_1) );
+            int idx = d2*lut_1;//std::min( lut_size-1, (int)(d2*lut_1) );
             float w = (idx >= 0 && idx < lut_size) ? gaussval[idx] : 0.0;
 
             sum_weight0 += w;

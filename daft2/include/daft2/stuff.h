@@ -34,7 +34,7 @@ inline void imshow( std::string win_title, cv::Mat img )
 }
 */
 
-inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
+inline void imshow2( std::string win_title, cv::Mat img, int size = -1 )
 {
   cv::Mat img2;
   if ( size > 0 )
@@ -48,7 +48,7 @@ inline void imshow2( std::string win_title, cv::Mat img, int size = 256 )
   imshow( win_title, img2 );
 }
 
-inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
+inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = -1 )
 {
   double minv,maxv;
   int tmp;
@@ -76,7 +76,6 @@ inline void imshowDxDy( std::string win_title, cv::Mat1f img, int size = 256 )
       dy(i,j) = img(i+1,j)-img(i,j);
     }
   }
-  imshowNorm(win_title,img,size);
   imshowNorm(win_title+" dx",dx,size);
   imshowNorm(win_title+" dy",dy,size);
 }

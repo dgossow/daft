@@ -69,7 +69,7 @@ int main(int argc, char** argv)
   cv::Mat1f depth_map( rows, cols, 1.0f );
 
   // wavelength
-  int lambda = 128;
+  int lambda = 64;
 
   cv::Mat1b img( rows, cols );
   makeSinoid( lambda, img );
@@ -90,6 +90,7 @@ int main(int argc, char** argv)
       cv::Mat1f smoothed_img;
 
       gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, lambda/4.0, smoothed_img );
+      imshowNorm( "smoothed_img", smoothed_img, -1 );
       imshowDxDy( "smoothed_img", smoothed_img, -1 );
 
       /*
@@ -101,10 +102,13 @@ int main(int argc, char** argv)
       */
 
       cv::Mat1f smoothed_img2;
-      gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, lambda/2.0, smoothed_img );
+      gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, depth_map, img, lambda/2.0, smoothed_img2 );
+      imshowNorm( "smoothed_img2", smoothed_img2 );
 
       cv::Mat1f laplace = smoothed_img - smoothed_img2;
-      imshowNorm( "laplace", laplace+0.5, -1 );
+      imshowNorm( "laplace", laplace*0.5+0.5 );
+
+      std::cout << "lambda = " << lambda << " laplace(center)=" << laplace(ci,cj) << std::endl;
     }
     cv::waitKey(100);
   }
