@@ -159,7 +159,7 @@ void DAFT::computeImpl(
       }
       break;
     case DetectorParams::DET_GAUSS3D:
-      gauss3d( K, smoothed_depth_map, gray_image, scale, smoothed_img );
+      gauss3d<float,float,inter::linear<float>,inter::linear<float> >( K, smoothed_depth_map, gray_image, scale, smoothed_img );
       break;
     default:
       DBG_OUT( "error: invalid detector type: " << det_params_.det_type_ );

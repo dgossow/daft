@@ -54,7 +54,31 @@ inline void imshowNorm( std::string win_title, cv::Mat1f img, int size = 256 )
   int tmp;
   cv::minMaxIdx( img, &minv, &maxv, &tmp, &tmp );
   std::cout << win_title << " min=" << minv << " max=" << maxv << std::endl;
-  imshow2( win_title, (img - minv) * (1.0 / (maxv-minv)), size );
+  if ( minv == maxv )
+  {
+    imshow2( win_title, img/maxv, size );
+  }
+  else
+  {
+    imshow2( win_title, (img - minv) * (1.0 / (maxv-minv)), size );
+  }
+}
+
+inline void imshowDxDy( std::string win_title, cv::Mat1f img, int size = 256 )
+{
+  cv::Mat1f dx( img.rows-1, img.cols-1 );
+  cv::Mat1f dy( img.rows-1, img.cols-1 );
+  for ( int i = 0; i < dx.rows; i++ )
+  {
+    for ( int j = 0; j < dx.cols; ++j )
+    {
+      dx(i,j) = img(i,j+1)-img(i,j);
+      dy(i,j) = img(i+1,j)-img(i,j);
+    }
+  }
+  imshowNorm(win_title,img,size);
+  imshowNorm(win_title+" dx",dx,size);
+  imshowNorm(win_title+" dy",dy,size);
 }
 
 
@@ -143,9 +167,11 @@ namespace inter
   template<typename S> inline S linear( S x ){ return x; }
   template<typename S> inline S smooth( S x ) { return 0.5*(1.0-cos(x*M_PI)); }
   template<typename S> inline S nearest( S x ) { return round(x); }
+  template<typename S> inline S zero( S x ) { return 0; }
+  template<typename S> inline S one( S x ) { return 1; }
 }
 
-template<typename S, typename T, S (*F)(S x)>
+template<typename S, typename T, S (*F)(S x), S (*G)(S x)>
 inline T interpMipMap( const std::vector< Mat_<T> >& mipmaps, S x, S y, S lod )
 {
   if ( lod < 0.0 ) lod = 0.0;
@@ -164,7 +190,8 @@ inline T interpMipMap( const std::vector< Mat_<T> >& mipmaps, S x, S y, S lod )
   const S v1 = interp2d<S,T,F >( mipmaps[lod1], x1, y1 );
   const S v2 = interp2d<S,T,F >( mipmaps[lod1+1], x2, y2 );
 
-  return interp< S,T,inter::linear<S> >( v1, v2, lod - (S)lod1 );
+  //return interp< S,T,inter::linear<S> >( v1, v2, std::pow( 2.0, lod - (S)lod1 ) * 0.5 );
+  return interp< S,T,G >( v1, v2, lod - (S)lod1 );
 }
 
 template<typename S, typename T>

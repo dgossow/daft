@@ -454,7 +454,7 @@ void princCurvFilter(
     return;
   }
 
-  float r_thresh = (max_ratio + 1) * (max_ratio + 1) / max_ratio;
+  float r_thresh = (max_ratio + 1.0) * (max_ratio + 1.0) / max_ratio;
   //std::cout << "r_thresh=" << r_thresh << std::endl;
 
   for ( unsigned k=0; k<kp_in.size(); k++ )
