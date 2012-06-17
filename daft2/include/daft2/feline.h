@@ -78,31 +78,63 @@ inline float feline( const Mat1d &ii,
 {
   assert(minor_len <= major_len);
 
-  if ( !checkBounds( ii, x, y, major_len+4 ) )
+  if ( !checkBounds( ii, x, y, major_len+1 ) )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
 
+  //original feline impl:
   float f_probes = 2.0f * (major_len/minor_len) - 1.0;
-  int i_probes = f_probes + 0.5f;
+  int i_probes = f_probes + 0.5;
+  /*
+  if ( i_probes < f_probes )
+  {
+    minor_len = 2.0f*major_len / float(i_probes+1.0);
+  }
+   */
 
-  const float half_axis_len = major_len-minor_len;
+  /*
+  float f_probes = major_len/minor_len;
+  int i_probes = f_probes + 1.0;
+  */
+
+  if ( x==ii.cols/2 && y==ii.cols/2 )
+  {
+    std::cout << "f_probes=" << f_probes << std::endl;
+    std::cout << "i_probes=" << i_probes << std::endl;
+  }
 
   switch( i_probes )
   {
   case 1:
-    return boxMean( ii, x, y, major_len );
+    //return boxMean( ii, x, y, major_len/0.886f );
+    return felineImpl<2>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   case 2:
-    return felineImpl<2>( ii, x, y, major_len, minor_len, major_x, major_y, half_axis_len );
+    return felineImpl<2>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   case 3:
-    return felineImpl<3>( ii, x, y, major_len, minor_len, major_x, major_y, half_axis_len );
+    return felineImpl<3>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   case 4:
-    return felineImpl<4>( ii, x, y, major_len, minor_len, major_x, major_y, half_axis_len );
+    return felineImpl<4>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  case 5:
+    return felineImpl<5>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  case 6:
+    return felineImpl<6>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  case 7:
+    return felineImpl<7>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  case 8:
+    return felineImpl<8>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  case 9:
+    return felineImpl<9>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   default:
-    return felineImpl<5>( ii, x, y, major_len, minor_len, major_x, major_y, half_axis_len );
+  {
+    minor_len = major_len * 4.0 / 21.0;
+    return felineImpl<10>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
+  }
   }
 
   /*
+  const float half_axis_len = major_len-minor_len;
+
   int num_steps = float(half_axis_len / (float)minor_len + 2.0f);
 
   if ( num_steps < 4 ) num_steps = 4;

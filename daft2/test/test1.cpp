@@ -93,12 +93,14 @@ int main(int argc, char** argv)
 
   namedWindow( "smoothed_img" );
 
-  int major = lambda;
+  int major = cols / 8;
   int minor_ratio = 100;
   int angle = 180;
+  int passes = 1;
   createTrackbar("major", "smoothed_img", &major, cols, &chg_cb );
-  createTrackbar("minor", "smoothed_img", &minor_ratio, cols, &chg_cb );
-  createTrackbar("angle", "smoothed_img", &angle, cols, &chg_cb );
+  createTrackbar("minor", "smoothed_img", &minor_ratio, 100, &chg_cb );
+  createTrackbar("angle", "smoothed_img", &angle, 360, &chg_cb );
+  createTrackbar("passes", "smoothed_img", &passes, 5, &chg_cb );
 
   int old_lambda = 0;
   bool use_gauss3d = false;
@@ -111,7 +113,7 @@ int main(int argc, char** argv)
 
       cv::Mat1f smoothed_img;
 
-      float scale = major/4.0;
+      float scale = major;
 
       for ( int i=0; i<img.rows; i++ )
       {
@@ -129,10 +131,12 @@ int main(int argc, char** argv)
       }
       else
       {
-        convolveAffine<feline>(ii, scale_map, affine_map, scale, 1, smoothed_img );
+        convolveAffineMP<feline>(ii, scale_map, affine_map, scale, 1, smoothed_img, passes );
       }
-      imshowNorm( "smoothed_img", smoothed_img, -1 );
-      imshowDxDy( "smoothed_img", smoothed_img, -1 );
+      //imshowNorm( "smoothed_img", smoothed_img, -1 );
+      imshowNorm( "smoothed_img", smoothed_img * minor_ratio*major*major*4.0*0.01 );
+      imshow( "smoothed_img", smoothed_img * minor_ratio*major*major*4.0*0.01 );
+      //imshowDxDy( "smoothed_img", smoothed_img, -1 );
 
       /*
       cv::Mat1f smoothed_img0,smoothed_img1;
@@ -150,7 +154,7 @@ int main(int argc, char** argv)
       }
       else
       {
-        convolveAffine<feline>(ii, scale_map, affine_map, scale*2.0, 1, smoothed_img2 );
+        convolveAffineMP<feline>(ii, scale_map, affine_map, scale*2.0, 1, smoothed_img2, passes );
       }
 
       imshowNorm( "smoothed_img2", smoothed_img2 );

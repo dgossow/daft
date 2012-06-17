@@ -52,12 +52,12 @@ void convolve( const Mat1d &ii,
  * @param img_out       The output image
  */
 template <float (*F)( const Mat1d &ii,
-    int x, int y, float sp,
-    float sw, float major_x, float major_y,
-    float minor_ratio, float min_sp )>
+    int x, int y,
+    float major_len,  float minor_len,
+    float major_x, float major_y )>
 void convolveAffine( const Mat1d &ii,
     const Mat1f& scale_map,
-    const Mat4f& affine_map,
+    const Mat3f& affine_map,
     float base_scale,
     float min_px_scale,
     Mat1f &img_out );
@@ -145,6 +145,30 @@ template <float (*F)( const Mat1d &ii,
     int x, int y,
     float major_len,  float minor_len,
     float major_x, float major_y )>
+void convolveAffineMP( const Mat1d &ii,
+    const Mat1f& scale_map,
+    const Mat3f& affine_map,
+    float base_scale,
+    float min_px_scale,
+    Mat1f &img_out,
+    int num_iterations )
+{
+  convolveAffine<F>( ii, scale_map, affine_map, base_scale, min_px_scale, img_out );
+  imshowNorm("ii",ii);
+  for ( int i=0; i<num_iterations-1; i++)
+  {
+    Mat1d ii2;
+    integral2<float,double>( img_out, ii2, 1.0 );
+    imshowNorm("img_out",img_out);
+    imshowNorm("ii2",ii2);
+    convolveAffine<F>( ii2, scale_map, affine_map, base_scale, min_px_scale, img_out );
+  }
+}
+
+template <float (*F)( const Mat1d &ii,
+    int x, int y,
+    float major_len,  float minor_len,
+    float major_x, float major_y )>
 void convolveAffine( const Mat1d &ii,
     const Mat1f& scale_map,
     const Mat3f& affine_map,
@@ -153,6 +177,11 @@ void convolveAffine( const Mat1d &ii,
     Mat1f &img_out )
 {
   img_out.create( ii.rows-1, ii.cols-1 );
+
+  if ( min_px_scale < 1.0 )
+  {
+    min_px_scale = 1.0;
+  }
 
   static const float nan = std::numeric_limits<float>::quiet_NaN();
 
@@ -167,7 +196,7 @@ void convolveAffine( const Mat1d &ii,
 
       if ( isnan( minor_len ) || minor_len < min_px_scale )
       {
-        img_out(y,x) = nan;
+        img_out(y,x) = 0;//nan;
         continue;
       }
 
