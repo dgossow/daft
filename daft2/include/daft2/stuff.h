@@ -238,11 +238,13 @@ void integral2( const cv::Mat_<T1>& m_in, cv::Mat_<T2>& m_out, T2 factor=1.0 )
         m_out[y][x] = 0;
       } else {
         T2 val = factor * static_cast<T2>(m_in[y - 1][x - 1]);
-        m_out[y][x] = row_sum + m_out[y - 1][x];
+        if ( isnan(val) ) val=0;
         row_sum += val;
+        m_out[y][x] = row_sum + m_out[y - 1][x];
       }
     }
   }
+  imshowNorm("m_out",m_out);
 }
 
 inline void depthIntegral( const cv::Mat1f& depth_map, cv::Mat1d& ii_depth_map, cv::Mat_<uint32_t>& ii_depth_count )

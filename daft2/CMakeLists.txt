@@ -3,9 +3,11 @@ cmake_minimum_required (VERSION 2.4.6)
 include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (ROS_BUILD_TYPE RelWithDebInfo)
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS}" )
 
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -UNDEBUG" )
 #set (ROS_BUILD_TYPE Debug)
+
 
 rosbuild_init ()
 rosbuild_add_boost_directories ()
