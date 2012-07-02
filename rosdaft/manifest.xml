@@ -5,11 +5,8 @@
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
  
-  <depend package="cv_features3d"/>
-  <depend package="eigen"/>
-  
   <export> 
-      <cpp cflags="-I${prefix}/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -ldaft"/>
+      <cpp cflags="-I${prefix}/libdaft/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/libdaft/lib -ldaft"/>
   </export>
     
 </package>
