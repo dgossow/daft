@@ -1,0 +1,17 @@
+<package>
+  <description brief="Depth-Adaptive Feature Transform (DAFT)">
+  </description>
+  <author>David Gossow</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+ 
+  <depend package="cv_features3d"/>
+  <depend package="eigen"/>
+  
+  <export> 
+      <cpp cflags="-I${prefix}/include/" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -ldaft2"/>
+  </export>
+    
+</package>
+
+
