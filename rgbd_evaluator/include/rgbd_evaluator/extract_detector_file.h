@@ -23,7 +23,7 @@
 
 #include <boost/foreach.hpp>
 
-#include <daft2/daft.h>
+#include <daft/daft.h>
 
 #include "rgbd_evaluator/extract_keypoints.h"
 

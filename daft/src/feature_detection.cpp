@@ -14,7 +14,7 @@
 
 namespace cv
 {
-namespace daft2
+namespace daft
 {
 
 void findExtrema( const cv::Mat1f &img,

@@ -18,7 +18,7 @@
   
   <depend package="cv_bridge"/>
   
-  <depend package="daft2" />
+  <depend package="daft" />
   <depend package="eigen" />
 
   <export>

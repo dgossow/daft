@@ -19,7 +19,7 @@
 
 namespace cv
 {
-namespace daft2
+namespace daft
 {
 
 inline float gaussAffineImpl( const Mat1d &ii, int x, int y, int a, float ratio, float angle )

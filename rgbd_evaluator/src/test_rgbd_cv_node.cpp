@@ -16,7 +16,7 @@
 
 #include <boost/timer.hpp>
 
-#include <daft2/daft.h>
+#include <daft/daft.h>
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo > RgbdSyncPolicy;
 
@@ -47,7 +47,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
 
   ROS_INFO_STREAM_ONCE( "f = " << camera_matrix(0,0) << " cx = " << camera_matrix(0,2) << " cy = " << camera_matrix(1,2) );
 
-  cv::daft2::DAFT::DetectorParams p1,p2;
+  cv::daft::DAFT::DetectorParams p1,p2;
   std::vector<cv::KeyPoint3D> keypoints1,keypoints2;
 
   p1.affine_ = true;
@@ -62,7 +62,7 @@ void rgbdImageCb(const sensor_msgs::Image::ConstPtr ros_intensity_image,
   //p2.affine_ = false;
   //p2.pf_type_ = p2.PF_NONE;
 
-  cv::daft2::DAFT rgbd_features1(p1), rgbd_features2(p2);
+  cv::daft::DAFT rgbd_features1(p1), rgbd_features2(p2);
 
   cv::Mat1f desc;
 

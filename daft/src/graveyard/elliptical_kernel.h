@@ -2,8 +2,8 @@
 * Copyright (C) 2011 David Gossow
 */
 
-#ifndef __DAFT2_ELLIPTICAL_KERNEL_H__
-#define __DAFT2_ELLIPTICAL_KERNEL_H__
+#ifndef __DAFT_ELLIPTICAL_KERNEL_H__
+#define __DAFT_ELLIPTICAL_KERNEL_H__
 
 
 #include <opencv2/core/core.hpp>
@@ -14,7 +14,7 @@
 
 namespace cv
 {
-namespace daft2
+namespace daft
 {
 
 /**

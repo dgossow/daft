@@ -1,10 +1,10 @@
 
-#ifndef __DAFT2_KERNEL2D_H__
-#define __DAFT2_KERNEL2D_H__
+#ifndef __DAFT_KERNEL2D_H__
+#define __DAFT_KERNEL2D_H__
 
 namespace cv
 {
-namespace daft2
+namespace daft
 {
 
 inline void showBig( int size, cv::Mat img, std::string name )

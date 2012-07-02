@@ -17,7 +17,7 @@
 #include "gauss3d.h"
 
 using namespace cv;
-using namespace cv::daft2;
+using namespace cv::daft;
 using namespace std;
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl

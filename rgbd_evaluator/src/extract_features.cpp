@@ -500,8 +500,8 @@ void ExtractDetectorFile::extractKeypoints(GetKpFunc getKp, std::string name, fl
 
 void ExtractDetectorFile::extractAllKeypoints()
 {
-  cv::daft2::DAFT::DetectorParams det_p;
-  cv::daft2::DAFT::DescriptorParams desc_p;
+  cv::daft::DAFT::DetectorParams det_p;
+  cv::daft::DAFT::DescriptorParams desc_p;
   //p.max_px_scale_ = 800;
   //det_p.min_px_scale_ = 3.0;
   //det_p.base_scale_ = 0.025;

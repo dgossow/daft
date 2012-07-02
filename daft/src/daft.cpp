@@ -21,7 +21,7 @@
 #include <map>
 
 namespace cv {
-namespace daft2 {
+namespace daft {
 
 boost::timer t;
 std::string dbg_msg;

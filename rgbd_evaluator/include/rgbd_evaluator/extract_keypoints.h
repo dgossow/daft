@@ -12,14 +12,14 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <daft2/daft.h>
+#include <daft/daft.h>
 
 #include "external/sift/Sift.h"
 #include "external/parallelsurf/KeyPointDetector.h"
 #include "external/parallelsurf/KeyPointDescriptor.h"
 #include "external/parallelsurf/Image.h"
 
-#define daft_ns cv::daft2
+#define daft_ns cv::daft
 
 typedef boost::function< void (
     const cv::Mat& gray_img,

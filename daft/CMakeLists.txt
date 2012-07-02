@@ -3,11 +3,9 @@ cmake_minimum_required (VERSION 2.4.6)
 include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 
 set (ROS_BUILD_TYPE RelWithDebInfo)
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS}" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -UNDEBUG" )
 #set (ROS_BUILD_TYPE Debug)
-
 
 rosbuild_init ()
 rosbuild_add_boost_directories ()
@@ -16,7 +14,7 @@ rosbuild_add_boost_directories ()
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
-include_directories (${PROJECT_SOURCE_DIR}/include/daft2/)
+include_directories (${PROJECT_SOURCE_DIR}/include/daft/)
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
@@ -25,15 +23,15 @@ message("-- OpenCV_LIBS = ${OpenCV_LIBS}\n" )
 
 
 # Make shared library
-rosbuild_add_library (daft2
+rosbuild_add_library (daft
 src/daft.cpp
 src/feature_detection.cpp
 src/descriptor.cpp
 src/depth_filter.cpp
 )
-target_link_libraries(daft2 ${OpenCV_LIBS})
+target_link_libraries(daft ${OpenCV_LIBS})
 
 add_executable (test1 
 test/test1.cpp
 )
-target_link_libraries(test1 daft2)
+target_link_libraries(test1 daft)

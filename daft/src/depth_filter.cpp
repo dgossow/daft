@@ -9,7 +9,7 @@
 
 namespace cv
 {
-namespace daft2
+namespace daft
 {
 
 
