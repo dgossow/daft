@@ -7,12 +7,6 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native
 
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include/daft/)
 
-# Find OpenCV
-find_package(OpenCV REQUIRED)
-include_directories (${OpenCV_INCLUDE_DIR})
-message("-- OpenCV_LIBS = ${OpenCV_LIBS}\n" )
-message("-- CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR}\n" )
-
 # Make shared library
 add_library (daft
 src/daft.cpp
