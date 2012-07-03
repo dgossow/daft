@@ -1,5 +1,0 @@
-<launch>
-  <node pkg="rosbag" type="rosbag" name="rosbag" args="play -d 2 $(find image_view)/test.bag"/>
-  <node name="extract" pkg="image_view" type="extract_images" respawn="false" output="screen" cwd="node">
-  </node>
-</launch>

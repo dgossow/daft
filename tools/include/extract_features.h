@@ -5,18 +5,8 @@
  *      Author: praktikum
  */
 
-#ifndef EXTRACT_DETECTOR_FILE_H_
-#define EXTRACT_DETECTOR_FILE_H_
-
-#include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
-#include <rosbag/message_instance.h>
-
-//#include <cv_bridge/cv_bridge.h>
-
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/CameraInfo.h>
+#ifndef EXTRACT_FEATURES_H_
+#define EXTRACT_FEATURES_H_
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -25,7 +15,7 @@
 
 #include <daft/daft.h>
 
-#include "rgbd_evaluator/extract_keypoints.h"
+#include "extract_impl.h"
 
 namespace rgbd_evaluator
 {

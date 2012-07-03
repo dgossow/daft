@@ -5,17 +5,17 @@
  *      Author: praktikum
  */
 
-#include "rgbd_evaluator/extract_detector_file.h"
+#include "extract_features.h"
 
 #include <iostream>
 #include <fstream>
 
 #include <math.h>
 #include <boost/timer.hpp>
+#include <boost/bind.hpp>
 
 #include <stdio.h>
-
-#include <sensor_msgs/image_encodings.h>
+#include <iomanip>
 
 namespace rgbd_evaluator {
 

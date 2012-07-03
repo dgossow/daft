@@ -1,3 +1,0 @@
-{base_scale: 0.03, det_threshold: 0.4, detector_type: 0, image_display: 2, input: 1,
-  num_threads: 4, paint_keypoints: true, pf_threshold: 1.0, postfilter_type: 0, scale_levels: 2,
-  scale_step: 1.8, thick_lines: true}

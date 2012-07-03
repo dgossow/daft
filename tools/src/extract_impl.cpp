@@ -6,7 +6,7 @@
  */
 
 
-#include "rgbd_evaluator/extract_keypoints.h"
+#include "extract_impl.h"
 
 daft_ns::DAFT daft1 = daft_ns::DAFT();
 
