@@ -13,6 +13,14 @@ Implemenation of DAFT algorithm, plus tools.
 
 # Checkout & compile:
 
+
+The following instructions have been tested with Ubuntu 11.10
+and OpenCV 2.3.
+
+You can install OpenCV like this:
+
+    sudo apt-get install libopencv2.3
+
 For an out-of-source build, do:
 
     git clone https://github.com/dgossow/daft.git
