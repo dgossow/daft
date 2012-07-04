@@ -11,3 +11,37 @@ Implemenation of DAFT algorithm, plus tools.
 *  **test_images:** printable images for debugging purposes
 *  **tools:**       command-line tools for feature extraction
 
+# Checkout & compile:
+
+For an out-of-source build, do:
+
+    git clone https://github.com/dgossow/daft.git
+    mkdir daft_build
+    cd daft_build
+    cmake ../daft
+    make
+    
+This will create the static library *libdaft/libdaft.a*.
+You will need to link against it and also have 
+your include paths set up.
+
+Extract DAFT features from an image like so:
+
+    #include <daft/daft.h>
+    
+    // ...
+
+    cv::Mat gray_img;
+    cv::Mat mask_img;
+    cv::Mat depth_img;
+    cv::Matx33f K;
+    
+    // load data ..
+    
+    std::vector<cv::KeyPoint3D> keypoints;
+    cv::Mat descriptors;
+    
+    cv::daft::DAFT daft;
+    daft( gray_img, mask_img, depth_img, K, keypoints, descriptors );
+  
+
