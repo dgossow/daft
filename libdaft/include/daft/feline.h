@@ -16,6 +16,7 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include "stuff.h"
+#include "interpolation.h"
 
 namespace cv
 {
@@ -25,7 +26,7 @@ namespace daft
 /* Compute box mean with sub-integer scale interpolation */
 inline float boxMean( const Mat1d &ii, int x, int y, float s )
 {
-  // make the box which cover the same area as a circle withradius s
+  // make the box cover the same area as a circle with radius s
   s *= 0.886f;
   if ( s < 1 ) s=1;
   const int si = int(s);
@@ -36,7 +37,7 @@ inline float boxMean( const Mat1d &ii, int x, int y, float s )
   }
   const float v1 = integrate ( ii, x - si,  y - si, x + si, y + si ) / float(4*si*si);
   const float v2 = integrate ( ii, x - si1,  y - si1, x + si1, y + si1 ) / float(4*si1*si1);
-  return interpolateLinear<float,float>(s - float(si), v1, v2);
+  return interp< float, float, inter::linear<float> >(s - float(si), v1, v2);
 }
 
 
@@ -52,7 +53,7 @@ inline float felineImpl( const Mat1d &ii, int x, int y,
   float val = 0;
   float area = 0;
 
-  static const float t_norm = 2.0 / (NumSteps-1);
+  const float t_norm = 2.0 / (NumSteps-1);
 
   for ( int step=0; step<NumSteps; step++ )
   {
@@ -78,7 +79,7 @@ inline float feline( const Mat1d &ii,
 {
   assert(minor_len <= major_len);
 
-  if ( !checkBounds( ii, x, y, major_len+1 ) )
+  if ( !checkBounds( ii, x, y, major_len+20 ) )
   {
     return std::numeric_limits<float>::quiet_NaN();
   }
@@ -86,23 +87,6 @@ inline float feline( const Mat1d &ii,
   //original feline impl:
   float f_probes = 2.0f * (major_len/minor_len) - 1.0;
   int i_probes = f_probes + 0.5;
-  /*
-  if ( i_probes < f_probes )
-  {
-    minor_len = 2.0f*major_len / float(i_probes+1.0);
-  }
-   */
-
-  /*
-  float f_probes = major_len/minor_len;
-  int i_probes = f_probes + 1.0;
-  */
-
-  if ( x==ii.cols/2 && y==ii.cols/2 )
-  {
-    std::cout << "f_probes=" << f_probes << std::endl;
-    std::cout << "i_probes=" << i_probes << std::endl;
-  }
 
   switch( i_probes )
   {
@@ -127,52 +111,11 @@ inline float feline( const Mat1d &ii,
     return felineImpl<9>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   default:
   {
+	// limit number of probes to 10:
     minor_len = major_len * 4.0 / 21.0;
     return felineImpl<10>( ii, x, y, major_len, minor_len, major_x, major_y, major_len-minor_len );
   }
   }
-
-  /*
-  const float half_axis_len = major_len-minor_len;
-
-  int num_steps = float(half_axis_len / (float)minor_len + 2.0f);
-
-  if ( num_steps < 4 ) num_steps = 4;
-
-  assert( num_steps >= 2 );
-
-  //return float(num_steps) * 0.25;
-
-  float start_x = major_x * half_axis_len;
-  float start_y = major_y * half_axis_len;
-
-  float val = 0;
-
-  if ( num_steps == 2 )
-  {
-    for ( int step=0; step<2; step++ )
-    {
-      float t = float(step) * 2.0 - 1.0;
-      float x1 = (float)x - t*start_x;
-      float y1 = (float)y - t*start_y;
-      val += integrateBilinear( ii, x1-minor_len, y1-minor_len, x1+minor_len, y1+minor_len );
-    }
-    val /= float( 8*minor_len*minor_len );
-    return val;
-  }
-  else
-  {
-    for ( int step=0; step<num_steps; step++ )
-    {
-      float t = float(step)/float(num_steps-1) * 2.0 - 1.0;
-      float x1 = (float)x - t*start_x + 0.5;
-      float y1 = (float)y - t*start_y + 0.5;
-      val += integrateBilinear( ii, x1-minor_len, y1-minor_len, x1+minor_len, y1+minor_len );
-    }
-    val /= float( num_steps * 4*minor_len*minor_len );
-    return val;
-  }
-  */
 }
 
 

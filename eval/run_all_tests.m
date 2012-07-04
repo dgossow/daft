@@ -1,6 +1,6 @@
 
 detectors = {'DAFT';'SIFT'};
-detectors = {'DAFT';'DAFT Gauss3D'};
+detectors = {'DAFT'};
 %detectors = {'DAFT';'DAFT Non-Affine'};
 is_affine = {1,1,1,1,0};
 
@@ -20,7 +20,7 @@ bagpath = '/work/gossow/bags/';
 
 %{'poster/vprotate35','poster/vprotate45','poster/vprotate55'}
 
-complete_evaluation( bagpath, 'eval/test', {'poster/camrotate60'}, detectors, is_affine, 'camera rotation' );
+complete_evaluation( bagpath, 'eval/test', {'poster/vprotate55'}, detectors, is_affine, 'rotation' );
 return;
 
 complete_evaluation( bagpath, 'eval/vprotation', {'poster/vprotate35','poster/vprotate40','poster/vprotate45','poster/vprotate55'}, detectors, is_affine, 'rotation' );

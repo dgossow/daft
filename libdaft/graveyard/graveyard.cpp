@@ -18,6 +18,56 @@
 //       \              \\|           |//                   \____\____\
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+
+inline float integrateBilinear( const Mat1d &ii, float start_x, float start_y, float end_x, float end_y )
+{
+  assert( start_x>=0 );
+  assert( end_x>start_x );
+  assert( end_x<ii.cols );
+  assert( start_y>=0 );
+  assert( end_y>start_y );
+  assert( end_y<ii.rows );
+  return
+      ( ii(start_y+0.5,start_x+0.5) + ii(end_y+0.5,end_x+0.5) - ii(end_y+0.5,start_x+0.5) - ii(start_y+0.5,end_x+0.5) )
+      / double( (int(end_y+0.5)-int(start_y+0.5) ) * (int(end_x+0.5)-int(start_x+0.5) ) );
+
+  /*
+  const double v1 = interpBilinear(ii,start_x,start_y);
+  const T v2 = interpBilinear(ii,end_x,end_y);
+  const T v3 = - interpBilinear(ii,start_x,end_y);
+  const T v4 = - interpBilinear(ii,end_x,start_y);
+  return v1+v2+v3+v4;
+  */
+}
+
+/** Gets integration value of NxN cells of size step x step in a grid starting with point (start_x,start_y)*/
+template<typename T, int N>
+inline void integrateGridCentered( const Mat_<T> &ii, int start_x, int start_y, int step, float* values) {
+//  for(int i=0; i<N; i++) {
+//    for(int j=0; j<N; j++) {
+//      int x = start_x + step*(j-M);
+//      int y = start_y + step*(i-M);
+//      values[i*N + j] = integrate(ii, x, x + step, y, y + step);
+//    }
+//  }
+  // look up values in integral image
+  float lookup[N+1][N+1];
+  for(int i=0; i<N+1; i++) {
+    for(int j=0; j<N+1; j++) {
+      int x = start_x + step*j - (step*N)/2;
+      int y = start_y + step*i - (step*N)/2;
+      lookup[i][j] = ii(y, x);
+    }
+  }
+  // compute cell integrals
+  for(int i=0; i<N; i++) {
+    for(int j=0; j<N; j++) {
+      values[i*N + j] = lookup[i][j] + lookup[i+1][j+1] - lookup[i+1][j] - lookup[i][j+1];
+    }
+  }
+}
+
+
 template <float (*F)(const Mat1d&, int, int, int)>
 inline float interpolateKernel( const Mat1d &ii,
     int x, int y, float s )

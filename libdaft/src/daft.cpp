@@ -10,11 +10,10 @@
 #include "descriptor.h"
 #include "preprocessing.h"
 #include "gauss3d.h"
+#include "dbg.h"
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
-#include <boost/timer.hpp>
 
 #include <cmath>
 #include <set>
@@ -23,21 +22,14 @@
 namespace cv {
 namespace daft {
 
-boost::timer t;
-std::string dbg_msg;
-
-//DEBUG FLAGS (To be removed) ----
+//-- DEBUG FLAGS --------
 //
 //#define SHOW_DEBUG_WIN
 //#define FIND_MAXKP
 //#define SHOW_MASK
 //#define SHOW_PYR
 //#define SHOW_RESPONSE
-
-#define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
-#define TIMER_STOP if(dbg_msg.length()!=0) { DBG_OUT( "++++++ " << dbg_msg << ": " << t.elapsed()*1000.0 << "ms ++++++" ); }
-#define TIMER_START( MSG ) TIMER_STOP dbg_msg=MSG; t.restart();
-
+//-----------------------
 
 DAFT::DAFT(const DetectorParams & detector_params, const DescriptorParams & descriptor_params ) :
     det_params_(detector_params), desc_params_(descriptor_params)

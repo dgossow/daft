@@ -22,6 +22,25 @@ using namespace std;
 
 #define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 
+template<typename S, typename T, S (*F)(S x)>
+void resize( const Mat_<T>& img, Mat_<T>& img_out, int rows, int cols )
+{
+  double pow2l = (double)(rows) / (double)(img.rows);
+  float o1 = (1.0-pow2l) / (2.0*pow2l);
+  double pow2l_inv = 1.0 / pow2l;
+
+  img_out = Mat_<T>( rows, cols );
+  for ( int i=0; i<rows; i++ )
+  {
+    for ( int j=0; j<cols; j++ )
+    {
+      double i1 = (double)i * pow2l_inv + o1;
+      double j1 = (double)j * pow2l_inv + o1;
+      img_out( i,j ) = interp2d<S,T,F>( img, i1, j1 );
+    }
+  }
+}
+
 
 
 void makeSinoid( double lambda, cv::Mat1b sin_img )

@@ -5,6 +5,8 @@
 
 #include "descriptor.h"
 
+#include "dbg.h"
+
 namespace cv
 {
 namespace daft
@@ -448,7 +450,7 @@ inline void getGradPatch( int patch_size, float thickness, Mat1f& smoothed_img, 
 
       if ( checkBounds( smoothed_img, pixel.x, pixel.y, 1 ) )
       {
-        patch[v][u] = interpBilinear(smoothed_img,pixel.x,pixel.y);
+        patch[v][u] = interp2d< float,float,inter::linear<float> >(smoothed_img,pixel.x,pixel.y);
 
         if ( show_win && !isnan( patch[v][u] ) )
         {

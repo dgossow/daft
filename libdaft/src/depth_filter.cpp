@@ -98,6 +98,27 @@ void computeAffineMap(
   }
 }
 
+
+inline float meanDepth(const Mat1d &ii_depth_map,
+    const cv::Mat_<uint32_t>& ii_depth_count,
+    int x, int y, int sp_int )
+{
+  int x_left = x-sp_int;
+  int x_right = x+sp_int;
+  int y_top = y-sp_int;
+  int y_bottom = y+sp_int;
+  if ( x_left < 0 ) x_left = 0;
+  if ( y_top < 0 ) y_top = 0;
+  if ( x_right >= ii_depth_map.cols ) x_right = ii_depth_map.cols-1;
+  if ( y_bottom >= ii_depth_map.rows ) y_bottom = ii_depth_map.rows-1;
+  float nump = float(integrate( ii_depth_count, x_left, y_top, x_right, y_bottom ));
+  if ( nump == 0 )
+  {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+  return integrate( ii_depth_map, x_left, y_top, x_right, y_bottom ) / nump;
+}
+
 void smoothDepth( const Mat1f &scale_map,
     const Mat1d &ii_depth_map,
     const Mat_<uint32_t>& ii_depth_count,
