@@ -1,0 +1,12 @@
+<stack>
+  <name>daft</name>
+  <version>0.1</version>
+  <description>DAFT (Depth Adaptive Feature Transform) - Texture feature for RGBD images</description>
+  <author email="dgossow@willowgarage.com">David Gossow</author>
+  <maintainer email="dgossow@willowgarage.com">David Gossow</maintainer>
+  <license>BSD</license>
+  <copyright>David Gossow</copyright>
+
+  <build_depends>opencv2</build_depends>
+  <depends>opencv2</depends>
+</stack>
