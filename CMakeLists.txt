@@ -9,7 +9,6 @@ find_package(OpenCV REQUIRED)
 include_directories (${OpenCV_INCLUDE_DIR})
 
 add_subdirectory( opencv_ext )
-
 add_subdirectory( libdaft )
 add_subdirectory( tools )
 

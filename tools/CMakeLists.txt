@@ -10,7 +10,7 @@ include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include/)
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/)
 
 # Main app
-add_executable (extract_features 
+add_executable (extract_daft_features 
 src/extract_features.cpp
 src/extract_impl.cpp
 external/sift/Sift.cpp
@@ -19,5 +19,5 @@ external/parallelsurf/KeyPointDescriptor.cpp
 external/parallelsurf/KeyPointDetector.cpp
 external/parallelsurf/MathStuff.cpp  
 )
-target_link_libraries(extract_features ${OpenCV_LIBS} daft)
+target_link_libraries(extract_daft_features ${OpenCV_LIBS} daft)
 
