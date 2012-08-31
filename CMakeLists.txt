@@ -9,19 +9,25 @@ if(catkin_FOUND)
 	message(STATUS "Found catkin.")
 	catkin_stack()
 	catkin_project(daft
-	              DEPENDS Eigen Boost OpenCV
-	              INCLUDE_DIRS opencv_features3d/include/ libdaft/include/
-	              LIBRARIES daft_library
+		DEPENDS Eigen Boost OpenCV
+		INCLUDE_DIRS include/
+		LIBRARIES daft
 	)
+else(catkin_FOUND)
+	# if we're not in a catkin environment, we can do what we want:
+	set( CMAKE_BUILD_TYPE RelWithDebInfo)
 endif(catkin_FOUND)
 
-include_directories (${CMAKE_CURRENT_SOURCE_DIR}/opencv_features3d/include/)
-include_directories (${CMAKE_CURRENT_SOURCE_DIR}/libdaft/include/)
+# Setup compiler optimizations etc.
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
 
 find_package(OpenCV REQUIRED)
 include_directories (${OpenCV_INCLUDE_DIR})
 
-add_subdirectory( opencv_features3d )
-add_subdirectory( libdaft )
-add_subdirectory( tools )
+# make sure all projects find the headers 
+include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include/)
+include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include/daft/)
 
+add_subdirectory( src/tools )
+add_subdirectory( src/daft )
+add_subdirectory( test )

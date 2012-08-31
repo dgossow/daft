@@ -13,10 +13,9 @@
 
 #include <fstream>
 
-#include <opencv2/features3d/features3d.hpp>
-
 #include "stuff.h"
 #include "dbg.h"
+#include "keypoint3d.hpp"
 
 namespace cv
 {

@@ -7,7 +7,7 @@
 #define __DAFT_DAFT_H__
 
 #include <opencv2/features2d/features2d.hpp>
-#include <opencv2/features3d/features3d.hpp>
+#include "keypoint3d.hpp"
 
 #include <set>
 
