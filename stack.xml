@@ -1,3 +1,4 @@
+<!-- This file is required if your are using catkin (https://github.com/ros/catkin) as a build system. -->
 <stack>
   <name>daft</name>
   <version>0.1</version>

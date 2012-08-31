@@ -14,7 +14,7 @@ src/feature_detection.cpp
 src/descriptor.cpp
 src/depth_filter.cpp
 )
-target_link_libraries(daft ${OpenCV_LIBS} opencv_ext)
+target_link_libraries(daft ${OpenCV_LIBS} opencv_features3d)
 
 add_executable (test1 
 test/test1.cpp
