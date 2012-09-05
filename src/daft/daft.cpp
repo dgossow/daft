@@ -43,16 +43,14 @@ DAFT::~DAFT()
 void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp, cv::Mat1f& desc )
 {
-  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)255 );
-  computeImpl(image,mask,depth_map_orig,K,kp,desc,true);
+  computeImpl(image,cv::Mat1b(),depth_map_orig,K,kp,desc,true);
 }
 
 void DAFT::operator()( const cv::Mat &image, const cv::Mat &depth_map_orig,
     cv::Matx33f K, std::vector<KeyPoint3D> & kp )
 {
-  cv::Mat1b mask( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)255 );
   cv::Mat1f desc;
-  computeImpl(image,mask,depth_map_orig,K,kp,desc,false);
+  computeImpl(image,cv::Mat1b(),depth_map_orig,K,kp,desc,false);
 }
 
 void DAFT::operator()( const cv::Mat &image, const cv::Mat1b &mask,
@@ -94,9 +92,14 @@ void DAFT::computeImpl(
   Mat gray_image;
   Mat1d ii;
   Mat1f depth_map;
-  cv::Mat1b mask = mask_orig.clone();
 
-  prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask );
+  cv::Mat1b mask = mask_orig;
+
+  if ( !prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask ) )
+  {
+    std::cout << "Invalid Depth format!" << std::endl;
+    return;
+  }
 
   // put an upper limit on the max. pixel scale
   float max_px_scale = 2.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
@@ -500,6 +503,15 @@ void DAFT::getOctaves( const Mat1f &scale_map, float max_px_scale, std::set<int>
 bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
     Mat& gray_image, Mat1d& ii, cv::Mat1f& depth_map, cv::Mat1b& mask )
 {
+  if ( mask.empty() )
+  {
+    mask = cv::Mat1b( (int)image.rows, (int)image.cols, (cv::Mat1b::value_type)255 );
+  }
+  else
+  {
+    mask = mask.clone();
+  }
+
   gray_image = image;
 
   // Convert RGB to Grey image
@@ -533,15 +545,19 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
     break;
   }
 
-  // Convert depth map to floating point
-  if (depth_map_orig.type() == CV_16U) {
-    depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
-  } else if (depth_map_orig.type() == CV_32F) {
-    depth_map= depth_map_orig;
+  // if original depth map is floating point, copy.
+  // otherwise, interpret as millimeters and convert to meters.
+  if (depth_map_orig.type() == CV_32F )
+  {
+    depth_map=depth_map_orig;
+  }
+  else if (depth_map_orig.type() == CV_64F )
+  {
+    depth_map_orig.convertTo(depth_map, CV_32F, 1.0, 0.0);
   }
   else
   {
-    return false;
+    depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
   }
 
 #ifdef SHOW_MASK
