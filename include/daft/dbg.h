@@ -18,7 +18,8 @@
 static boost::timer t;
 static std::string dbg_msg;
 
-#define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
+#define DBG_OUT( SEQ )
+//#define DBG_OUT( SEQ ) std::cout << SEQ << std::endl
 #define TIMER_STOP if(dbg_msg.length()!=0) { DBG_OUT( "++++++ " << dbg_msg << ": " << t.elapsed()*1000.0 << "ms ++++++" ); }
 #define TIMER_START( MSG ) TIMER_STOP dbg_msg=MSG; t.restart();
 

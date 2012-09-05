@@ -15,7 +15,7 @@
 
 #include "stuff.h"
 #include "dbg.h"
-#include "keypoint3d.hpp"
+#include "keypoint3d.h"
 
 namespace cv
 {

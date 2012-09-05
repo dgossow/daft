@@ -3,7 +3,7 @@
  * Copyright (C) 2011 David Gossow
 */
 
-#include "keypoint3d.hpp"
+#include "keypoint3d.h"
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
