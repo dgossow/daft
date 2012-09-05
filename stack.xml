@@ -2,7 +2,7 @@
 <stack>
   <name>daft</name>
   <version>0.1</version>
-  <description>DAFT (Depth Adaptive Feature Transform) - Texture feature for RGBD images</description>
+  <description>DAFT (Depth Adaptive Feature Transform) - Texture features for RGBD images</description>
   <author email="dgossow@willowgarage.com">David Gossow</author>
   <maintainer email="dgossow@willowgarage.com">David Gossow</maintainer>
   <license>BSD</license>

@@ -101,6 +101,10 @@ void DAFT::computeImpl(
     return;
   }
 
+#ifdef SHOW_MASK
+  imshow( "mask", mask*255 );
+#endif
+
   // put an upper limit on the max. pixel scale
   float max_px_scale = 2.0 * std::min(image.rows, image.cols) / desc_params_.patch_size_ / pow(2.0,desc_params_.octave_offset_);
 
@@ -560,10 +564,6 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
     depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
   }
 
-#ifdef SHOW_MASK
-  imshow( "mask", mask*255 );
-#endif
-
   for ( int y=0; y<depth_map.rows; y++ )
   {
     for ( int x=0; x<depth_map.cols; x++ )
@@ -574,10 +574,6 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
       }
     }
   }
-
-#ifdef SHOW_MASK
-  imshow( "mask new", mask*255 );
-#endif
 
 #ifdef SHOW_DEBUG_WIN
   imshow( "depth_map", depth_map );

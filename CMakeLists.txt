@@ -2,7 +2,9 @@ cmake_minimum_required (VERSION 2.4.6)
 
 project(daft)
 
-# 
+# make daft findable in other catkin projects
+find_package(catkin)
+
 if(catkin_FOUND)
 	message(STATUS "Found catkin.")
 	catkin_stack()
@@ -15,9 +17,6 @@ else(catkin_FOUND)
 	set( CMAKE_BUILD_TYPE RelWithDebInfo)
 endif(catkin_FOUND)
 
-
-# make daft findable in other catkin projects
-find_package(catkin)
 
 # Setup compiler optimizations etc.
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -O3  -march=native ${SSE_FLAGS} -DNDEBUG" )
@@ -32,4 +31,3 @@ include_directories (${CMAKE_CURRENT_SOURCE_DIR}/include/daft/)
 add_subdirectory( src/daft )
 add_subdirectory( src/tools )
 add_subdirectory( test )
-
