@@ -7,12 +7,18 @@ find_package(catkin)
 
 if(catkin_FOUND)
 	message(STATUS "Found catkin.")
-	catkin_stack()
-	catkin_project(daft
-		DEPENDS Eigen Boost OpenCV
-		INCLUDE_DIRS include/
-		LIBRARIES daft
-	)
+	if (${catkin_VERSION} VERSION_GREATER "0.5.26")
+		catkin_package()
+		catkin_package_export(INCLUDE_DIRS include/
+		                LIBRARIES daft
+		)
+	else()
+		catkin_stack()
+		catkin_project(daft
+			INCLUDE_DIRS include/
+			LIBRARIES daft
+		)
+	endif()
 else(catkin_FOUND)
 	set( CMAKE_BUILD_TYPE RelWithDebInfo)
 endif(catkin_FOUND)
