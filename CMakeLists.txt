@@ -7,10 +7,9 @@ find_package(catkin)
 
 if(catkin_FOUND)
 	message(STATUS "Found catkin.")
-	if (${catkin_VERSION} VERSION_GREATER "0.5.26")
-		catkin_package()
-		catkin_package_export(INCLUDE_DIRS include/
-		                LIBRARIES daft
+	if (${catkin_VERSION} VERSION_GREATER "0.5.28")
+		catkin_package(INCLUDE_DIRS include/
+		               LIBRARIES daft
 		)
 	else()
 		catkin_stack()
