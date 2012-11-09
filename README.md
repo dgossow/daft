@@ -1,7 +1,8 @@
-daft
+DAFT
 ====
 
-Implemenation of DAFT algorithm, plus tools.
+Implemenation of DAFT (Depth-Adaptive Feature Transform) algorithm, plus tools. 
+For more information, see https://ias.in.tum.de/people/gossow/rgbd.
 
 # Directory structure:
 
