@@ -6,7 +6,7 @@ For more information, see https://ias.in.tum.de/people/gossow/rgbd.
 
 # Directory structure:
 
-*  **eval:**    Matlab evaluation framework
+*  **eval:**    Matlab evaluation framework (modified version of [1])
 *  **libdaft:** DAFT implementation
 *  **opencv_ext:** OpenCV addons (contains Keypoint3D class)
 *  **test_images:** printable images for debugging purposes
@@ -54,3 +54,4 @@ Extract DAFT features from an image like so:
     daft( gray_img, mask_img, depth_img, K, keypoints, descriptors );
   
 
+[1] http://www.robots.ox.ac.uk/~vgg/research/affine/evaluation.html
