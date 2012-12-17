@@ -1,7 +1,7 @@
 <!-- This file is required if your are using catkin (https://github.com/ros/catkin) as a build system. -->
 <package>
   <name>daft</name>
-  <version>0.1</version>
+  <version>0.1.0</version>
   <description>DAFT (Depth Adaptive Feature Transform) - Texture features for RGBD images</description>
   <author email="dgossow@willowgarage.com">David Gossow</author>
   <maintainer email="dgossow@willowgarage.com">David Gossow</maintainer>
