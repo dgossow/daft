@@ -6,8 +6,8 @@
   <author email="dgossow@willowgarage.com">David Gossow</author>
   <maintainer email="dgossow@willowgarage.com">David Gossow</maintainer>
   <license>BSD</license>
-  <copyright>David Gossow</copyright>
 
   <build_depend>opencv2</build_depend>
   <run_depend>opencv2</run_depend>
+  <buildtool_depend>catkin</buildtool_depend>
 </package>
