@@ -571,6 +571,7 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
       if ( isnan(depth_map(y,x)) || depth_map(y,x) == 0.0 )
       {
         mask(y,x) = 0;
+        depth_map(y,x) = std::numeric_limits<float>::quiet_NaN();
       }
     }
   }
