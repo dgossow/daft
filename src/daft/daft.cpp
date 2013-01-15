@@ -97,7 +97,6 @@ void DAFT::computeImpl(
 
   if ( !prepareData( image, depth_map_orig, gray_image, ii, depth_map, mask ) )
   {
-    std::cout << "Invalid Depth format!" << std::endl;
     return;
   }
 
@@ -513,7 +512,14 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
   else
   {
-    mask = mask.clone();
+	if ( mask.type() != CV_8U )
+	{
+      std::cout << "Invalid input format! Mask must have 8U type." << std::endl;
+      return false;
+	} else
+	{
+      mask = mask.clone();
+	}
   }
 
   gray_image = image;
@@ -545,23 +551,38 @@ bool DAFT::prepareData(const cv::Mat &image, const cv::Mat &depth_map_orig,
   }
   break;
   default:
+    std::cout << "Invalid input format! Image must have 8UC3, 8U, 64F or 32F type." << std::endl;
     return false;
     break;
   }
 
-  // if original depth map is floating point, copy.
-  // otherwise, interpret as millimeters and convert to meters.
-  if (depth_map_orig.type() == CV_32F )
+  // copy / convert depth image
+  switch (depth_map_orig.type())
   {
-    depth_map=depth_map_orig;
-  }
-  else if (depth_map_orig.type() == CV_64F )
+  case CV_64F:
   {
     depth_map_orig.convertTo(depth_map, CV_32F, 1.0, 0.0);
   }
-  else
+  break;
+  case CV_32F:
   {
+    depth_map=depth_map_orig;
+  }
+  break;
+  case CV_8U:
+  case CV_16U:
+  case CV_8S:
+  case CV_16S:
+  case CV_32S:
+  {
+    // interpret as millimeters and convert to meters.
     depth_map_orig.convertTo(depth_map, CV_32F, 0.001, 0.0);
+  }
+  break;
+  default:
+    std::cout << "Invalid input format! Depth must be single-channel." << std::endl;
+    return false;
+    break;
   }
 
   for ( int y=0; y<depth_map.rows; y++ )
